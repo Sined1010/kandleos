@@ -1,7 +1,7 @@
 import { Plus, X } from 'lucide-react'
-import { useState } from 'react'
-import { isCrypto, SYMBOL_RE } from '../../../shared/types'
+import { isCrypto } from '../../../shared/types'
 import { useQuotes, useStore } from '../store/useStore'
+import SymbolSearch from './SymbolSearch'
 
 export const formatPrice = (p: number): string =>
   p.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: p < 1 ? 6 : p < 10 ? 4 : 2 })
@@ -13,15 +13,6 @@ export default function Watchlist() {
   const add = useStore((s) => s.addToWatchlist)
   const remove = useStore((s) => s.removeFromWatchlist)
   const quotes = useQuotes((s) => s.quotes)
-  const [input, setInput] = useState('')
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const s = input.trim().toUpperCase()
-    if (!SYMBOL_RE.test(s)) return
-    add(s)
-    setInput('')
-  }
 
   const groups: [string, string[]][] = [
     ['Krypto', watchlist.filter(isCrypto)],
@@ -30,19 +21,17 @@ export default function Watchlist() {
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
-      <form onSubmit={submit} className="flex gap-1 border-b border-line p-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Symbol hinzufügen (z. B. XRPUSDT, AMZN)"
-          aria-label="Symbol hinzufügen"
-          spellCheck={false}
-          className="min-w-0 flex-1 rounded bg-bg px-2 py-1 text-xs uppercase outline-none ring-1 ring-line placeholder:normal-case placeholder:text-muted/60 focus:ring-accent"
-        />
-        <button type="submit" className="rounded px-1.5 text-muted hover:bg-line hover:text-white" aria-label="Hinzufügen">
-          <Plus size={16} />
-        </button>
-      </form>
+      <div className="flex items-center gap-1.5 border-b border-line p-2">
+        <Plus size={15} className="shrink-0 text-muted" />
+        <div className="min-w-0 flex-1">
+          <SymbolSearch
+            onPick={add}
+            alignRight
+            placeholder="Hinzufügen: Name oder Symbol"
+            inputClassName="w-full rounded bg-bg px-2 py-1 text-xs uppercase outline-none ring-1 ring-line placeholder:normal-case placeholder:text-muted/60 focus:ring-accent"
+          />
+        </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {groups.map(([title, symbols]) => (

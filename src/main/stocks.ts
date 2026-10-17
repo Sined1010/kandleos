@@ -1,5 +1,13 @@
 import { aggregate } from '../shared/candles'
-import { SYMBOL_RE, TF_SECONDS, type Candle, type Quote, type Timeframe } from '../shared/types'
+import {
+  isCrypto,
+  SYMBOL_RE,
+  TF_SECONDS,
+  type Candle,
+  type Quote,
+  type SearchResult,
+  type Timeframe
+} from '../shared/types'
 
 const YAHOO: Record<Timeframe, [interval: string, range: string]> = {
   '1m': ['1m', '5d'],
@@ -23,8 +31,24 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
 async function getJson(url: string): Promise<any> {
   // Yahoo rejects requests without a browser-like user agent.
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) })
+  if (res.status === 404) throw new Error(`Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben`)
   if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`)
   return res.json()
+}
+
+export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
+  if (typeof query !== 'string' || !query.trim() || query.length > 40) return []
+  const d = await getJson(
+    `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&quotesCount=10&newsCount=0&listsCount=0`
+  )
+  return (d.quotes ?? []).flatMap((q: any): SearchResult[] => {
+    if (typeof q.symbol !== 'string') return []
+    const crypto = q.quoteType === 'CRYPTOCURRENCY'
+    // Crypto charts come from Binance, so Yahoo's BTC-USD becomes the BTCUSDT pair.
+    const symbol = crypto ? q.symbol.replace(/-USD$/, 'USDT') : q.symbol
+    if (!SYMBOL_RE.test(symbol) || crypto !== isCrypto(symbol)) return []
+    return [{ symbol, name: String(q.shortname ?? q.longname ?? '').trim(), exchange: crypto ? 'Binance' : (q.exchDisp ?? '') }]
+  })
 }
 
 function checkArgs(symbol: unknown, key: unknown): [string, string] {

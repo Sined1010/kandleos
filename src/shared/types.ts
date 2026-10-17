@@ -28,6 +28,12 @@ export interface Quote {
   prevClose?: number
 }
 
+export interface SearchResult {
+  symbol: string
+  name: string
+  exchange: string
+}
+
 export const SYMBOL_RE = /^[A-Z0-9.\-^=]{1,20}$/
 
 // shortcut: market is guessed from the quote-currency suffix; add an explicit market field if exotic tickers collide.

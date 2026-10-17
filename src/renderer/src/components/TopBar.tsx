@@ -1,48 +1,30 @@
 import { Activity, Search, Settings } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { isCrypto, SYMBOL_RE, TIMEFRAMES } from '../../../shared/types'
+import { useState } from 'react'
+import { isCrypto, TIMEFRAMES } from '../../../shared/types'
 import { useStore, type Indicators } from '../store/useStore'
+import SymbolSearch from './SymbolSearch'
 
 export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
-  const watchlist = useStore((s) => s.watchlist)
   const setSymbol = useStore((s) => s.setSymbol)
   const setTimeframe = useStore((s) => s.setTimeframe)
-  const [query, setQuery] = useState(symbol)
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => setQuery(symbol), [symbol])
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const s = query.trim().toUpperCase()
-    if (SYMBOL_RE.test(s)) setSymbol(s)
-    else setQuery(symbol)
-  }
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel px-3">
       <span className="font-semibold tracking-wide text-white">KandleOS</span>
 
-      <form onSubmit={submit} className="flex items-center gap-2 rounded bg-bg px-2 py-1 ring-1 ring-line focus-within:ring-accent">
+      <div className="flex items-center gap-2 rounded bg-bg px-2 py-1 ring-1 ring-line focus-within:ring-accent">
         <Search size={14} className="text-muted" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={(e) => e.target.select()}
-          list="symbols"
-          spellCheck={false}
-          aria-label="Symbol"
-          className="w-28 bg-transparent font-medium uppercase text-white outline-none"
+        <SymbolSearch
+          value={symbol}
+          onPick={setSymbol}
+          placeholder="Symbol oder Name suchen"
+          inputClassName="w-44 bg-transparent font-medium uppercase text-white outline-none placeholder:normal-case placeholder:font-normal placeholder:text-muted/60"
         />
-        <datalist id="symbols">
-          {watchlist.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
         <span className="rounded bg-line px-1.5 text-[10px] uppercase text-muted">{isCrypto(symbol) ? 'Krypto' : 'Aktie'}</span>
-      </form>
+      </div>
 
       <div className="flex rounded bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
         {TIMEFRAMES.map((tf) => (
