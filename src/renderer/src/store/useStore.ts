@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
+import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
 export type Drawing =
@@ -151,6 +152,10 @@ export const useStore = create<State>()(
 )
 
 /** Live quotes change several times per second, so they live outside the persisted store. */
-export const useQuotes = create<{ quotes: Record<string, Quote> }>(() => ({ quotes: {} }))
+export const useQuotes = create<{ quotes: Record<string, Quote>; feed: FeedStatus }>(() => ({
+  quotes: {},
+  feed: { state: 'off' }
+}))
+export const setFeedStatus = (feed: FeedStatus): void => useQuotes.setState({ feed })
 export const setQuote = (symbol: string, q: Quote): void =>
   useQuotes.setState((s) => ({ quotes: { ...s.quotes, [symbol]: q } }))

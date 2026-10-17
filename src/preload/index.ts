@@ -10,7 +10,8 @@ const api = {
     ipcRenderer.invoke('stocks:candles', symbol, tf, key),
   stockQuotes: (symbols: string[], key: string): Promise<Record<string, Quote>> =>
     ipcRenderer.invoke('stocks:quotes', symbols, key),
-  searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query)
+  searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
+  finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key)
 }
 
 export type Api = typeof api

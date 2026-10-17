@@ -110,6 +110,22 @@ export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: u
   return tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS['4h']) } : data
 }
 
+/** Validates the key with one cheap request. Returns null if it works, otherwise a user-facing reason. */
+export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
+  const [, key] = checkArgs('AAPL', keyArg)
+  if (!key) return 'Ungültiges Key-Format'
+  try {
+    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`, {
+      signal: AbortSignal.timeout(10_000)
+    })
+    if (res.status === 401 || res.status === 403) return 'API-Key ungültig'
+    if (res.status === 429) return 'Rate-Limit erreicht (max. 60 Anfragen/Minute)'
+    return res.ok ? null : `Finnhub HTTP ${res.status}`
+  } catch {
+    return 'Finnhub nicht erreichbar'
+  }
+}
+
 async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
   const d = await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`)
   if (!d.c) throw new Error(`Finnhub: kein Kurs für ${symbol}`)

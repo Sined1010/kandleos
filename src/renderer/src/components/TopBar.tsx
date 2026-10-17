@@ -1,7 +1,8 @@
 import { Activity, Folder as FolderIcon, FolderPlus, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { isCrypto, TIMEFRAMES } from '../../../shared/types'
-import { useStore, type Indicators } from '../store/useStore'
+import type { FeedStatus } from '../services/marketData'
+import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import SymbolSearch from './SymbolSearch'
 
 export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
@@ -52,15 +53,49 @@ export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void 
         {menuOpen && <IndicatorMenu onClose={() => setMenuOpen(false)} />}
       </div>
 
+      <FeedBadge onClick={onOpenSettings} />
       <button
         onClick={onOpenSettings}
-        className="ml-auto rounded p-1.5 text-muted hover:bg-line hover:text-white"
+        className="rounded p-1.5 text-muted hover:bg-line hover:text-white"
         title="Einstellungen"
         aria-label="Einstellungen"
       >
         <Settings size={16} />
       </button>
     </header>
+  )
+}
+
+const FEED: Record<FeedStatus['state'], [dot: string, label: string, hint: string]> = {
+  off: ['bg-muted', 'Yahoo · verzögert', 'Kein Finnhub-Key: Aktienkurse alle 15 s über Yahoo. Klicken zum Eintragen.'],
+  checking: ['bg-yellow-400 animate-pulse', 'Finnhub · prüfe Key…', 'API-Key wird geprüft.'],
+  connecting: ['bg-yellow-400 animate-pulse', 'Finnhub · verbinde…', 'Key gültig, Echtzeit-Verbindung wird aufgebaut.'],
+  live: ['bg-up', 'Finnhub · live', 'Key gültig, Echtzeit-Verbindung aktiv.'],
+  error: ['bg-down', 'Finnhub · Fehler', 'Aktienkurse kommen ersatzweise über Yahoo.']
+}
+
+/** Finnhub connection status; opens the settings on click. */
+function FeedBadge({ onClick }: { onClick: () => void }) {
+  const feed = useQuotes((s) => s.feed)
+  const [dot, label, hint] = FEED[feed.state]
+  const details = [
+    feed.detail,
+    hint,
+    feed.state === 'live' &&
+      (feed.lastTrade
+        ? `Letzter Trade: ${new Date(feed.lastTrade * 1000).toLocaleTimeString('de-DE')}`
+        : 'Noch keine Trades empfangen (Börse evtl. geschlossen).')
+  ]
+  return (
+    <button
+      onClick={onClick}
+      title={details.filter(Boolean).join('\n')}
+      className="ml-auto flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted hover:bg-line hover:text-white"
+    >
+      <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden />
+      {label}
+      {feed.state === 'error' && feed.detail && <span className="text-down">({feed.detail})</span>}
+    </button>
   )
 }
 

@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { searchSymbols, stockCandles, stockQuotes } from './stocks'
+import { finnhubCheck, searchSymbols, stockCandles, stockQuotes } from './stocks'
 
 const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.json')
 let writeQueue = Promise.resolve()
@@ -42,6 +42,7 @@ ipcMain.handle('key:set', async (_e, key: unknown) => {
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key) => stockCandles(symbol, tf, key))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
+ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 
 function createWindow(): void {
   const win = new BrowserWindow({

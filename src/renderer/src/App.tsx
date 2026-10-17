@@ -5,7 +5,7 @@ import SettingsModal from './components/SettingsModal'
 import TopBar from './components/TopBar'
 import Watchlist from './components/Watchlist'
 import { watchQuotes } from './services/marketData'
-import { setQuote, useStore } from './store/useStore'
+import { setFeedStatus, setQuote, useStore } from './store/useStore'
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -15,7 +15,7 @@ export default function App() {
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
   const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].join(',')
 
-  useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote), [feed, finnhubKey])
+  useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote, setFeedStatus), [feed, finnhubKey])
 
   return (
     <div className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
