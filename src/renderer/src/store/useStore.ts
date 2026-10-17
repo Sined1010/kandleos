@@ -1,12 +1,18 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { Quote, Timeframe } from '../../../shared/types'
+import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
 
 export type Point = { time: number; price: number }
 export type Drawing =
   | { id: string; type: 'trend' | 'fib'; p1: Point; p2: Point }
   | { id: string; type: 'hline'; price: number }
 export type Tool = 'cursor' | 'trend' | 'hline' | 'fib'
+export interface Folder {
+  id: string
+  name: string
+  symbols: string[]
+  collapsed: boolean
+}
 
 export interface Indicators {
   sma: { on: boolean; period: number }
@@ -19,7 +25,7 @@ export interface Indicators {
 interface State {
   symbol: string
   timeframe: Timeframe
-  watchlist: string[]
+  folders: Folder[]
   finnhubKey: string
   indicators: Indicators
   drawings: Record<string, Drawing[]>
@@ -27,8 +33,13 @@ interface State {
   selectedId: string | null
   setSymbol: (symbol: string) => void
   setTimeframe: (tf: Timeframe) => void
-  addToWatchlist: (symbol: string) => void
-  removeFromWatchlist: (symbol: string) => void
+  addFolder: (name: string) => string
+  renameFolder: (id: string, name: string) => void
+  removeFolder: (id: string) => void
+  toggleFolder: (id: string) => void
+  addToFolder: (id: string, symbol: string) => void
+  removeFromFolder: (id: string, symbol: string) => void
+  moveSymbol: (symbol: string, fromId: string, toId: string) => void
   setFinnhubKey: (key: string) => void
   setIndicator: <K extends keyof Indicators>(name: K, patch: Partial<Indicators[K]>) => void
   setTool: (tool: Tool) => void
@@ -39,13 +50,20 @@ interface State {
 }
 
 const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [s.symbol]: list } })
+const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
+const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
+  folders: s.folders.map((f) => (f.id === id ? fn(f) : f))
+})
+const withSymbol = (f: Folder, symbol: string): Folder =>
+  f.symbols.includes(symbol) ? f : { ...f, symbols: [...f.symbols, symbol] }
+const withoutSymbol = (f: Folder, symbol: string): Folder => ({ ...f, symbols: f.symbols.filter((x) => x !== symbol) })
 
 export const useStore = create<State>()(
   persist(
     (set) => ({
       symbol: 'BTCUSDT',
       timeframe: '1h',
-      watchlist: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'AAPL', 'NVDA', 'MSFT', 'TSLA'],
+      folders: [folder('Krypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Aktien', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       finnhubKey: '',
       indicators: {
         sma: { on: true, period: 20 },
@@ -59,9 +77,26 @@ export const useStore = create<State>()(
       selectedId: null,
       setSymbol: (symbol) => set({ symbol, selectedId: null, tool: 'cursor' }),
       setTimeframe: (timeframe) => set({ timeframe }),
-      addToWatchlist: (symbol) =>
-        set((s) => (s.watchlist.includes(symbol) ? s : { watchlist: [...s.watchlist, symbol] })),
-      removeFromWatchlist: (symbol) => set((s) => ({ watchlist: s.watchlist.filter((x) => x !== symbol) })),
+      addFolder: (name) => {
+        const f = folder(name, [])
+        set((s) => ({ folders: [...s.folders, f] }))
+        return f.id
+      },
+      renameFolder: (id, name) => set((s) => mapFolder(s, id, (f) => ({ ...f, name }))),
+      removeFolder: (id) => set((s) => ({ folders: s.folders.filter((f) => f.id !== id) })),
+      toggleFolder: (id) => set((s) => mapFolder(s, id, (f) => ({ ...f, collapsed: !f.collapsed }))),
+      addToFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withSymbol({ ...f, collapsed: false }, symbol))),
+      removeFromFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withoutSymbol(f, symbol))),
+      moveSymbol: (symbol, fromId, toId) =>
+        set((s) =>
+          fromId === toId
+            ? s
+            : {
+                folders: s.folders.map((f) =>
+                  f.id === fromId ? withoutSymbol(f, symbol) : f.id === toId ? withSymbol(f, symbol) : f
+                )
+              }
+        ),
       setFinnhubKey: (finnhubKey) => set({ finnhubKey }),
       setIndicator: (name, patch) =>
         set((s) => ({ indicators: { ...s.indicators, [name]: { ...s.indicators[name], ...patch } } })),
@@ -74,17 +109,27 @@ export const useStore = create<State>()(
     }),
     {
       name: 'kandleos',
-      version: 1,
+      version: 2,
+      // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
+      migrate: (persisted, version) => {
+        const p = persisted as Record<string, unknown>
+        if (version < 2 && Array.isArray(p.watchlist)) {
+          const list = p.watchlist as string[]
+          p.folders = [folder('Krypto', list.filter(isCrypto)), folder('Aktien', list.filter((s) => !isCrypto(s)))]
+          delete p.watchlist
+        }
+        return p as unknown as State
+      },
       // Synchronous read lets the store hydrate before the first render (no flash of defaults).
       storage: createJSONStorage(() => ({
         getItem: () => window.api.storeGet(),
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, watchlist, finnhubKey, indicators, drawings }) => ({
+      partialize: ({ symbol, timeframe, folders, finnhubKey, indicators, drawings }) => ({
         symbol,
         timeframe,
-        watchlist,
+        folders,
         finnhubKey,
         indicators,
         drawings

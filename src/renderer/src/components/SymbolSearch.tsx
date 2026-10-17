@@ -7,11 +7,22 @@ interface Props {
   placeholder: string
   onPick: (symbol: string) => void
   inputClassName: string
-  alignRight?: boolean
+  /** Narrow layout: suggestion list as wide as the input, name under the symbol. */
+  compact?: boolean
+  autoFocus?: boolean
+  onClose?: () => void
 }
 
 /** Ticker or company-name search with a suggestion list (Yahoo search via IPC). */
-export default function SymbolSearch({ value = '', placeholder, onPick, inputClassName, alignRight }: Props) {
+export default function SymbolSearch({
+  value = '',
+  placeholder,
+  onPick,
+  inputClassName,
+  compact,
+  autoFocus,
+  onClose
+}: Props) {
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
@@ -43,6 +54,7 @@ export default function SymbolSearch({ value = '', placeholder, onPick, inputCla
     setOpen(false)
     setQuery(value)
     input?.blur()
+    onClose?.()
   }
 
   const pick = (symbol: string, input?: HTMLInputElement) => {
@@ -79,6 +91,7 @@ export default function SymbolSearch({ value = '', placeholder, onPick, inputCla
         }}
         onBlur={() => close()}
         onKeyDown={onKeyDown}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={placeholder}
         role="combobox"
@@ -89,8 +102,8 @@ export default function SymbolSearch({ value = '', placeholder, onPick, inputCla
       {open && results.length > 0 && (
         <ul
           role="listbox"
-          className={`absolute top-full z-30 mt-2 max-h-80 w-80 overflow-y-auto rounded border border-line bg-panel py-1 shadow-xl ${
-            alignRight ? 'right-0' : '-left-8'
+          className={`absolute top-full z-30 mt-2 max-h-80 overflow-y-auto rounded border border-line bg-panel py-1 shadow-xl ${
+            compact ? 'inset-x-0' : '-left-8 w-80'
           }`}
         >
           {results.map((r, i) => (
@@ -104,10 +117,10 @@ export default function SymbolSearch({ value = '', placeholder, onPick, inputCla
                 pick(r.symbol, document.activeElement as HTMLInputElement)
               }}
               onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-xs ${i === active ? 'bg-accent/20' : ''}`}
+              className={`flex cursor-pointer flex-wrap items-baseline gap-x-2 px-3 py-1.5 text-xs ${i === active ? 'bg-accent/20' : ''}`}
             >
-              <span className="w-20 shrink-0 font-medium text-white">{r.symbol}</span>
-              <span className="flex-1 truncate text-slate-300">{r.name}</span>
+              <span className={`shrink-0 font-medium text-white ${compact ? 'flex-1' : 'w-20'}`}>{r.symbol}</span>
+              <span className={`truncate text-slate-300 ${compact ? 'order-last w-full' : 'flex-1'}`}>{r.name}</span>
               <span className="shrink-0 text-[10px] uppercase text-muted">{r.exchange}</span>
             </li>
           ))}

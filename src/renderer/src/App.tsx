@@ -10,10 +10,10 @@ import { setQuote, useStore } from './store/useStore'
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const symbol = useStore((s) => s.symbol)
-  const watchlist = useStore((s) => s.watchlist)
+  const folders = useStore((s) => s.folders)
   const finnhubKey = useStore((s) => s.finnhubKey)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
-  const feed = [...new Set([...watchlist, symbol])].join(',')
+  const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].join(',')
 
   useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote), [feed, finnhubKey])
 
