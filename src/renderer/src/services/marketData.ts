@@ -1,0 +1,115 @@
+import { isCrypto, type Candle, type Quote, type Timeframe } from '../../../shared/types'
+
+const BINANCE = 'https://api.binance.com/api/v3'
+const BINANCE_WS = 'wss://stream.binance.com:9443'
+const BINANCE_TF: Record<Timeframe, string> = {
+  '1m': '1m',
+  '5m': '5m',
+  '15m': '15m',
+  '1h': '1h',
+  '4h': '4h',
+  '1D': '1d',
+  '1W': '1w'
+}
+
+/** WebSocket that reconnects after drops (Binance closes streams every 24h). Returns a close function. */
+function socket(url: string, onMessage: (msg: any) => void, onOpen?: (ws: WebSocket) => void): () => void {
+  let ws: WebSocket
+  let closed = false
+  let timer: ReturnType<typeof setTimeout>
+  const connect = () => {
+    ws = new WebSocket(url)
+    ws.onopen = () => onOpen?.(ws)
+    ws.onmessage = (e) => onMessage(JSON.parse(e.data))
+    ws.onclose = () => {
+      if (!closed) timer = setTimeout(connect, 3000)
+    }
+  }
+  connect()
+  return () => {
+    closed = true
+    clearTimeout(timer)
+    ws.close()
+  }
+}
+
+export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: string): Promise<Candle[]> {
+  if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey)
+  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${BINANCE_TF[tf]}&limit=1000`)
+  if (!res.ok) throw new Error(`Binance: ${symbol} nicht gefunden (HTTP ${res.status})`)
+  const rows: (string | number)[][] = await res.json()
+  return rows.map((k) => ({
+    time: Number(k[0]) / 1000,
+    open: +k[1],
+    high: +k[2],
+    low: +k[3],
+    close: +k[4],
+    volume: +k[5]
+  }))
+}
+
+/** Live bars for a crypto chart. */
+export function watchCandles(symbol: string, tf: Timeframe, onBar: (c: Candle) => void): () => void {
+  return socket(`${BINANCE_WS}/ws/${symbol.toLowerCase()}@kline_${BINANCE_TF[tf]}`, ({ k }) =>
+    onBar({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v })
+  )
+}
+
+/** Live quotes: Binance ticker for crypto; Finnhub trades (with key) or Yahoo polling via IPC for stocks. */
+export function watchQuotes(symbols: string[], finnhubKey: string, onQuote: (s: string, q: Quote) => void): () => void {
+  const crypto = symbols.filter(isCrypto)
+  const stocks = symbols.filter((s) => !isCrypto(s))
+  const cleanups: (() => void)[] = []
+  let active = true
+
+  if (crypto.length) {
+    const streams = crypto.map((s) => `${s.toLowerCase()}@ticker`).join('/')
+    cleanups.push(
+      socket(`${BINANCE_WS}/stream?streams=${streams}`, ({ data: d }) =>
+        onQuote(d.s, { price: +d.c, changePct: +d.P, time: d.E / 1000 })
+      )
+    )
+  }
+
+  if (stocks.length) {
+    const prevClose: Record<string, number> = {}
+    const poll = () =>
+      window.api
+        .stockQuotes(stocks, finnhubKey)
+        .then((quotes) => {
+          if (!active) return
+          for (const [s, q] of Object.entries(quotes)) {
+            if (q.prevClose) prevClose[s] = q.prevClose
+            onQuote(s, q)
+          }
+        })
+        .catch((e) => console.warn('Aktienkurse:', e))
+    poll()
+    if (finnhubKey) {
+      cleanups.push(
+        socket(
+          `wss://ws.finnhub.io?token=${encodeURIComponent(finnhubKey)}`,
+          (msg) => {
+            if (msg.type !== 'trade') return
+            // One message can carry hundreds of trades; only the latest per symbol matters.
+            const latest: Record<string, { p: number; t: number }> = {}
+            for (const t of msg.data) latest[t.s] = t
+            for (const [s, t] of Object.entries(latest)) {
+              const pc = prevClose[s]
+              if (pc) onQuote(s, { price: t.p, changePct: (t.p / pc - 1) * 100, time: t.t / 1000, prevClose: pc })
+            }
+          },
+          (ws) => stocks.forEach((symbol) => ws.send(JSON.stringify({ type: 'subscribe', symbol })))
+        )
+      )
+    } else {
+      const id = setInterval(poll, 15_000)
+      cleanups.push(() => clearInterval(id))
+    }
+  }
+
+  return () => {
+    active = false
+    cleanups.forEach((c) => c())
+  }
+}

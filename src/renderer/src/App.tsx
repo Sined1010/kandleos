@@ -1,0 +1,33 @@
+import { useEffect, useState } from 'react'
+import ChartArea from './components/ChartArea'
+import DrawingToolbar from './components/DrawingToolbar'
+import SettingsModal from './components/SettingsModal'
+import TopBar from './components/TopBar'
+import Watchlist from './components/Watchlist'
+import { watchQuotes } from './services/marketData'
+import { setQuote, useStore } from './store/useStore'
+
+export default function App() {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const symbol = useStore((s) => s.symbol)
+  const watchlist = useStore((s) => s.watchlist)
+  const finnhubKey = useStore((s) => s.finnhubKey)
+  // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
+  const feed = [...new Set([...watchlist, symbol])].join(',')
+
+  useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote), [feed, finnhubKey])
+
+  return (
+    <div className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
+      <TopBar onOpenSettings={() => setSettingsOpen(true)} />
+      <div className="flex min-h-0 flex-1">
+        <DrawingToolbar />
+        <main className="relative min-w-0 flex-1">
+          <ChartArea />
+        </main>
+        <Watchlist />
+      </div>
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+    </div>
+  )
+}

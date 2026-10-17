@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0b0e14;
+  --color-panel: #151924;
+  --color-line: #232838;
+  --color-muted: #8b93a7;
+  --color-up: #26a69a;
+  --color-down: #ef5350;
+  --color-accent: #2962ff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  font-family: system-ui, 'Segoe UI', sans-serif;
+}
+
+input[type='number']::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
