@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { readFileSync } from 'node:fs'
-import { rename, writeFile } from 'node:fs/promises'
+import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { searchSymbols, stockCandles, stockQuotes } from './stocks'
 
@@ -24,6 +24,20 @@ ipcMain.handle('store:set', (_e, data: unknown) => {
     })
     .catch((err) => console.error('Speichern fehlgeschlagen:', err))
   return writeQueue
+})
+// The API key lives apart from the portable store file, encrypted for this OS user (DPAPI on Windows).
+const keyFile = (): string => join(app.getPath('userData'), 'finnhub-key.bin')
+ipcMain.on('key:get', (e) => {
+  try {
+    e.returnValue = safeStorage.decryptString(readFileSync(keyFile()))
+  } catch {
+    e.returnValue = ''
+  }
+})
+ipcMain.handle('key:set', async (_e, key: unknown) => {
+  if (typeof key !== 'string' || !/^[A-Za-z0-9]{0,64}$/.test(key)) return
+  if (!key) return rm(keyFile(), { force: true })
+  await writeFile(keyFile(), safeStorage.encryptString(key))
 })
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key) => stockCandles(symbol, tf, key))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))

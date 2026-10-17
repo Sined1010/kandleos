@@ -65,7 +65,7 @@ export const useStore = create<State>()(
       symbol: 'BTCUSDT',
       timeframe: '1h',
       folders: [folder('Krypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Aktien', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
-      finnhubKey: '',
+      finnhubKey: window.api.keyGet(),
       indicators: {
         sma: { on: true, period: 20 },
         ema: { on: false, period: 50 },
@@ -98,7 +98,10 @@ export const useStore = create<State>()(
                 )
               }
         ),
-      setFinnhubKey: (finnhubKey) => set({ finnhubKey }),
+      setFinnhubKey: (finnhubKey) => {
+        set({ finnhubKey })
+        void window.api.keySet(finnhubKey)
+      },
       setIndicator: (name, patch) =>
         set((s) => ({ indicators: { ...s.indicators, [name]: { ...s.indicators[name], ...patch } } })),
       setTool: (tool) => set({ tool, selectedId: null }),
@@ -112,7 +115,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'kandleos',
-      version: 2,
+      version: 3,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -120,6 +123,13 @@ export const useStore = create<State>()(
           const list = p.watchlist as string[]
           p.folders = [folder('Krypto', list.filter(isCrypto)), folder('Aktien', list.filter((s) => !isCrypto(s)))]
           delete p.watchlist
+        }
+        // v2 kept the API key in this file; move it to the encrypted key file. It stays in the
+        // returned state for this session, and partialize leaves it out of every future write.
+        if (version < 3) {
+          if (typeof p.finnhubKey === 'string' && p.finnhubKey) void window.api.keySet(p.finnhubKey)
+          // An empty legacy key must not blank out one already in the key file.
+          else delete p.finnhubKey
         }
         return p as unknown as State
       },
@@ -129,11 +139,10 @@ export const useStore = create<State>()(
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, folders, finnhubKey, indicators, drawings }) => ({
+      partialize: ({ symbol, timeframe, folders, indicators, drawings }) => ({
         symbol,
         timeframe,
         folders,
-        finnhubKey,
         indicators,
         drawings
       })

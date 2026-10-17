@@ -4,6 +4,8 @@ import type { CandleData, Quote, SearchResult, Timeframe } from '../shared/types
 const api = {
   storeGet: (): string | null => ipcRenderer.sendSync('store:get'),
   storeSet: (data: string): Promise<void> => ipcRenderer.invoke('store:set', data),
+  keyGet: (): string => ipcRenderer.sendSync('key:get'),
+  keySet: (key: string): Promise<void> => ipcRenderer.invoke('key:set', key),
   stockCandles: (symbol: string, tf: Timeframe, key: string): Promise<CandleData> =>
     ipcRenderer.invoke('stocks:candles', symbol, tf, key),
   stockQuotes: (symbols: string[], key: string): Promise<Record<string, Quote>> =>

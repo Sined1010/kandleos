@@ -58,7 +58,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           <a href="https://finnhub.io/register" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             finnhub.io/register
           </a>
-          . Der Key wird lokal im Benutzerdatenordner gespeichert.
+          . Der Key wird verschlüsselt für dein Windows-Konto gespeichert (finnhub-key.bin) und ist nicht Teil von
+          kandleos-store.json – nach einem Gerätewechsel hier einfach neu eintragen.
         </p>
 
         <div className="mt-5 flex justify-end gap-2">
