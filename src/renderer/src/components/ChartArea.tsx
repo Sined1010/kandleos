@@ -23,6 +23,8 @@ import DrawingOverlay from './DrawingOverlay'
 const UP = '#26a69a'
 const DOWN = '#ef5350'
 const LINE = '#232838'
+// Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
+const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
 interface ChartApi {
   chart: IChartApi
@@ -60,6 +62,7 @@ export default function ChartArea() {
   const [data, setData] = useState<Candle[]>([])
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
   const [status, setStatus] = useState<string | null>(null)
+  const [currency, setCurrency] = useState('')
 
   // History + live updates for the current symbol/timeframe.
   useEffect(() => {
@@ -79,6 +82,7 @@ export default function ChartArea() {
     api.candles.setData([])
     api.volume.setData([])
     setStatus(`Lade ${symbol} …`)
+    setCurrency('')
 
     const push = (bar: Candle) => {
       const arr = dataRef.current
@@ -91,7 +95,7 @@ export default function ChartArea() {
     }
 
     loadCandles(symbol, timeframe, finnhubKey)
-      .then((bars) => {
+      .then(({ candles: bars, currency }) => {
         if (!active) return
         if (!bars.length) return setStatus(`Keine Daten für ${symbol}`)
         const last = bars[bars.length - 1].close
@@ -102,6 +106,7 @@ export default function ChartArea() {
         api.chart.timeScale().setVisibleLogicalRange({ from: bars.length - 150, to: bars.length + 10 })
         dataRef.current = bars
         setData([...bars])
+        setCurrency(currency)
         setStatus(null)
       })
       .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
@@ -217,6 +222,11 @@ export default function ChartArea() {
       {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
       <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
         <span className="font-semibold text-white">{symbol}</span> · {timeframe}
+        {currency && (
+          <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
+            {MINOR_UNITS[currency] ?? currency}
+          </span>
+        )}
       </div>
       {status && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>

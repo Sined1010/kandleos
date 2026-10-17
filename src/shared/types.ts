@@ -36,5 +36,14 @@ export interface SearchResult {
 
 export const SYMBOL_RE = /^[A-Z0-9.\-^=]{1,20}$/
 
+export interface CandleData {
+  candles: Candle[]
+  /** ISO code as the exchange reports it, e.g. USD, EUR, GBp (pence); '' if unknown */
+  currency: string
+}
+
 // shortcut: market is guessed from the quote-currency suffix; add an explicit market field if exotic tickers collide.
-export const isCrypto = (symbol: string): boolean => /^[A-Z0-9]{2,}(USDT|USDC|FDUSD|BTC|ETH|BNB)$/.test(symbol)
+const CRYPTO_RE = /^[A-Z0-9]{2,}(USDT|USDC|FDUSD|BTC|ETH|BNB)$/
+export const isCrypto = (symbol: string): boolean => CRYPTO_RE.test(symbol)
+/** BTCUSDT → USDT */
+export const cryptoQuoteAsset = (symbol: string): string => CRYPTO_RE.exec(symbol)?.[1] ?? ''

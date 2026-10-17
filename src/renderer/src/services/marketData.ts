@@ -1,4 +1,11 @@
-import { isCrypto, type Candle, type Quote, type Timeframe } from '../../../shared/types'
+import {
+  cryptoQuoteAsset,
+  isCrypto,
+  type Candle,
+  type CandleData,
+  type Quote,
+  type Timeframe
+} from '../../../shared/types'
 
 const BINANCE = 'https://api.binance.com/api/v3'
 const BINANCE_WS = 'wss://stream.binance.com:9443'
@@ -33,12 +40,12 @@ function socket(url: string, onMessage: (msg: any) => void, onOpen?: (ws: WebSoc
   }
 }
 
-export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: string): Promise<Candle[]> {
+export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: string): Promise<CandleData> {
   if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey)
   const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${BINANCE_TF[tf]}&limit=1000`)
   if (!res.ok) throw new Error(`Binance: ${symbol} nicht gefunden (HTTP ${res.status})`)
   const rows: (string | number)[][] = await res.json()
-  return rows.map((k) => ({
+  const candles = rows.map((k) => ({
     time: Number(k[0]) / 1000,
     open: +k[1],
     high: +k[2],
@@ -46,6 +53,7 @@ export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: str
     close: +k[4],
     volume: +k[5]
   }))
+  return { candles, currency: cryptoQuoteAsset(symbol) }
 }
 
 /** Live bars for a crypto chart. */

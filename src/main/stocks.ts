@@ -4,6 +4,7 @@ import {
   SYMBOL_RE,
   TF_SECONDS,
   type Candle,
+  type CandleData,
   type Quote,
   type SearchResult,
   type Timeframe
@@ -73,7 +74,7 @@ async function finnhubCandles(symbol: string, tf: Timeframe, key: string): Promi
   }))
 }
 
-async function yahooCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
+async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> {
   const [interval, range] = YAHOO[tf]
   const d = await getJson(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`
@@ -87,23 +88,26 @@ async function yahooCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
     if (q.open[i] == null || q.close[i] == null || (out.length && t <= out[out.length - 1].time)) return
     out.push({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] ?? 0 })
   })
-  return out
+  return { candles: out, currency: r.meta?.currency ?? '' }
 }
 
-export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: unknown): Promise<Candle[]> {
+export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: unknown): Promise<CandleData> {
   const [symbol, key] = checkArgs(symbolArg, keyArg)
   if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(`Ungültiger Timeframe: ${String(tfArg)}`)
   const tf = tfArg as Timeframe
-  let candles: Candle[] | undefined
+  let data: CandleData | undefined
   if (key) {
     try {
-      candles = await finnhubCandles(symbol, tf, key)
+      const candles = await finnhubCandles(symbol, tf, key)
+      // Finnhub candles carry no currency; Yahoo's quote metadata does.
+      const currency = await yahooMeta(symbol).then((m) => m.currency ?? '', () => '')
+      data = { candles, currency }
     } catch (e) {
       console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, (e as Error).message)
     }
   }
-  candles ??= await yahooCandles(symbol, tf)
-  return tf === '4h' ? aggregate(candles, TF_SECONDS['4h']) : candles
+  data ??= await yahooCandles(symbol, tf)
+  return tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS['4h']) } : data
 }
 
 async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
@@ -112,12 +116,17 @@ async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
   return { price: d.c, changePct: d.dp ?? 0, time: d.t, prevClose: d.pc }
 }
 
-async function yahooQuote(symbol: string): Promise<Quote> {
+async function yahooMeta(symbol: string): Promise<any> {
   const d = await getJson(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`
   )
   const m = d.chart?.result?.[0]?.meta
   if (!m?.regularMarketPrice) throw new Error(`Yahoo: kein Kurs für ${symbol}`)
+  return m
+}
+
+async function yahooQuote(symbol: string): Promise<Quote> {
+  const m = await yahooMeta(symbol)
   const prev = m.chartPreviousClose ?? m.previousClose ?? m.regularMarketPrice
   return {
     price: m.regularMarketPrice,
