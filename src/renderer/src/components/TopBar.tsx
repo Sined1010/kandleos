@@ -1,4 +1,4 @@
-import { Activity, Search, Settings } from 'lucide-react'
+import { Activity, Folder as FolderIcon, FolderPlus, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { isCrypto, TIMEFRAMES } from '../../../shared/types'
 import { useStore, type Indicators } from '../store/useStore'
@@ -25,6 +25,8 @@ export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void 
         />
         <span className="rounded bg-line px-1.5 text-[10px] uppercase text-muted">{isCrypto(symbol) ? 'Krypto' : 'Aktie'}</span>
       </div>
+
+      <AddToWatchlist symbol={symbol} />
 
       <div className="flex rounded bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
         {TIMEFRAMES.map((tf) => (
@@ -59,6 +61,52 @@ export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void 
         <Settings size={16} />
       </button>
     </header>
+  )
+}
+
+/** Shown only while the open chart is in no folder; puts it into the chosen one. */
+function AddToWatchlist({ symbol }: { symbol: string }) {
+  const folders = useStore((s) => s.folders)
+  const addToFolder = useStore((s) => s.addToFolder)
+  const addFolder = useStore((s) => s.addFolder)
+  const [open, setOpen] = useState(false)
+  if (folders.some((f) => f.symbols.includes(symbol))) return null
+
+  const put = (folderId: string) => {
+    addToFolder(folderId, symbol)
+    setOpen(false)
+  }
+  const item = 'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-bg'
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        title={`${symbol} zur Watchlist hinzufügen`}
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-accent ring-1 ring-accent/50 hover:bg-accent/15"
+      >
+        <Plus size={14} /> Watchlist
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-56 rounded border border-line bg-panel py-1 shadow-xl">
+            <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted">{symbol} hinzufügen zu</p>
+            {folders.map((f) => (
+              <button key={f.id} role="menuitem" onClick={() => put(f.id)} className={`${item} text-white`}>
+                <FolderIcon size={14} className="shrink-0 text-muted" />
+                <span className="truncate">{f.name}</span>
+                <span className="ml-auto text-xs text-muted/60">{f.symbols.length}</span>
+              </button>
+            ))}
+            <div className="my-1 h-px bg-line" />
+            <button role="menuitem" onClick={() => put(addFolder('Neuer Ordner'))} className={`${item} text-muted`}>
+              <FolderPlus size={14} className="shrink-0" /> Neuer Ordner
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
