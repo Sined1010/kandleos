@@ -25,19 +25,29 @@ ipcMain.handle('store:set', (_e, data: unknown) => {
     .catch((err) => console.error('Speichern fehlgeschlagen:', err))
   return writeQueue
 })
-// The API key lives apart from the portable store file, encrypted for this OS user (DPAPI on Windows).
+// The API key lives apart from the portable store file, encrypted for this OS user
+// (DPAPI on Windows, Secret Service/KWallet on Linux).
 const keyFile = (): string => join(app.getPath('userData'), 'finnhub-key.bin')
+const plainKeyFile = (): string => join(app.getPath('userData'), 'finnhub-key.txt')
 ipcMain.on('key:get', (e) => {
   try {
     e.returnValue = safeStorage.decryptString(readFileSync(keyFile()))
   } catch {
-    e.returnValue = ''
+    try {
+      e.returnValue = readFileSync(plainKeyFile(), 'utf8')
+    } catch {
+      e.returnValue = ''
+    }
   }
 })
 ipcMain.handle('key:set', async (_e, key: unknown) => {
   if (typeof key !== 'string' || !/^[A-Za-z0-9]{0,64}$/.test(key)) return
-  if (!key) return rm(keyFile(), { force: true })
-  await writeFile(keyFile(), safeStorage.encryptString(key))
+  await rm(keyFile(), { force: true })
+  await rm(plainKeyFile(), { force: true })
+  if (!key) return
+  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(key))
+  // shortcut: without an OS keyring (some Linux setups) the key is plain text readable only by this user; install gnome-keyring/KWallet to get encryption.
+  else await writeFile(plainKeyFile(), key, { mode: 0o600 })
 })
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key) => stockCandles(symbol, tf, key))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
