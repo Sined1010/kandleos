@@ -45,6 +45,7 @@ interface State {
   setTool: (tool: Tool) => void
   select: (id: string | null) => void
   addDrawing: (d: Drawing) => void
+  updateDrawing: (d: Drawing) => void
   removeDrawing: (id: string) => void
   clearDrawings: () => void
 }
@@ -103,6 +104,8 @@ export const useStore = create<State>()(
       setTool: (tool) => set({ tool, selectedId: null }),
       select: (selectedId) => set({ selectedId }),
       addDrawing: (d) => set((s) => withDrawings(s, [...(s.drawings[s.symbol] ?? []), d])),
+      updateDrawing: (d) =>
+        set((s) => withDrawings(s, (s.drawings[s.symbol] ?? []).map((x) => (x.id === d.id ? d : x)))),
       removeDrawing: (id) =>
         set((s) => ({ ...withDrawings(s, (s.drawings[s.symbol] ?? []).filter((d) => d.id !== id)), selectedId: null })),
       clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null }))

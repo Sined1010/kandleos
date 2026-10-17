@@ -10,6 +10,14 @@ const COLOR = '#2962ff'
 const SELECTED = '#f5c542'
 const NO_DRAWINGS: Drawing[] = []
 
+type Handle = 'move' | 'p1' | 'p2'
+interface DragState {
+  handle: Handle
+  from: { logical: number; price: number }
+  orig: Drawing
+  current: Drawing
+}
+
 interface Props {
   chart: IChartApi
   series: ISeriesApi<'Candlestick'>
@@ -27,8 +35,12 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const select = useStore((s) => s.select)
   const addDrawing = useStore((s) => s.addDrawing)
   const removeDrawing = useStore((s) => s.removeDrawing)
+  const updateDrawing = useStore((s) => s.updateDrawing)
   const svgRef = useRef<SVGSVGElement>(null)
   const [draft, setDraft] = useState<{ p1: Point; p2: Point } | null>(null)
+  // Edits are previewed locally and committed on mouseup, so the store file is written once per drag.
+  const [drag, setDrag] = useState<DragState | null>(null)
+  const dragRef = useRef<DragState | null>(null)
   const [, redraw] = useState(0)
   const times = useMemo(() => data.map((c) => c.time), [data])
   const step = TF_SECONDS[timeframe]
@@ -63,7 +75,11 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
-      if (e.key === 'Escape') setTool('cursor')
+      if (e.key === 'Escape') {
+        setTool('cursor')
+        dragRef.current = null
+        setDrag(null)
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) removeDrawing(selectedId)
     }
     window.addEventListener('keydown', onKey)
@@ -75,13 +91,65 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const toY = (price: number) => series.priceToCoordinate(price)
   const fmt = (price: number) => series.priceFormatter().format(price)
 
-  const pointAt = (e: React.MouseEvent): Point | null => {
+  const logicalAt = (e: { clientX: number; clientY: number }) => {
     const rect = svgRef.current!.getBoundingClientRect()
     const logical = chart.timeScale().coordinateToLogical(e.clientX - rect.left)
     const price = series.coordinateToPrice(e.clientY - rect.top)
-    if (logical === null || price === null || !times.length) return null
-    return { time: logicalToTime(times, logical, step), price }
+    return logical === null || price === null || !times.length ? null : { logical, price }
   }
+  const pointAt = (e: { clientX: number; clientY: number }): Point | null => {
+    const at = logicalAt(e)
+    return at && { time: logicalToTime(times, at.logical, step), price: at.price }
+  }
+
+  const startDrag = (e: React.MouseEvent, d: Drawing, handle: Handle) => {
+    e.stopPropagation()
+    e.preventDefault()
+    select(d.id)
+    const from = logicalAt(e)
+    if (!from) return
+    dragRef.current = { handle, from, orig: d, current: d }
+    setDrag(dragRef.current)
+  }
+
+  // Window listeners: the pointer may leave the line (or the svg) while dragging.
+  const dragging = drag !== null
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current
+      const at = logicalAt(e)
+      if (!d || !at) return
+      const dPrice = at.price - d.from.price
+      // Shift in bar space, not seconds, so a line keeps its shape across weekend/overnight gaps.
+      const shift = (p: Point): Point => ({
+        time: logicalToTime(times, timeToLogical(times, p.time, step) + at.logical - d.from.logical, step),
+        price: p.price + dPrice
+      })
+      const o = d.orig
+      const current: Drawing =
+        o.type === 'hline'
+          ? { ...o, price: o.price + dPrice }
+          : d.handle === 'move'
+            ? { ...o, p1: shift(o.p1), p2: shift(o.p2) }
+            : { ...o, [d.handle]: { time: logicalToTime(times, at.logical, step), price: at.price } }
+      dragRef.current = { ...d, current }
+      setDrag(dragRef.current)
+    }
+    const onUp = () => {
+      const d = dragRef.current
+      if (d && d.current !== d.orig) updateDrawing(d.current)
+      dragRef.current = null
+      setDrag(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    // Handlers read the live drag via dragRef; times/step only change on new bars, which is harmless mid-drag.
+  }, [dragging])
 
   const onClick = (e: React.MouseEvent) => {
     const p = pointAt(e)
@@ -114,11 +182,8 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       : {
           stroke: 'transparent',
           strokeWidth: 10,
-          style: { pointerEvents: 'stroke' as const, cursor: 'pointer' },
-          onMouseDown: (e: React.MouseEvent) => {
-            e.stopPropagation()
-            select(d.id)
-          }
+          style: { pointerEvents: 'stroke' as const, cursor: d.type === 'hline' ? 'ns-resize' : 'move' },
+          onMouseDown: (e: React.MouseEvent) => startDrag(e, d, 'move')
         }
 
     if (d.type === 'hline') {
@@ -141,10 +206,22 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
     const y2 = toY(d.p2.price)
     if (x1 === null || x2 === null || y1 === null || y2 === null) return null
     const ends = { x1, y1, x2, y2 }
+    const handle = (cx: number, cy: number, h: Handle) => (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill="#0b0e14"
+        stroke={stroke}
+        strokeWidth={1.5}
+        style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
+        onMouseDown={preview ? undefined : (e) => startDrag(e, d, h)}
+      />
+    )
     const handles = (selected || preview) && (
       <>
-        <circle cx={x1} cy={y1} r={4} fill="#0b0e14" stroke={stroke} strokeWidth={1.5} />
-        <circle cx={x2} cy={y2} r={4} fill="#0b0e14" stroke={stroke} strokeWidth={1.5} />
+        {handle(x1, y1, 'p1')}
+        {handle(x2, y2, 'p2')}
       </>
     )
 
@@ -199,11 +276,15 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       width={width}
       height={height}
       className="absolute left-0 top-0"
-      style={{ pointerEvents: drawingMode ? 'all' : 'none', cursor: drawingMode ? 'crosshair' : 'default' }}
+      // While dragging, the svg swallows the mouse so the chart underneath does not pan along.
+      style={{
+        pointerEvents: drawingMode || drag ? 'all' : 'none',
+        cursor: drag ? 'grabbing' : drawingMode ? 'crosshair' : 'default'
+      }}
       onClick={onClick}
       onMouseMove={onMove}
     >
-      {drawings.map((d) => render(d))}
+      {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
       {draft && (tool === 'trend' || tool === 'fib') && render({ id: 'draft', type: tool, ...draft }, true)}
     </svg>
   )
