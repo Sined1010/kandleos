@@ -62,8 +62,26 @@ function createWindow(): void {
   else win.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-app.whenReady().then(() => {
-  createWindow()
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
-})
+// A second instance would load its own copy of the store and overwrite this one's changes on its next save.
+if (!app.requestSingleInstanceLock()) app.quit()
+else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win?.isMinimized()) win.restore()
+    win?.focus()
+  })
+  app.whenReady().then(() => {
+    createWindow()
+    app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+  })
+}
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+
+// Finish the last store write before exiting, so a change made right before closing is not lost.
+let flushed = false
+app.on('before-quit', (e) => {
+  if (flushed) return
+  e.preventDefault()
+  flushed = true
+  writeQueue.finally(() => app.quit())
+})
