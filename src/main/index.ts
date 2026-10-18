@@ -4,6 +4,10 @@ import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { finnhubCheck, searchSymbols, stockCandles, stockQuotes } from './stocks'
 
+// Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
+// those would be two different folders. All data (store, key, single-instance lock) lives here.
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(app.getPath('appData'), 'kandleos'))
+
 const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.json')
 let writeQueue = Promise.resolve()
 

@@ -1,22 +1,20 @@
 {
   "name": "kandleos",
+  "productName": "KandleOS",
   "version": "0.1.0",
   "private": true,
   "description": "Desktop-App für technische Chartanalyse",
+  "author": "Sined1010 <343844815+Sined1010@users.noreply.github.com>",
+  "desktopName": "kandleos.desktop",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test \"src/**/*.test.ts\""
-  },
-  "dependencies": {
-    "lightweight-charts": "^5.2.1",
-    "lucide-react": "^1.59.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "zustand": "^5.0.15"
+    "test": "node --test \"src/**/*.test.ts\"",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -25,9 +23,15 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",
+    "lightweight-charts": "^5.2.1",
+    "lucide-react": "^1.59.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "zustand": "^5.0.15"
   }
 }

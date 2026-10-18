@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# KandleOS unter Linux starten.
-# Erster Start im Terminal:  bash kandleos.sh
-# Danach liegt hier KandleOS.desktop – diese Datei auf den Desktop ziehen
+# KandleOS unter Linux aus dem Quellcode starten (Entwicklung). Für die normale Nutzung: build-installer.sh.
+# Erster Start im Terminal:  bash linux/kandleos.sh
+# Danach liegt in linux/ die Datei KandleOS.desktop – auf den Desktop ziehen
 # (GNOME: Rechtsklick auf das Symbol -> "Start erlauben").
 set -euo pipefail
-DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+DIR="$(dirname "$HERE")"
 cd "$DIR"
 
 # Vom Desktop gestartet gibt es kein Terminal: Ausgaben ins Log, Fehler als Benachrichtigung.
@@ -27,22 +28,24 @@ if [ ! -x node_modules/electron/dist/electron ]; then
   echo "Installiere Abhängigkeiten (einmalig, dauert etwas) …"
   rm -rf node_modules
   npm ci || fail "Installation der Abhängigkeiten fehlgeschlagen."
+  # npm 11+ skips install scripts by default, so fetch the Electron binary explicitly.
+  node node_modules/electron/install.js || fail "Download von Electron fehlgeschlagen."
 fi
 
 # Absolute paths; rewritten on every start so the shortcut follows a moved folder.
-cat >KandleOS.desktop <<EOF
+cat >"$HERE/KandleOS.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=KandleOS
 Comment=Technische Chartanalyse
-Exec=bash "$DIR/kandleos.sh"
+Exec=bash "$HERE/kandleos.sh"
 Path=$DIR
 Icon=$DIR/resources/icon.svg
 Terminal=false
 Categories=Office;Finance;
 StartupWMClass=kandleos
 EOF
-chmod +x KandleOS.desktop
+chmod +x "$HERE/KandleOS.desktop"
 
 # Always rebuild (~2 s) so a stale build never starts.
 node_modules/.bin/electron-vite build >/dev/null || fail "Build fehlgeschlagen."

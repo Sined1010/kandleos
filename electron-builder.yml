@@ -1,0 +1,26 @@
+appId: de.kandleos.app
+productName: KandleOS
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+
+win:
+  target: nsis
+  icon: resources/icon.png
+nsis:
+  artifactName: KandleOS-Setup-${version}.${ext}
+  oneClick: false
+  perMachine: false # per-user install, no admin rights needed
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+
+linux:
+  target: [AppImage, deb]
+  icon: resources/icon.png
+  category: Office
+  syncDesktopName: true # window <-> launcher icon association (WM_CLASS / Wayland app_id)
+  synopsis: Technische Chartanalyse
+  artifactName: KandleOS-${version}-${arch}.${ext}
