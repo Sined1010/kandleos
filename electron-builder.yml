@@ -18,7 +18,13 @@ nsis:
   createStartMenuShortcut: true
 
 linux:
-  target: [AppImage, deb]
+  # tar.gz can also be built on Windows; it ships install.sh + icon for a per-user install.
+  target: [AppImage, deb, tar.gz]
+  extraFiles:
+    - from: linux/install.sh
+      to: install.sh
+    - from: resources/icon.png
+      to: icon.png
   icon: resources/icon.png
   category: Office
   syncDesktopName: true # window <-> launcher icon association (WM_CLASS / Wayland app_id)

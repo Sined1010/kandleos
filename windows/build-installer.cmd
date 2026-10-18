@@ -8,8 +8,10 @@ if not exist node_modules (
 )
 
 call npm.cmd run dist:win || goto fail
+rem Linux-Archiv mit install.sh (AppImage/.deb lassen sich nur unter Linux bauen)
+call node_modules\.bin\electron-builder.cmd --linux tar.gz || goto fail
 echo.
-echo Fertig: Installer liegt in %cd%\release
+echo Fertig: Windows-Installer und Linux-Archiv liegen in %cd%\release
 start "" "%cd%\release"
 exit /b 0
 
