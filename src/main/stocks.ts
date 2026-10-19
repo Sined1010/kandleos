@@ -1,5 +1,5 @@
 import { aggregate } from '../shared/candles'
-import { cleanName } from '../shared/names'
+import { aliasName, cleanName, findAliases } from '../shared/names'
 import {
   cryptoQuoteAsset,
   isCrypto,
@@ -41,17 +41,31 @@ async function getJson(url: string): Promise<any> {
 
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   if (typeof query !== 'string' || !query.trim() || query.length > 40) return []
-  const d = await getJson(
-    `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&quotesCount=10&newsCount=0&listsCount=0`
-  )
-  return (d.quotes ?? []).flatMap((q: any): SearchResult[] => {
-    if (typeof q.symbol !== 'string') return []
-    const crypto = q.quoteType === 'CRYPTOCURRENCY'
-    // Crypto charts come from Binance, so Yahoo's BTC-USD becomes the BTCUSDT pair.
-    const symbol = crypto ? q.symbol.replace(/-USD$/, 'USDT') : q.symbol
-    if (!SYMBOL_RE.test(symbol) || crypto !== isCrypto(symbol)) return []
-    return [{ symbol, name: String(q.shortname ?? q.longname ?? '').trim(), exchange: crypto ? 'Binance' : (q.exchDisp ?? '') }]
-  })
+  // German names for futures and indices come first; Yahoo's search does not know them.
+  const curated: SearchResult[] = findAliases(query).map((a) => ({
+    symbol: a.symbol,
+    name: a.name,
+    exchange: a.symbol.endsWith('=F') ? 'Future' : 'Index'
+  }))
+  let found: SearchResult[] = []
+  try {
+    const d = await getJson(
+      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&quotesCount=10&newsCount=0&listsCount=0`
+    )
+    found = (d.quotes ?? []).flatMap((q: any): SearchResult[] => {
+      if (typeof q.symbol !== 'string') return []
+      const crypto = q.quoteType === 'CRYPTOCURRENCY'
+      // Crypto charts come from Binance, so Yahoo's BTC-USD becomes the BTCUSDT pair.
+      const symbol = crypto ? q.symbol.replace(/-USD$/, 'USDT') : q.symbol
+      if (!SYMBOL_RE.test(symbol) || crypto !== isCrypto(symbol) || curated.some((c) => c.symbol === symbol)) return []
+      const name = aliasName(symbol) ?? cleanName(String(q.longname ?? q.shortname ?? ''), crypto)
+      return [{ symbol, name, exchange: crypto ? 'Binance' : (q.exchDisp ?? '') }]
+    })
+  } catch (e) {
+    // Curated hits still work offline or when Yahoo is down.
+    if (!curated.length) throw e
+  }
+  return [...curated, ...found]
 }
 
 function checkArgs(symbol: unknown, key: unknown): [string, string] {
@@ -151,7 +165,7 @@ export async function symbolName(symbolArg: unknown): Promise<string | null> {
   const lookup = crypto ? `${symbol.slice(0, -cryptoQuoteAsset(symbol).length)}-USD` : symbol
   try {
     const m = await yahooMeta(lookup)
-    const name = cleanName(String(m.longName ?? m.shortName ?? ''), crypto)
+    const name = aliasName(symbol) ?? cleanName(String(m.longName ?? m.shortName ?? ''), crypto)
     return name || null
   } catch {
     return null

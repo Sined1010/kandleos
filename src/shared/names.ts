@@ -10,7 +10,62 @@ const LEGAL_FORMS: [RegExp, string][] = [
 
 /** Readable display name from a Yahoo listing name; crypto pairs drop the trailing quote currency. */
 export function cleanName(raw: string, crypto: boolean): string {
-  let name = raw.replace(/\s+/g, ' ').trim()
+  let name = raw
+    // Yahoo pads short names and appends a share-class letter: "SIEMENS AG          N".
+    .replace(/\s{2,}[A-Z]$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    // Continuous futures (GC=F) roll every month, so the contract month in "Gold Dec 26" goes stale.
+    .replace(/,?\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[- ]\d{2,4}$/, '')
   for (const [re, short] of LEGAL_FORMS) name = name.replace(re, short)
   return crypto ? name.replace(/ USD$/, '') : name
 }
+
+/**
+ * German names and search terms for futures and indices: Yahoo's search only knows them in English or by
+ * symbol ("Silber" finds nothing, "Gold" ranks a company first).
+ */
+export const ALIASES: { symbol: string; name: string; terms: string[] }[] = [
+  { symbol: 'GC=F', name: 'Gold', terms: ['gold'] },
+  { symbol: 'SI=F', name: 'Silber', terms: ['silber', 'silver'] },
+  { symbol: 'PL=F', name: 'Platin', terms: ['platin', 'platinum'] },
+  { symbol: 'PA=F', name: 'Palladium', terms: ['palladium'] },
+  { symbol: 'HG=F', name: 'Kupfer', terms: ['kupfer', 'copper'] },
+  { symbol: 'CL=F', name: 'Rohöl WTI', terms: ['rohoel', 'oel', 'wti', 'crudeoil'] },
+  { symbol: 'BZ=F', name: 'Rohöl Brent', terms: ['rohoel', 'oel', 'brent'] },
+  { symbol: 'NG=F', name: 'Erdgas', terms: ['erdgas', 'gas', 'naturalgas'] },
+  { symbol: 'UX=F', name: 'Uran (U3O8)', terms: ['uran', 'uranium'] },
+  { symbol: 'ZW=F', name: 'Weizen', terms: ['weizen', 'wheat'] },
+  { symbol: 'ZC=F', name: 'Mais', terms: ['mais', 'corn'] },
+  { symbol: '^GDAXI', name: 'DAX', terms: ['dax'] },
+  { symbol: '^MDAXI', name: 'MDAX', terms: ['mdax'] },
+  { symbol: '^TECDAX', name: 'TecDAX', terms: ['tecdax'] },
+  { symbol: '^STOXX50E', name: 'Euro Stoxx 50', terms: ['eurostoxx', 'stoxx'] },
+  { symbol: '^GSPC', name: 'S&P 500', terms: ['sp500', 'sandp'] },
+  { symbol: 'ES=F', name: 'S&P 500 Future', terms: ['sp500', 'sandp'] },
+  { symbol: '^NDX', name: 'Nasdaq 100', terms: ['nasdaq100'] },
+  { symbol: 'NQ=F', name: 'Nasdaq 100 Future', terms: ['nasdaq100'] },
+  { symbol: '^IXIC', name: 'Nasdaq Composite', terms: ['nasdaqcomposite'] },
+  { symbol: '^DJI', name: 'Dow Jones', terms: ['dowjones'] },
+  { symbol: '^N225', name: 'Nikkei 225', terms: ['nikkei'] },
+  { symbol: '^VIX', name: 'VIX (Volatilität)', terms: ['vix', 'volatilitaet'] }
+]
+
+/** Lowercase, umlauts spelled out, only letters and digits: "Rohöl" -> "rohoel", "S&P 500" -> "sp500". */
+export const normalize = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '')
+
+/** Aliases whose search term, name or symbol starts with the query. */
+export function findAliases(query: string): typeof ALIASES {
+  const q = normalize(query)
+  if (q.length < 2) return []
+  return ALIASES.filter((a) => [...a.terms, a.name, a.symbol].some((t) => normalize(t).startsWith(q)))
+}
+
+export const aliasName = (symbol: string): string | undefined => ALIASES.find((a) => a.symbol === symbol)?.name

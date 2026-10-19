@@ -1,6 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cleanName } from './names.ts'
+import { aliasName, cleanName, findAliases } from './names.ts'
+
+test('cleanName drops the share-class letter and the futures contract month', () => {
+  assert.equal(cleanName('SIEMENS AG                    N', false), 'SIEMENS AG')
+  assert.equal(cleanName('Silver Dec 26', false), 'Silver')
+  assert.equal(cleanName('Micro Gold Futures,Dec-2026', false), 'Micro Gold Futures')
+  assert.equal(cleanName('DAX                           P', false), 'DAX')
+})
+
+test('findAliases matches German terms, umlauts and symbols', () => {
+  const symbols = (q: string) => findAliases(q).map((a) => a.symbol)
+  assert.equal(symbols('Silber')[0], 'SI=F')
+  assert.ok(symbols('Öl').includes('CL=F') && symbols('rohoel').includes('BZ=F'))
+  assert.ok(symbols('S&P 500').includes('^GSPC'))
+  assert.ok(symbols('nasdaq').includes('NQ=F'))
+  assert.ok(symbols('gc=f').includes('GC=F'))
+  assert.deepEqual(symbols('x'), [])
+  assert.equal(aliasName('GC=F'), 'Gold')
+})
 
 test('cleanName shortens legal forms and whitespace', () => {
   assert.equal(cleanName('Siemens Aktiengesellschaft', false), 'Siemens AG')
