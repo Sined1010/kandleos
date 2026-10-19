@@ -149,9 +149,14 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
 const ROWS: Record<keyof Indicators, { label: string; params: [string, string, number?][] }> = {
   sma: { label: 'SMA', params: [['period', 'Periode']] },
   ema: { label: 'EMA', params: [['period', 'Periode']] },
+  ema3: { label: '3-fach EMA', params: [['fast', 'Kurz'], ['mid', 'Mittel'], ['slow', 'Lang']] },
   bb: { label: 'Bollinger Bands', params: [['period', 'Periode'], ['mult', 'StdAbw', 0.1]] },
+  vwap: { label: 'VWAP', params: [] },
+  supertrend: { label: 'Supertrend', params: [['period', 'ATR-Periode'], ['mult', 'Faktor', 0.1]] },
   rsi: { label: 'RSI', params: [['period', 'Periode']] },
-  macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']] }
+  macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']] },
+  stoch: { label: 'Stochastik', params: [['period', 'Periode'], ['smoothK', '%K'], ['smoothD', '%D']] },
+  atr: { label: 'ATR', params: [['period', 'Periode']] }
 }
 
 function IndicatorMenu({ onClose }: { onClose: () => void }) {

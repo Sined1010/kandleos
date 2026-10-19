@@ -15,7 +15,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { mergeTick } from '../../../shared/candles'
 import { isCrypto, TF_SECONDS, type Candle } from '../../../shared/types'
-import { bollinger, ema, macd, rsi, sma } from '../lib/indicators'
+import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
@@ -33,8 +33,8 @@ interface ChartApi {
 }
 interface IndicatorSeries {
   series: ISeriesApi<SeriesType>
-  calc: (closes: number[]) => number[]
-  color?: (v: number) => string
+  calc: (closes: number[], data: Candle[]) => number[]
+  color?: (v: number, i: number) => string
 }
 
 const ts = (s: number) => s as UTCTimestamp
@@ -138,28 +138,56 @@ export default function ChartArea() {
       list.push({ series, calc })
       return series
     }
-    const { sma: s, ema: e, bb, rsi: r, macd: m } = indicators
+    const guides = (series: ISeriesApi<SeriesType>, levels: number[]) => {
+      series.applyOptions({ lastValueVisible: true })
+      for (const price of levels)
+        series.createPriceLine({ price, color: '#5d6375', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false })
+    }
+    const { sma: s, ema: e, ema3, bb, vwap: vw, supertrend: st, rsi: r, macd: m, stoch, atr: at } = indicators
     if (s.on) line('#f5c542', (c) => sma(c, s.period))
     if (e.on) line('#42a5f5', (c) => ema(c, e.period))
+    if (ema3.on) {
+      line('#26c6da', (c) => ema(c, ema3.fast))
+      line('#ffa726', (c) => ema(c, ema3.mid))
+      line('#ec407a', (c) => ema(c, ema3.slow))
+    }
     if (bb.on) {
       line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).upper)
       line('#9c6ade88', (c) => bollinger(c, bb.period, bb.mult).mid)
       line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).lower)
     }
-    let pane = 1
-    if (r.on) {
-      const series = line('#b388ff', (c) => rsi(c, r.period), pane++)
-      series.applyOptions({ lastValueVisible: true })
-      for (const price of [70, 30])
-        series.createPriceLine({ price, color: '#5d6375', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false })
+    if (vw.on) line('#e0e0e0', (_, d) => vwap(d)).applyOptions({ lineStyle: LineStyle.Dashed })
+    if (st.on) {
+      // Line series bridge gaps, so one line is coloured per point. A segment takes the colour of its start
+      // point, so the last point before a trend flip is transparent to hide the jump to the other side.
+      let r = supertrend([], st.period, st.mult)
+      const series = chart.addSeries(
+        LineSeries,
+        { lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
+        0
+      )
+      list.push({
+        series,
+        calc: (_, d) => (r = supertrend(d, st.period, st.mult)).value,
+        color: (_, i) =>
+          i + 1 < r.rising.length && r.rising[i + 1] !== r.rising[i] ? 'transparent' : r.rising[i] ? UP : DOWN
+      })
     }
+    let pane = 1
+    if (r.on) guides(line('#b388ff', (c) => rsi(c, r.period), pane++), [70, 30])
     if (m.on) {
       const calc = (c: number[]) => macd(c, m.fast, m.slow, m.signal)
       const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
       list.push({ series: hist, calc: (c) => calc(c).hist, color: (v) => (v >= 0 ? UP : DOWN) + '99' })
       line('#42a5f5', (c) => calc(c).line, pane)
-      line('#ff9800', (c) => calc(c).signal, pane)
+      line('#ff9800', (c) => calc(c).signal, pane++)
     }
+    if (stoch.on) {
+      const calc = (d: Candle[]) => stochastic(d, stoch.period, stoch.smoothK, stoch.smoothD)
+      guides(line('#42a5f5', (_, d) => calc(d).k, pane), [80, 20])
+      line('#ff9800', (_, d) => calc(d).d, pane++)
+    }
+    if (at.on) line('#b0bec5', (_, d) => atr(d, at.period), pane++).applyOptions({ lastValueVisible: true })
     chart.panes().forEach((p, i) => i > 0 && p.setStretchFactor(0.3))
     setIndicatorSeries(list)
     return () => {
@@ -171,10 +199,10 @@ export default function ChartArea() {
   useEffect(() => {
     const closes = data.map((c) => c.close)
     for (const { series, calc, color } of indicatorSeries) {
-      const v = calc(closes)
+      const v = calc(closes, data)
       series.setData(
         data.flatMap((c, i) =>
-          Number.isNaN(v[i]) ? [] : [{ time: ts(c.time), value: v[i], ...(color && { color: color(v[i]) }) }]
+          Number.isNaN(v[i]) ? [] : [{ time: ts(c.time), value: v[i], ...(color && { color: color(v[i], i) }) }]
         )
       )
     }

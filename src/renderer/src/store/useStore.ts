@@ -19,8 +19,13 @@ export interface Indicators {
   sma: { on: boolean; period: number }
   ema: { on: boolean; period: number }
   bb: { on: boolean; period: number; mult: number }
+  ema3: { on: boolean; fast: number; mid: number; slow: number }
+  vwap: { on: boolean }
+  supertrend: { on: boolean; period: number; mult: number }
   rsi: { on: boolean; period: number }
   macd: { on: boolean; fast: number; slow: number; signal: number }
+  stoch: { on: boolean; period: number; smoothK: number; smoothD: number }
+  atr: { on: boolean; period: number }
 }
 
 interface State {
@@ -71,8 +76,13 @@ export const useStore = create<State>()(
         sma: { on: true, period: 20 },
         ema: { on: false, period: 50 },
         bb: { on: false, period: 20, mult: 2 },
+        ema3: { on: false, fast: 20, mid: 50, slow: 200 },
+        vwap: { on: false },
+        supertrend: { on: false, period: 10, mult: 3 },
         rsi: { on: true, period: 14 },
-        macd: { on: false, fast: 12, slow: 26, signal: 9 }
+        macd: { on: false, fast: 12, slow: 26, signal: 9 },
+        stoch: { on: false, period: 14, smoothK: 3, smoothD: 3 },
+        atr: { on: false, period: 14 }
       },
       drawings: {},
       tool: 'cursor',
@@ -135,6 +145,11 @@ export const useStore = create<State>()(
         return p as unknown as State
       },
       // Synchronous read lets the store hydrate before the first render (no flash of defaults).
+      // Indicators added in later versions are missing from older files; fill them with their defaults.
+      merge: (persisted, current) => {
+        const p = persisted as Partial<State>
+        return { ...current, ...p, indicators: { ...current.indicators, ...p.indicators } }
+      },
       storage: createJSONStorage(() => ({
         getItem: () => window.api.storeGet(),
         setItem: (_name, value) => void window.api.storeSet(value),
