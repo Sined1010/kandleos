@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useQuotes, useStore, type Folder } from '../store/useStore'
 import SymbolSearch from './SymbolSearch'
 
@@ -13,6 +13,28 @@ export default function Watchlist() {
   const addFolder = useStore((s) => s.addFolder)
   const [editing, setEditing] = useState<string | null>(null)
   const drag = useRef<{ symbol: string; from: string } | null>(null)
+  const names = useStore((s) => s.names)
+  const setName = useStore((s) => s.setName)
+  // Symbols already looked up this session, so a symbol Yahoo does not know is not asked for again.
+  const looked = useRef(new Set<string>())
+
+  // Fill in readable names for symbols that have none yet (new symbols, or after a reset).
+  useEffect(() => {
+    for (const s of new Set(folders.flatMap((f) => f.symbols))) {
+      if (names[s] || looked.current.has(s)) continue
+      looked.current.add(s)
+      window.api
+        .symbolName(s)
+        // A name typed by the user while the lookup ran wins.
+        .then((n) => n && !useStore.getState().names[s] && setName(s, n))
+        .catch(() => {})
+    }
+  }, [folders, names, setName])
+
+  const resetName = (s: string) => {
+    looked.current.delete(s)
+    setName(s, '')
+  }
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
@@ -34,6 +56,7 @@ export default function Watchlist() {
             editing={editing === f.id}
             onEdit={() => setEditing(f.id)}
             onEditDone={() => setEditing(null)}
+            onNameReset={resetName}
             drag={drag}
           />
         ))}
@@ -48,10 +71,11 @@ interface SectionProps {
   editing: boolean
   onEdit: () => void
   onEditDone: () => void
+  onNameReset: (symbol: string) => void
   drag: Drag
 }
 
-function FolderSection({ folder: f, editing, onEdit, onEditDone, drag }: SectionProps) {
+function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, drag }: SectionProps) {
   const active = useStore((s) => s.symbol)
   const setSymbol = useStore((s) => s.setSymbol)
   const toggle = useStore((s) => s.toggleFolder)
@@ -61,7 +85,10 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, drag }: Section
   const removeFromFolder = useStore((s) => s.removeFromFolder)
   const moveSymbol = useStore((s) => s.moveSymbol)
   const quotes = useQuotes((s) => s.quotes)
+  const names = useStore((s) => s.names)
+  const setName = useStore((s) => s.setName)
   const [adding, setAdding] = useState(false)
+  const [renaming, setRenaming] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState(false)
 
   const iconBtn = 'rounded p-1 text-muted hover:bg-line hover:text-white'
@@ -170,7 +197,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, drag }: Section
           return (
             <div
               key={s}
-              draggable
+              draggable={renaming !== s}
               onDragStart={(e) => {
                 drag.current = { symbol: s, from: f.id }
                 e.dataTransfer.effectAllowed = 'move'
@@ -182,7 +209,40 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, drag }: Section
                 s === active ? 'bg-accent/15' : 'hover:bg-bg'
               }`}
             >
-              <span className="truncate font-medium text-white">{s}</span>
+              {renaming === s ? (
+                <input
+                  autoFocus
+                  defaultValue={names[s] ?? s}
+                  maxLength={40}
+                  aria-label={`Anzeigename für ${s}`}
+                  onClick={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    // Empty (or the bare ticker) means "back to the automatic name".
+                    if (!v || v === s) onNameReset(s)
+                    else setName(s, v)
+                    setRenaming(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') e.currentTarget.value = names[s] ?? s
+                    if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
+                  }}
+                  className="min-w-0 rounded bg-bg px-1 text-xs text-white outline-none ring-1 ring-accent"
+                />
+              ) : (
+                <span
+                  className="min-w-0"
+                  title={`${s} – Doppelklick zum Umbenennen`}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation()
+                    setRenaming(s)
+                  }}
+                >
+                  <span className="block truncate font-medium text-white">{names[s] ?? s}</span>
+                  {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
+                </span>
+              )}
               <span className="text-right tabular-nums">{q ? formatPrice(q.price) : '—'}</span>
               <span
                 className={`w-16 text-right tabular-nums group-hover/row:hidden ${
@@ -191,16 +251,28 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, drag }: Section
               >
                 {q ? `${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%` : '—'}
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeFromFolder(f.id, s)
-                }}
-                className="hidden w-16 justify-end text-muted hover:text-down group-hover/row:flex"
-                aria-label={`${s} aus ${f.name} entfernen`}
-              >
-                <X size={14} />
-              </button>
+              <div className="hidden w-16 justify-end gap-1.5 group-hover/row:flex">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setRenaming(s)
+                  }}
+                  className="text-muted hover:text-white"
+                  aria-label={`${s} umbenennen`}
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFromFolder(f.id, s)
+                  }}
+                  className="text-muted hover:text-down"
+                  aria-label={`${s} aus ${f.name} entfernen`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
           )
         })}

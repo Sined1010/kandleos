@@ -32,6 +32,8 @@ interface State {
   symbol: string
   timeframe: Timeframe
   folders: Folder[]
+  /** Display names per symbol (automatic or set by the user); missing means "show the ticker". */
+  names: Record<string, string>
   finnhubKey: string
   indicators: Indicators
   drawings: Record<string, Drawing[]>
@@ -39,6 +41,8 @@ interface State {
   selectedId: string | null
   setSymbol: (symbol: string) => void
   setTimeframe: (tf: Timeframe) => void
+  /** An empty name removes it, so the automatic name is looked up again. */
+  setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
   renameFolder: (id: string, name: string) => void
   removeFolder: (id: string) => void
@@ -71,6 +75,7 @@ export const useStore = create<State>()(
       symbol: 'BTCUSDT',
       timeframe: '1h',
       folders: [folder('Krypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Aktien', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
+      names: {},
       finnhubKey: window.api.keyGet(),
       indicators: {
         sma: { on: true, period: 20 },
@@ -89,6 +94,11 @@ export const useStore = create<State>()(
       selectedId: null,
       setSymbol: (symbol) => set({ symbol, selectedId: null, tool: 'cursor' }),
       setTimeframe: (timeframe) => set({ timeframe }),
+      setName: (symbol, name) =>
+        set((s) => {
+          const { [symbol]: _, ...rest } = s.names
+          return { names: name ? { ...rest, [symbol]: name } : rest }
+        }),
       addFolder: (name) => {
         const f = folder(name, [])
         set((s) => ({ folders: [...s.folders, f] }))
@@ -155,7 +165,8 @@ export const useStore = create<State>()(
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, folders, indicators, drawings }) => ({
+      partialize: ({ symbol, timeframe, folders, names, indicators, drawings }) => ({
+        names,
         symbol,
         timeframe,
         folders,

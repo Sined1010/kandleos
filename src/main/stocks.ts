@@ -1,5 +1,7 @@
 import { aggregate } from '../shared/candles'
+import { cleanName } from '../shared/names'
 import {
+  cryptoQuoteAsset,
   isCrypto,
   SYMBOL_RE,
   TF_SECONDS,
@@ -139,6 +141,21 @@ async function yahooMeta(symbol: string): Promise<any> {
   const m = d.chart?.result?.[0]?.meta
   if (!m?.regularMarketPrice) throw new Error(`Yahoo: kein Kurs für ${symbol}`)
   return m
+}
+
+/** Display name for a watchlist symbol, or null if Yahoo does not know it. */
+export async function symbolName(symbolArg: unknown): Promise<string | null> {
+  const [symbol] = checkArgs(symbolArg, '')
+  const crypto = isCrypto(symbol)
+  // Yahoo lists coins against USD (BTC-USD), not as exchange pairs (BTCUSDT).
+  const lookup = crypto ? `${symbol.slice(0, -cryptoQuoteAsset(symbol).length)}-USD` : symbol
+  try {
+    const m = await yahooMeta(lookup)
+    const name = cleanName(String(m.longName ?? m.shortName ?? ''), crypto)
+    return name || null
+  } catch {
+    return null
+  }
 }
 
 async function yahooQuote(symbol: string): Promise<Quote> {

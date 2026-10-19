@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { finnhubCheck, searchSymbols, stockCandles, stockQuotes } from './stocks'
+import { finnhubCheck, searchSymbols, stockCandles, stockQuotes, symbolName } from './stocks'
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
 // those would be two different folders. All data (store, key, single-instance lock) lives here.
@@ -57,6 +57,7 @@ ipcMain.handle('stocks:candles', (_e, symbol, tf, key) => stockCandles(symbol, t
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
+ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
 
 function createWindow(): void {
   const win = new BrowserWindow({
