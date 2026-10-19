@@ -7,7 +7,10 @@ export type Point = { time: number; price: number }
 export type Drawing =
   | { id: string; type: 'trend' | 'fib'; p1: Point; p2: Point }
   | { id: string; type: 'hline'; price: number }
-export type Tool = 'cursor' | 'trend' | 'hline' | 'fib'
+  | { id: string; type: 'vline'; time: number }
+  // Tools added later store their clicks as a point list; the older shapes above keep their saved format.
+  | { id: string; type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure'; points: Point[] }
+export type Tool = 'cursor' | Drawing['type']
 export interface Folder {
   id: string
   name: string

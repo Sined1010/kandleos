@@ -2,20 +2,49 @@ import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_SECONDS, type Candle } from '../../../shared/types'
-import { useStore, type Drawing, type Point } from '../store/useStore'
+import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
+import { useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
 const COLOR = '#2962ff'
 const SELECTED = '#f5c542'
+const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043' }
+const WAVE_LABELS = { elliott: ['0', '1', '2', '3', '4', '5'], abc: ['0', 'A', 'B', 'C'] }
 const NO_DRAWINGS: Drawing[] = []
 
-type Handle = 'move' | 'p1' | 'p2'
+/** Clicks each tool needs; the drawing is created on the last one. */
+const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
+  trend: 2,
+  ray: 2,
+  hline: 1,
+  vline: 1,
+  fib: 2,
+  rect: 2,
+  channel: 3,
+  elliott: 6,
+  abc: 4,
+  measure: 2
+}
+
+/** 'move' drags the whole drawing, a number drags that point. */
+type Handle = 'move' | number
 interface DragState {
   handle: Handle
   from: { logical: number; price: number }
   orig: Drawing
   current: Drawing
+}
+
+const pointsOf = (d: Drawing): Point[] => ('points' in d ? d.points : 'p1' in d ? [d.p1, d.p2] : [])
+const withPoints = (d: Drawing, pts: Point[]): Drawing =>
+  'points' in d ? { ...d, points: pts } : 'p1' in d ? { ...d, p1: pts[0], p2: pts[1] } : d
+
+function build(tool: Exclude<Tool, 'cursor'>, id: string, pts: Point[]): Drawing {
+  if (tool === 'hline') return { id, type: tool, price: pts[0].price }
+  if (tool === 'vline') return { id, type: tool, time: pts[0].time }
+  if (tool === 'trend' || tool === 'fib') return { id, type: tool, p1: pts[0], p2: pts[1] ?? pts[0] }
+  return { id, type: tool, points: pts }
 }
 
 interface Props {
@@ -37,7 +66,9 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const removeDrawing = useStore((s) => s.removeDrawing)
   const updateDrawing = useStore((s) => s.updateDrawing)
   const svgRef = useRef<SVGSVGElement>(null)
-  const [draft, setDraft] = useState<{ p1: Point; p2: Point } | null>(null)
+  // Clicked points of the drawing in progress, plus the point under the mouse for the preview.
+  const [draft, setDraft] = useState<Point[]>([])
+  const [hover, setHover] = useState<Point | null>(null)
   // Edits are previewed locally and committed on mouseup, so the store file is written once per drag.
   const [drag, setDrag] = useState<DragState | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -70,7 +101,10 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
     return () => cancelAnimationFrame(raf)
   }, [chart, series])
 
-  useEffect(() => setDraft(null), [tool, symbol])
+  useEffect(() => {
+    setDraft([])
+    setHover(null)
+  }, [tool, symbol])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -86,8 +120,8 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedId, setTool, removeDrawing])
 
-  const toX = (time: number) =>
-    times.length ? chart.timeScale().logicalToCoordinate(timeToLogical(times, time, step) as Logical) : null
+  const logicalOf = (time: number) => timeToLogical(times, time, step)
+  const toX = (time: number) => (times.length ? chart.timeScale().logicalToCoordinate(logicalOf(time) as Logical) : null)
   const toY = (price: number) => series.priceToCoordinate(price)
   const fmt = (price: number) => series.priceFormatter().format(price)
 
@@ -121,18 +155,18 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       const at = logicalAt(e)
       if (!d || !at) return
       const dPrice = at.price - d.from.price
-      // Shift in bar space, not seconds, so a line keeps its shape across weekend/overnight gaps.
-      const shift = (p: Point): Point => ({
-        time: logicalToTime(times, timeToLogical(times, p.time, step) + at.logical - d.from.logical, step),
-        price: p.price + dPrice
-      })
+      // Shift in bar space, not seconds, so a shape keeps its form across weekend/overnight gaps.
+      const shiftTime = (t: number) => logicalToTime(times, logicalOf(t) + at.logical - d.from.logical, step)
       const o = d.orig
+      const cursor = { time: logicalToTime(times, at.logical, step), price: at.price }
       const current: Drawing =
         o.type === 'hline'
           ? { ...o, price: o.price + dPrice }
-          : d.handle === 'move'
-            ? { ...o, p1: shift(o.p1), p2: shift(o.p2) }
-            : { ...o, [d.handle]: { time: logicalToTime(times, at.logical, step), price: at.price } }
+          : o.type === 'vline'
+            ? { ...o, time: shiftTime(o.time) }
+            : d.handle === 'move'
+              ? withPoints(o, pointsOf(o).map((p) => ({ time: shiftTime(p.time), price: p.price + dPrice })))
+              : withPoints(o, pointsOf(o).map((p, i) => (i === d.handle ? cursor : p)))
       dragRef.current = { ...d, current }
       setDrag(dragRef.current)
     }
@@ -154,19 +188,14 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const onClick = (e: React.MouseEvent) => {
     const p = pointAt(e)
     if (!p || tool === 'cursor') return
-    if (tool === 'hline') {
-      addDrawing({ id: crypto.randomUUID(), type: 'hline', price: p.price })
-      setTool('cursor')
-    } else if (!draft) setDraft({ p1: p, p2: p })
-    else {
-      addDrawing({ id: crypto.randomUUID(), type: tool, p1: draft.p1, p2: p })
-      setTool('cursor')
-    }
+    const pts = [...draft, p]
+    if (pts.length < CLICKS[tool]) return setDraft(pts)
+    addDrawing(build(tool, crypto.randomUUID(), pts))
+    setTool('cursor')
   }
 
   const onMove = (e: React.MouseEvent) => {
-    const p = draft && pointAt(e)
-    if (p) setDraft({ p1: draft.p1, p2: p })
+    if (draft.length) setHover(pointAt(e))
   }
 
   const width = chart.timeScale().width()
@@ -176,15 +205,18 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const render = (d: Drawing, preview = false) => {
     const selected = d.id === selectedId
     const stroke = selected ? SELECTED : COLOR
+    const lineWidth = selected ? 2 : 1.5
     // A wide transparent twin of each line is the hit area; in cursor mode only these catch the mouse.
-    const hit = preview
-      ? null
-      : {
-          stroke: 'transparent',
-          strokeWidth: 10,
-          style: { pointerEvents: 'stroke' as const, cursor: d.type === 'hline' ? 'ns-resize' : 'move' },
-          onMouseDown: (e: React.MouseEvent) => startDrag(e, d, 'move')
-        }
+    const hit = (cursor = 'move') =>
+      preview
+        ? null
+        : {
+            stroke: 'transparent',
+            strokeWidth: 10,
+            fill: 'none',
+            style: { pointerEvents: 'stroke' as const, cursor },
+            onMouseDown: (e: React.MouseEvent) => startDrag(e, d, 'move')
+          }
 
     if (d.type === 'hline') {
       const y = toY(d.price)
@@ -192,7 +224,7 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       return (
         <g key={d.id}>
           <line x1={0} x2={width} y1={y} y2={y} stroke={stroke} strokeWidth={selected ? 2 : 1} />
-          {hit && <line x1={0} x2={width} y1={y} y2={y} {...hit} />}
+          {hit('ns-resize') && <line x1={0} x2={width} y1={y} y2={y} {...hit('ns-resize')} />}
           <text x={width - 6} y={y - 4} textAnchor="end" fill={stroke} fontSize={11}>
             {fmt(d.price)}
           </text>
@@ -200,46 +232,151 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       )
     }
 
-    const x1 = toX(d.p1.time)
-    const x2 = toX(d.p2.time)
-    const y1 = toY(d.p1.price)
-    const y2 = toY(d.p2.price)
-    if (x1 === null || x2 === null || y1 === null || y2 === null) return null
-    const ends = { x1, y1, x2, y2 }
-    const handle = (cx: number, cy: number, h: Handle) => (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={5}
-        fill="#0b0e14"
-        stroke={stroke}
-        strokeWidth={1.5}
-        style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
-        onMouseDown={preview ? undefined : (e) => startDrag(e, d, h)}
-      />
-    )
-    const handles = (selected || preview) && (
-      <>
-        {handle(x1, y1, 'p1')}
-        {handle(x2, y2, 'p2')}
-      </>
-    )
-
-    if (d.type === 'trend') {
+    if (d.type === 'vline') {
+      const x = toX(d.time)
+      if (x === null) return null
       return (
         <g key={d.id}>
-          <line {...ends} stroke={stroke} strokeWidth={selected ? 2 : 1.5} />
-          {hit && <line {...ends} {...hit} />}
+          <line x1={x} x2={x} y1={0} y2={height} stroke={stroke} strokeWidth={selected ? 2 : 1} />
+          {hit('ew-resize') && <line x1={x} x2={x} y1={0} y2={height} {...hit('ew-resize')} />}
+          <text x={x + 4} y={height - 6} fill={stroke} fontSize={11}>
+            {new Date(d.time * 1000).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: step < 86400 ? 'short' : undefined })}
+          </text>
+        </g>
+      )
+    }
+
+    const pts = pointsOf(d)
+    const xy = pts.map((p) => [toX(p.time), toY(p.price)] as const)
+    if (xy.some(([x, y]) => x === null || y === null)) return null
+    const xs = xy.map(([x]) => x as number)
+    const ys = xy.map(([, y]) => y as number)
+    const handles = (selected || preview) &&
+      xs.map((x, i) => (
+        <circle
+          key={`h${i}`}
+          cx={x}
+          cy={ys[i]}
+          r={5}
+          fill="#0b0e14"
+          stroke={stroke}
+          strokeWidth={1.5}
+          style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
+          onMouseDown={preview ? undefined : (e) => startDrag(e, d, i)}
+        />
+      ))
+    const seg = (a: number, b: number) => ({ x1: xs[a], y1: ys[a], x2: xs[b], y2: ys[b] })
+
+    if (d.type === 'trend' || (d.type === 'ray' && pts.length < 2)) {
+      return (
+        <g key={d.id}>
+          <line {...seg(0, 1)} stroke={stroke} strokeWidth={lineWidth} />
+          {hit() && <line {...seg(0, 1)} {...hit()} />}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'ray') {
+      const [ex, ey] = rayEnd(xs[0], ys[0], xs[1], ys[1], width)
+      const ray = { x1: xs[0], y1: ys[0], x2: ex, y2: ey }
+      return (
+        <g key={d.id}>
+          <line {...ray} stroke={stroke} strokeWidth={lineWidth} />
+          {hit() && <line {...ray} {...hit()} />}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'rect' || d.type === 'measure') {
+      const box = { x: Math.min(...xs), y: Math.min(...ys), width: Math.abs(xs[1] - xs[0]), height: Math.abs(ys[1] - ys[0]) }
+      const up = pts[1].price >= pts[0].price
+      const color = d.type === 'rect' ? stroke : up ? '#26a69a' : '#ef5350'
+      return (
+        <g key={d.id}>
+          <rect {...box} fill={color} fillOpacity={0.12} stroke={color} strokeWidth={selected ? 2 : 1} />
+          {hit() && <rect {...box} {...hit()} />}
+          {d.type === 'measure' && (
+            <>
+              <line {...seg(0, 1)} stroke={color} strokeDasharray="4 3" />
+              <text x={box.x + box.width / 2} y={up ? box.y - 6 : box.y + box.height + 14} textAnchor="middle" fill={color} fontSize={11} fontWeight={600}>
+                {measureLabel(pts[0].price, pts[1].price, logicalOf(pts[1].time) - logicalOf(pts[0].time), fmt)}
+              </text>
+            </>
+          )}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'channel') {
+      if (pts.length < 3) {
+        return (
+          <g key={d.id}>
+            <line {...seg(0, 1)} stroke={stroke} strokeWidth={lineWidth} />
+            {handles}
+          </g>
+        )
+      }
+      const offset = channelOffset(
+        logicalOf(pts[0].time),
+        pts[0].price,
+        logicalOf(pts[1].time),
+        pts[1].price,
+        logicalOf(pts[2].time),
+        pts[2].price
+      )
+      const parallel = [toY(pts[0].price + offset), toY(pts[1].price + offset)]
+      const middle = [toY(pts[0].price + offset / 2), toY(pts[1].price + offset / 2)]
+      if ([...parallel, ...middle].some((v) => v === null)) return null
+      const [q0, q1] = parallel as number[]
+      const [m0, m1] = middle as number[]
+      const second = { x1: xs[0], y1: q0, x2: xs[1], y2: q1 }
+      return (
+        <g key={d.id}>
+          <polygon points={`${xs[0]},${ys[0]} ${xs[1]},${ys[1]} ${xs[1]},${q1} ${xs[0]},${q0}`} fill={stroke} fillOpacity={0.08} />
+          <line {...seg(0, 1)} stroke={stroke} strokeWidth={lineWidth} />
+          <line {...second} stroke={stroke} strokeWidth={lineWidth} />
+          <line x1={xs[0]} y1={m0} x2={xs[1]} y2={m1} stroke={stroke} strokeWidth={1} strokeDasharray="4 4" strokeOpacity={0.7} />
+          {hit() && <line {...seg(0, 1)} {...hit()} />}
+          {hit() && <line {...second} {...hit()} />}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'elliott' || d.type === 'abc') {
+      const color = selected ? SELECTED : WAVE_COLORS[d.type]
+      const labels = WAVE_LABELS[d.type]
+      const path =xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+      return (
+        <g key={d.id}>
+          <polyline points={path} fill="none" stroke={color} strokeWidth={lineWidth} />
+          {hit() && <polyline points={path} {...hit()} />}
+          {xs.map((x, i) => (
+            <text
+              key={`l${i}`}
+              x={x}
+              y={isTrough(ys, i) ? ys[i] + 16 : ys[i] - 8}
+              textAnchor="middle"
+              fill={color}
+              fontSize={12}
+              fontWeight={700}
+            >
+              ({labels[i]})
+            </text>
+          ))}
           {handles}
         </g>
       )
     }
 
     // Fibonacci: level 1 at the first click (swing high), level 0 at the second (swing low).
-    const left = Math.min(x1, x2)
-    const right = Math.max(x1, x2)
+    const left = Math.min(xs[0], xs[1])
+    const right = Math.max(xs[0], xs[1])
     const levels = FIB_LEVELS.map((lvl, i) => {
-      const price = d.p2.price + (d.p1.price - d.p2.price) * lvl
+      const price = pts[1].price + (pts[0].price - pts[1].price) * lvl
       return { lvl, price, y: toY(price), color: FIB_COLORS[i] }
     })
     return (
@@ -256,36 +393,44 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
             l.y !== null && (
               <g key={l.lvl}>
                 <line x1={left} x2={right} y1={l.y} y2={l.y} stroke={l.color} strokeWidth={selected ? 2 : 1} />
-                {hit && <line x1={left} x2={right} y1={l.y} y2={l.y} {...hit} />}
+                {hit() && <line x1={left} x2={right} y1={l.y} y2={l.y} {...hit()} />}
                 <text x={left + 4} y={l.y - 3} fill={l.color} fontSize={10}>
                   {l.lvl} ({fmt(l.price)})
                 </text>
               </g>
             )
         )}
-        <line {...ends} stroke={stroke} strokeDasharray="4 4" />
-        {hit && <line {...ends} {...hit} />}
+        <line {...seg(0, 1)} stroke={stroke} strokeDasharray="4 4" />
+        {hit() && <line {...seg(0, 1)} {...hit()} />}
         {handles}
       </g>
     )
   }
 
+  const preview = tool !== 'cursor' && draft.length > 0 && hover ? build(tool, 'draft', [...draft, hover]) : null
   return (
-    <svg
-      ref={svgRef}
-      width={width}
-      height={height}
-      className="absolute left-0 top-0"
-      // While dragging, the svg swallows the mouse so the chart underneath does not pan along.
-      style={{
-        pointerEvents: drawingMode || drag ? 'all' : 'none',
-        cursor: drag ? 'grabbing' : drawingMode ? 'crosshair' : 'default'
-      }}
-      onClick={onClick}
-      onMouseMove={onMove}
-    >
-      {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
-      {draft && (tool === 'trend' || tool === 'fib') && render({ id: 'draft', type: tool, ...draft }, true)}
-    </svg>
+    <>
+      <svg
+        ref={svgRef}
+        width={width}
+        height={height}
+        className="absolute left-0 top-0"
+        // While dragging, the svg swallows the mouse so the chart underneath does not pan along.
+        style={{
+          pointerEvents: drawingMode || drag ? 'all' : 'none',
+          cursor: drag ? 'grabbing' : drawingMode ? 'crosshair' : 'default'
+        }}
+        onClick={onClick}
+        onMouseMove={onMove}
+      >
+        {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
+        {preview && render(preview, true)}
+      </svg>
+      {tool !== 'cursor' && CLICKS[tool] > 1 && (
+        <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded bg-panel/90 px-2 py-1 text-xs text-slate-200 ring-1 ring-line">
+          Punkt {draft.length + 1} von {CLICKS[tool]} · Esc bricht ab
+        </div>
+      )}
+    </>
   )
 }

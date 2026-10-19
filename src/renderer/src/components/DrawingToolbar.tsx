@@ -1,11 +1,33 @@
-import { ChartNoAxesGantt, Minus, MousePointer2, Slash, Trash2, X, type LucideIcon } from 'lucide-react'
+import {
+  Activity,
+  ChartNoAxesGantt,
+  Columns2,
+  Minus,
+  MousePointer2,
+  MoveUpRight,
+  RectangleHorizontal,
+  Ruler,
+  SeparatorVertical,
+  Slash,
+  Spline,
+  Trash2,
+  X,
+  type LucideIcon
+} from 'lucide-react'
 import { useStore, type Tool } from '../store/useStore'
 
 const TOOLS: [Tool, LucideIcon, string][] = [
   ['cursor', MousePointer2, 'Auswahl'],
   ['trend', Slash, 'Trendlinie (2 Klicks)'],
+  ['ray', MoveUpRight, 'Strahl – Trendlinie bis zum Rand verlängert (2 Klicks)'],
   ['hline', Minus, 'Horizontale Linie (1 Klick)'],
-  ['fib', ChartNoAxesGantt, 'Fibonacci Retracement (2 Klicks: Hoch → Tief)']
+  ['vline', SeparatorVertical, 'Vertikale Linie (1 Klick)'],
+  ['channel', Columns2, 'Parallelkanal (3 Klicks: Linie, dann Abstand)'],
+  ['rect', RectangleHorizontal, 'Rechteck / Zone (2 Klicks)'],
+  ['fib', ChartNoAxesGantt, 'Fibonacci Retracement (2 Klicks: Hoch → Tief)'],
+  ['elliott', Activity, 'Elliott-Impuls 0-1-2-3-4-5 (6 Klicks)'],
+  ['abc', Spline, 'Elliott-Korrektur 0-A-B-C (4 Klicks)'],
+  ['measure', Ruler, 'Messen – Preis, Prozent und Kerzen (2 Klicks)']
 ]
 
 export default function DrawingToolbar() {
