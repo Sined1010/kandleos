@@ -14,7 +14,8 @@ import {
 } from 'lightweight-charts'
 import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { futureTimes, mergeTick } from '../../../shared/candles'
+import { futureTimes } from '../../../shared/calendar'
+import { mergeTick } from '../../../shared/candles'
 import { isCrypto, TF_SECONDS, type Candle } from '../../../shared/types'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { loadCandles, watchCandles } from '../services/marketData'
@@ -64,6 +65,8 @@ export default function ChartArea() {
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [currency, setCurrency] = useState('')
+  // Exchange time zone of the loaded symbol; the forecast's time axis follows that exchange's calendar.
+  const timezoneRef = useRef<string | undefined>(undefined)
   const [fc, setFc] = useState<{ state: 'idle' | 'loading' | 'shown' | 'error'; pct?: number; error?: string }>({
     state: 'idle'
   })
@@ -102,7 +105,7 @@ export default function ChartArea() {
     }
 
     loadCandles(symbol, timeframe, finnhubKey)
-      .then(({ candles: bars, currency }) => {
+      .then(({ candles: bars, currency, timezone }) => {
         if (!active) return
         if (!bars.length) return setStatus(`Keine Daten für ${symbol}`)
         const last = bars[bars.length - 1].close
@@ -114,6 +117,7 @@ export default function ChartArea() {
         dataRef.current = bars
         setData([...bars])
         setCurrency(currency)
+        timezoneRef.current = timezone
         setStatus(null)
       })
       .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
@@ -245,7 +249,8 @@ export default function ChartArea() {
       const future = futureTimes(
         bars.map((c) => c.time),
         seconds,
-        steps.length
+        steps.length,
+        timezoneRef.current
       )
       const line =(k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
         const s = api.chart.addSeries(

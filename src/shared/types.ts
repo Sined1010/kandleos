@@ -40,6 +40,8 @@ export interface CandleData {
   candles: Candle[]
   /** ISO code as the exchange reports it, e.g. USD, EUR, GBp (pence); '' if unknown */
   currency: string
+  /** IANA time zone of the exchange (stocks only), e.g. America/New_York; drives the trading calendar. */
+  timezone?: string
 }
 
 // shortcut: market is guessed from the quote-currency suffix; add an explicit market field if exotic tickers collide.

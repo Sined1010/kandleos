@@ -1,3 +1,4 @@
+import { timeZoneForSymbol } from '../shared/calendar'
 import { aggregate } from '../shared/candles'
 import { aliasName, cleanName, findAliases } from '../shared/names'
 import {
@@ -90,6 +91,17 @@ async function finnhubCandles(symbol: string, tf: Timeframe, key: string): Promi
   }))
 }
 
+/** Yahoo's exchange time zone, if it is one the runtime knows (it ends up in Intl.DateTimeFormat). */
+function validTimeZone(tz: unknown): string | undefined {
+  if (typeof tz !== 'string') return undefined
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz })
+    return tz
+  } catch {
+    return undefined
+  }
+}
+
 async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> {
   const [interval, range] = YAHOO[tf]
   const d = await getJson(
@@ -104,7 +116,8 @@ async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> 
     if (q.open[i] == null || q.close[i] == null || (out.length && t <= out[out.length - 1].time)) return
     out.push({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] ?? 0 })
   })
-  return { candles: out, currency: r.meta?.currency ?? '' }
+  const timezone = validTimeZone(r.meta?.exchangeTimezoneName) ?? timeZoneForSymbol(symbol)
+  return { candles: out, currency: r.meta?.currency ?? '', timezone }
 }
 
 export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: unknown): Promise<CandleData> {
@@ -116,8 +129,10 @@ export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: u
     try {
       const candles = await finnhubCandles(symbol, tf, key)
       // Finnhub candles carry no currency; Yahoo's quote metadata does.
-      const currency = await yahooMeta(symbol).then((m) => m.currency ?? '', () => '')
-      data = { candles, currency }
+      const meta = await yahooMeta(symbol).catch(() => null)
+      // Finnhub candles carry no exchange time zone: take Yahoo's, else derive it from the ticker suffix.
+      const timezone = validTimeZone(meta?.exchangeTimezoneName) ?? timeZoneForSymbol(symbol)
+      data = { candles, currency: meta?.currency ?? '', timezone }
     } catch (e) {
       console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, (e as Error).message)
     }
