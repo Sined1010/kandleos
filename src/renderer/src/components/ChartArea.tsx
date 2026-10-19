@@ -14,7 +14,7 @@ import {
 } from 'lightweight-charts'
 import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { mergeTick } from '../../../shared/candles'
+import { futureTimes, mergeTick } from '../../../shared/candles'
 import { isCrypto, TF_SECONDS, type Candle } from '../../../shared/types'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { loadCandles, watchCandles } from '../services/marketData'
@@ -242,8 +242,12 @@ export default function ChartArea() {
       if (run !== fcRun.current) return
       const last = bars[bars.length - 1]
       const seconds = TF_SECONDS[timeframe]
-      // shortcut: future bars are evenly spaced, ignoring weekends and trading hours; fine for a visual projection.
-      const line = (k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
+      const future = futureTimes(
+        bars.map((c) => c.time),
+        seconds,
+        steps.length
+      )
+      const line =(k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
         const s = api.chart.addSeries(
           LineSeries,
           { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
@@ -252,7 +256,7 @@ export default function ChartArea() {
         // Starts at the last close so the projection visibly continues the chart.
         s.setData([
           { time: ts(last.time), value: last.close },
-          ...steps.map((v, i) => ({ time: ts(last.time + (i + 1) * seconds), value: v[k] }))
+          ...steps.map((v, i) => ({ time: ts(future[i]), value: v[k] }))
         ])
         return s
       }
