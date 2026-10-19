@@ -9,6 +9,10 @@ files:
 win:
   target: nsis
   icon: resources/icon.png
+  # onnxruntime-node ships native libraries for every OS; keep only this target's (saves ~150 MB).
+  files:
+    - '!node_modules/onnxruntime-node/bin/napi-v*/{linux,darwin}/**'
+    - '!node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**'
 nsis:
   artifactName: KandleOS-Setup-${version}.${ext}
   oneClick: false
@@ -20,6 +24,9 @@ nsis:
 linux:
   # tar.gz can also be built on Windows; it ships install.sh + icon for a per-user install.
   target: [AppImage, deb, tar.gz]
+  files:
+    - '!node_modules/onnxruntime-node/bin/napi-v*/{win32,darwin}/**'
+    - '!node_modules/onnxruntime-node/bin/napi-v*/linux/arm64/**'
   extraFiles:
     - from: linux/install.sh
       to: install.sh

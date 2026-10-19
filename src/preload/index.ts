@@ -12,7 +12,15 @@ const api = {
     ipcRenderer.invoke('stocks:quotes', symbols, key),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),
-  symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol)
+  symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
+  /** Chronos-2 forecast: [p10, median, p90] for each of the next 64 bars. */
+  forecast: (closes: number[]): Promise<number[][]> => ipcRenderer.invoke('forecast:run', closes),
+  /** Model download progress in percent; returns an unsubscribe function. */
+  onForecastProgress: (cb: (pct: number) => void): (() => void) => {
+    const handler = (_e: unknown, pct: number) => cb(pct)
+    ipcRenderer.on('forecast:progress', handler)
+    return () => ipcRenderer.removeListener('forecast:progress', handler)
+  }
 }
 
 export type Api = typeof api

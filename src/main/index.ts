@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { forecast } from './forecast'
 import { finnhubCheck, searchSymbols, stockCandles, stockQuotes, symbolName } from './stocks'
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
@@ -58,6 +59,14 @@ ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
+ipcMain.handle('forecast:run', (e, closes) => {
+  let last = -1
+  return forecast(closes, (share) => {
+    // Report whole percents only; the download emits thousands of chunks.
+    const pct = Math.floor(share * 100)
+    if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))
+  })
+})
 
 function createWindow(): void {
   const win = new BrowserWindow({

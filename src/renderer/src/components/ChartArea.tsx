@@ -12,6 +12,7 @@ import {
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
+import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { mergeTick } from '../../../shared/candles'
 import { isCrypto, TF_SECONDS, type Candle } from '../../../shared/types'
@@ -63,6 +64,12 @@ export default function ChartArea() {
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [currency, setCurrency] = useState('')
+  const [fc, setFc] = useState<{ state: 'idle' | 'loading' | 'shown' | 'error'; pct?: number; error?: string }>({
+    state: 'idle'
+  })
+  const fcSeries = useRef<ISeriesApi<'Line'>[]>([])
+  // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
+  const fcRun = useRef(0)
 
   // History + live updates for the current symbol/timeframe.
   useEffect(() => {
@@ -208,6 +215,61 @@ export default function ChartArea() {
     }
   }, [data, indicatorSeries])
 
+  // A forecast belongs to one symbol and timeframe; drop it when either changes.
+  useEffect(() => {
+    if (!api) return
+    return () => {
+      fcRun.current++
+      fcSeries.current.forEach((s) => api.chart.removeSeries(s))
+      fcSeries.current = []
+      setFc({ state: 'idle' })
+    }
+  }, [api, symbol, timeframe])
+
+  const toggleForecast = async () => {
+    if (!api) return
+    if (fc.state === 'shown') {
+      fcSeries.current.forEach((s) => api.chart.removeSeries(s))
+      fcSeries.current = []
+      return setFc({ state: 'idle' })
+    }
+    const bars = dataRef.current
+    const run = ++fcRun.current
+    setFc({ state: 'loading' })
+    const stop = window.api.onForecastProgress((pct) => run === fcRun.current && setFc({ state: 'loading', pct }))
+    try {
+      const steps = await window.api.forecast(bars.map((c) => c.close))
+      if (run !== fcRun.current) return
+      const last = bars[bars.length - 1]
+      const seconds = TF_SECONDS[timeframe]
+      // shortcut: future bars are evenly spaced, ignoring weekends and trading hours; fine for a visual projection.
+      const line = (k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
+        const s = api.chart.addSeries(
+          LineSeries,
+          { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
+          0
+        )
+        // Starts at the last close so the projection visibly continues the chart.
+        s.setData([
+          { time: ts(last.time), value: last.close },
+          ...steps.map((v, i) => ({ time: ts(last.time + (i + 1) * seconds), value: v[k] }))
+        ])
+        return s
+      }
+      fcSeries.current = [
+        line(0, '#ffd54f99', 1, LineStyle.Dotted),
+        line(1, '#ffd54f', 2, LineStyle.Dashed),
+        line(2, '#ffd54f99', 1, LineStyle.Dotted)
+      ]
+      setFc({ state: 'shown' })
+    } catch (e) {
+      const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+      if (run === fcRun.current) setFc({ state: 'error', error })
+    } finally {
+      stop()
+    }
+  }
+
   // Declared last on purpose: React runs effect cleanups in declaration order, so the chart is removed after its series.
   useEffect(() => {
     const chart = createChart(containerRef.current!, {
@@ -255,6 +317,27 @@ export default function ChartArea() {
             {MINOR_UNITS[currency] ?? currency}
           </span>
         )}
+        <button
+          onClick={toggleForecast}
+          onMouseDown={(e) => e.stopPropagation()}
+          disabled={fc.state === 'loading' || data.length < 32}
+          title={
+            'Statistische Prognose der nächsten 64 Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) ' +
+            'und 80 %-Band (gepunktet). Keine Anlageberatung.' +
+            (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+          }
+          className="pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:cursor-wait disabled:opacity-70"
+        >
+          <Sparkles size={12} className="text-[#ffd54f]" />
+          {fc.state === 'shown'
+            ? 'Prognose aus'
+            : fc.state === 'loading'
+              ? fc.pct !== undefined && fc.pct < 100
+                ? `Lade Modell ${fc.pct} %`
+                : 'Rechne …'
+              : 'Prognose'}
+        </button>
+        {fc.state === 'error' && <span className="ml-2 text-down">{fc.error}</span>}
       </div>
       {status && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
