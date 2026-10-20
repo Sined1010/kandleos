@@ -1,11 +1,11 @@
-import { Activity, Folder as FolderIcon, FolderPlus, Plus, Search, Settings } from 'lucide-react'
+import { Activity, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { isCrypto, TIMEFRAMES } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import SymbolSearch from './SymbolSearch'
 
-export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
   const setSymbol = useStore((s) => s.setSymbol)
@@ -61,6 +61,14 @@ export default function TopBar({ onOpenSettings }: { onOpenSettings: () => void 
         aria-label="Einstellungen"
       >
         <Settings size={16} />
+      </button>
+      <button
+        onClick={onOpenAbout}
+        className="rounded p-1.5 text-muted hover:bg-line hover:text-white"
+        title="Über KandleOS, Haftung, Datenschutz, Lizenzen"
+        aria-label="Über KandleOS"
+      >
+        <Info size={16} />
       </button>
     </header>
   )

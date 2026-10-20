@@ -54,6 +54,9 @@ interface State {
   removeFromFolder: (id: string, symbol: string) => void
   moveSymbol: (symbol: string, fromId: string, toId: string) => void
   setFinnhubKey: (key: string) => void
+  /** Whether the disclaimer shown on first start has been confirmed. */
+  disclaimerAccepted: boolean
+  acceptDisclaimer: () => void
   setIndicator: <K extends keyof Indicators>(name: K, patch: Partial<Indicators[K]>) => void
   setTool: (tool: Tool) => void
   select: (id: string | null) => void
@@ -79,6 +82,8 @@ export const useStore = create<State>()(
       timeframe: '1h',
       folders: [folder('Krypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Aktien', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       names: {},
+      disclaimerAccepted: false,
+      acceptDisclaimer: () => set({ disclaimerAccepted: true }),
       finnhubKey: window.api.keyGet(),
       indicators: {
         sma: { on: true, period: 20 },
@@ -168,7 +173,8 @@ export const useStore = create<State>()(
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, folders, names, indicators, drawings }) => ({
+      partialize: ({ symbol, timeframe, folders, names, indicators, drawings, disclaimerAccepted }) => ({
+        disclaimerAccepted,
         names,
         symbol,
         timeframe,

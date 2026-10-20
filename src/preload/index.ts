@@ -13,6 +13,8 @@ const api = {
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
+  /** Opens the third-party license file; resolves to an error message, or '' on success. */
+  openLicenses: (): Promise<string> => ipcRenderer.invoke('app:licenses'),
   /** Chronos-2 forecast: [p10, median, p90] for each of the next 64 bars. */
   forecast: (closes: number[]): Promise<number[][]> => ipcRenderer.invoke('forecast:run', closes),
   /** Model download progress in percent; returns an unsubscribe function. */

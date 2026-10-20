@@ -5,6 +5,19 @@ directories:
 files:
   - out/**
   - package.json
+# Shipped next to the app (resources/), opened from the "Über KandleOS" dialog.
+extraResources:
+  - from: resources/THIRD_PARTY_LICENSES.txt
+    to: THIRD_PARTY_LICENSES.txt
+# Hardening of the packaged Electron binary: no "run as plain Node", no Node debugging/option injection,
+# app code only from the (integrity-checked) app.asar, encrypted cookies.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
+  enableCookieEncryption: true
 
 win:
   target: nsis

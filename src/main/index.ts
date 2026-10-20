@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -77,7 +77,14 @@ function createWindow(): void {
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
     title: 'KandleOS',
-    webPreferences: { preload: join(__dirname, '../preload/index.js') }
+    // Electron's secure defaults, spelled out so a later change cannot silently weaken them.
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webviewTag: false
+    }
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url)
@@ -86,6 +93,23 @@ function createWindow(): void {
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(join(__dirname, '../renderer/index.html'))
 }
+
+// The window may only ever show KandleOS itself: no navigation to other pages, no embedded webviews.
+const isAppUrl = (url: string) =>
+  process.env.ELECTRON_RENDERER_URL ? url.startsWith(process.env.ELECTRON_RENDERER_URL) : url.startsWith('file://')
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-navigate', (e, url) => !isAppUrl(url) && e.preventDefault())
+  contents.on('will-attach-webview', (e) => e.preventDefault())
+})
+
+// Third-party license texts, shipped next to the app (see scripts/third-party-licenses.mjs).
+ipcMain.handle('app:licenses', () =>
+  shell.openPath(
+    app.isPackaged
+      ? join(process.resourcesPath, 'THIRD_PARTY_LICENSES.txt')
+      : join(app.getAppPath(), 'resources', 'THIRD_PARTY_LICENSES.txt')
+  )
+)
 
 // A second instance would load its own copy of the store and overwrite this one's changes on its next save.
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -96,6 +120,9 @@ else {
     win?.focus()
   })
   app.whenReady().then(() => {
+    // KandleOS needs no camera, microphone, location, notifications etc.; refuse every such request.
+    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+    session.defaultSession.setPermissionCheckHandler(() => false)
     createWindow()
     app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
   })
