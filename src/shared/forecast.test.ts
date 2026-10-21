@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { backtest, backtestCutoffs, probabilityAbove, QUANTILES } from './forecast.ts'
+import { backtest, backtestCutoffs, forecastCandles, probabilityAbove, QUANTILES } from './forecast.ts'
 
 // A step whose quantile values equal 100 + 100 × level: 101 at 1 %, 150 at the median, 199 at 99 %.
 const step = QUANTILES.map((l) => 100 + 100 * l)
@@ -34,4 +34,11 @@ test('backtest measures deviation, range hits and direction against the real clo
   assert.equal(r.inside80, 1)
   assert.equal(r.inside50, 2 / 3) // 103 lies outside the 50 % range
   assert.equal(r.direction, 1) // both the forecast and the real close end above the 100 at the cutoff
+})
+
+test('forecastCandles chain the median closes and put the wick lengths around the body', () => {
+  const candles = forecastCandles(100, [102, 101], [1, 0.5], [0.5, -0.2])
+  assert.deepEqual(candles[0], { open: 100, close: 102, high: 103, low: 99.5 })
+  // Falling candle: the upper wick sits on the open; a negative wick forecast counts as none.
+  assert.deepEqual(candles[1], { open: 102, close: 101, high: 102.5, low: 101 })
 })

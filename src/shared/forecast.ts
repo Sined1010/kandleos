@@ -68,3 +68,28 @@ export function backtest(closes: number[], cutoffs: number[], forecasts: number[
   })
   return { runs: cutoffs.length, steps, error: error / n, inside80: in80 / n, inside50: in50 / n, direction }
 }
+
+export interface ForecastCandle {
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
+/**
+ * One candle per forecast step: it opens at the previous step's median close (the first at the last real
+ * close), closes at this step's median and gets the forecast median wick lengths above and below its body.
+ * Wick lengths rather than high and low prices: forecast as price paths of their own, the median high can
+ * drift below the median close a few steps out, while wick lengths stay stable and never negative.
+ */
+export function forecastCandles(base: number, closes: number[], upper: number[], lower: number[]): ForecastCandle[] {
+  return closes.map((close, i) => {
+    const open = i ? closes[i - 1] : base
+    return {
+      open,
+      close,
+      high: Math.max(open, close) + Math.max(0, upper[i]),
+      low: Math.min(open, close) - Math.max(0, lower[i])
+    }
+  })
+}

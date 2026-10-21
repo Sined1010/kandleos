@@ -17,7 +17,7 @@ const MODEL = {
 const CONTEXT = 2048
 // The quantile levels behind each step's 21 values are listed in shared/forecast.ts (QUANTILES).
 const LEVELS = 21
-// Live forecast plus a few backtests; more series in one run gain nothing.
+// Live close and wick series plus up to three backtests; more series in one run gain nothing.
 const MAX_SERIES = 8
 
 const modelFile = (): string => join(app.getPath('userData'), 'models', 'chronos2-ctx2048-h64.onnx')
@@ -65,13 +65,25 @@ function getSession(onProgress: (share: number) => void): Promise<InferenceSessi
 }
 
 /**
- * Forecasts the next 64 bars of each close series (up to the last 2048 closes each) in one model run.
- * Returns per series and step the 21 quantile values. Each series gets its own group id, so the model
- * treats them as unrelated instead of learning across them.
+ * Forecasts the next 64 bars of each price series (up to the last 2048 values each) in one model run.
+ * Returns per series and step the 21 quantile values. Series with the same group id are forecast together
+ * (Chronos-2 lets them inform each other, e.g. close, high and low of one chart); without groups every
+ * series stands alone.
  */
-export async function forecast(seriesArg: unknown, onProgress: (share: number) => void): Promise<number[][][]> {
+export async function forecast(
+  seriesArg: unknown,
+  groupsArg: unknown,
+  onProgress: (share: number) => void
+): Promise<number[][][]> {
   if (!Array.isArray(seriesArg) || !seriesArg.length || seriesArg.length > MAX_SERIES)
     throw new Error('Ungültige Prognose-Anfrage')
+  const groups =
+    groupsArg === undefined || groupsArg === null ? seriesArg.map((_, i) => i) : (groupsArg as unknown[])
+  const validGroups =
+    Array.isArray(groups) &&
+    groups.length === seriesArg.length &&
+    groups.every((g) => Number.isInteger(g) && (g as number) >= 0)
+  if (!validGroups) throw new Error('Ungültige Prognose-Gruppen')
   for (const closes of seriesArg)
     if (!Array.isArray(closes) || closes.length < FORECAST_MIN_BARS || !closes.every((v) => Number.isFinite(v)))
       throw new Error(`Zu wenige Kursdaten für eine Prognose (mindestens ${FORECAST_MIN_BARS} Kerzen)`)
@@ -83,7 +95,7 @@ export async function forecast(seriesArg: unknown, onProgress: (share: number) =
   series.forEach((closes, b) => context.set(closes, (b + 1) * CONTEXT - closes.length))
   const out = await s.run({
     context: new ort.Tensor('float32', context, [series.length, CONTEXT]),
-    group_ids: new ort.Tensor('int64', BigInt64Array.from(series, (_, b) => BigInt(b)), [series.length])
+    group_ids: new ort.Tensor('int64', BigInt64Array.from(groups as number[], (g) => BigInt(g)), [series.length])
   })
   const q = out.quantiles.data as Float32Array
   const steps = q.length / series.length / LEVELS

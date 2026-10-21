@@ -20,6 +20,19 @@ export interface Folder {
   collapsed: boolean
 }
 
+/** What a shown forecast draws; changing it redraws without recomputing. */
+export interface ForecastView {
+  /** Median as a dashed line, or as candles built from the close, high and low forecasts. */
+  style: 'line' | 'candles'
+  band50: boolean
+  band80: boolean
+  band90: boolean
+  /** Accuracy check: the summary line and the latest backtest drawn over the real bars. */
+  backtest: boolean
+  /** Value box for the forecast step under the mouse. */
+  hover: boolean
+}
+
 export interface Indicators {
   sma: { on: boolean; period: number }
   ema: { on: boolean; period: number }
@@ -52,6 +65,8 @@ interface State {
   /** Intraday stock charts include pre-market and after-hours candles. */
   extendedHours: boolean
   toggleExtendedHours: () => void
+  forecastView: ForecastView
+  setForecastView: (patch: Partial<ForecastView>) => void
   /** An empty name removes it, so the automatic name is looked up again. */
   setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
@@ -115,6 +130,8 @@ export const useStore = create<State>()(
       setRange: (range) => set({ range, timeframe: rangeById(range).tf }),
       extendedHours: false,
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
+      forecastView: { style: 'line', band50: true, band80: true, band90: true, backtest: true, hover: true },
+      setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
       setName: (symbol, name) =>
         set((s) => {
           const { [symbol]: _, ...rest } = s.names
@@ -171,16 +188,33 @@ export const useStore = create<State>()(
       // Indicators added in later versions are missing from older files; fill them with their defaults.
       merge: (persisted, current) => {
         const p = persisted as Partial<State>
-        return { ...current, ...p, indicators: { ...current.indicators, ...p.indicators } }
+        return {
+          ...current,
+          ...p,
+          indicators: { ...current.indicators, ...p.indicators },
+          forecastView: { ...current.forecastView, ...p.forecastView }
+        }
       },
       storage: createJSONStorage(() => ({
         getItem: () => window.api.storeGet(),
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, range, extendedHours, folders, names, indicators, drawings, disclaimerAccepted }) => ({
+      partialize: ({
+        symbol,
+        timeframe,
         range,
         extendedHours,
+        forecastView,
+        folders,
+        names,
+        indicators,
+        drawings,
+        disclaimerAccepted
+      }) => ({
+        range,
+        extendedHours,
+        forecastView,
         disclaimerAccepted,
         names,
         symbol,

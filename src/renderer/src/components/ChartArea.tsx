@@ -13,11 +13,11 @@ import {
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
-import { Moon, Sparkles, Sunrise, X } from 'lucide-react'
+import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
-import { backtest, backtestCutoffs, Q } from '../../../shared/forecast'
+import { backtest, backtestCutoffs, forecastCandles, Q } from '../../../shared/forecast'
 import { phaseAt } from '../../../shared/market'
 import {
   FORECAST_MIN_BARS,
@@ -35,10 +35,11 @@ import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
-import { ForecastCheck, ForecastTip, type ForecastResult } from './ForecastInfo'
+import { ForecastCheck, ForecastSettings, ForecastTip, type ForecastResult } from './ForecastInfo'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
+const FORECAST = '#ffd54f'
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
@@ -80,6 +81,7 @@ export default function ChartArea() {
   const extendable = !isCrypto(symbol) && TF_SECONDS[timeframe] < 86400
   const extended = extendedHours && extendable
   const quote = useQuotes((s) => s.quotes[symbol])
+  const forecastView = useStore((s) => s.forecastView)
   const containerRef = useRef<HTMLDivElement>(null)
   const dataRef = useRef<Candle[]>([])
   const [api, setApi] = useState<ChartApi | null>(null)
@@ -96,9 +98,9 @@ export default function ChartArea() {
     error?: string
     result?: ForecastResult
   }>({ state: 'idle' })
-  const fcSeries = useRef<ISeriesApi<SeriesType>[]>([])
   // Forecast step under the crosshair, for the value box.
   const [fcHover, setFcHover] = useState<{ x: number; y: number; index: number } | null>(null)
+  const [fcMenu, setFcMenu] = useState(false)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
   const fcRun = useRef(0)
 
@@ -291,22 +293,15 @@ export default function ChartArea() {
 
   // A forecast belongs to one symbol and timeframe; drop it when either changes.
   useEffect(() => {
-    if (!api) return
     return () => {
       fcRun.current++
-      fcSeries.current.forEach((s) => api.chart.removeSeries(s))
-      fcSeries.current = []
       setFc({ state: 'idle' })
     }
   }, [api, symbol, timeframe])
 
   const toggleForecast = async () => {
     if (!api) return
-    if (fc.state === 'shown') {
-      fcSeries.current.forEach((s) => api.chart.removeSeries(s))
-      fcSeries.current = []
-      return setFc({ state: 'idle' })
-    }
+    if (fc.state === 'shown') return setFc({ state: 'idle' })
     const bars = dataRef.current
     const run = ++fcRun.current
     setFc({ state: 'loading' })
@@ -314,72 +309,45 @@ export default function ChartArea() {
     try {
       const closes = bars.map((c) => c.close)
       const times = bars.map((c) => c.time)
+      // Wick lengths above and below each body, for the forecast candles.
+      const upper = bars.map((c) => c.high - Math.max(c.open, c.close))
+      const lower = bars.map((c) => Math.min(c.open, c.close) - c.low)
       const n = forecastSteps(timeframe, bars.length)
-      // Backtests run in the same model call: forecasts from earlier cutoffs, compared with what followed.
       const cutoffs = backtestCutoffs(bars.length, n)
-      const [live, ...past] = await window.api.forecast([closes, ...cutoffs.map((c) => closes.slice(0, c))])
+      // One model call: the close on its own (grouping it with the wicks made it measurably worse in
+      // backtests), the two wick series as a group of their own, and the close at each backtest cutoff.
+      const [live, liveUpper, liveLower, ...past] = await window.api.forecast(
+        [closes, upper, lower, ...cutoffs.map((c) => closes.slice(0, c))],
+        [0, 1, 1, ...cutoffs.map((_, k) => 2 + k)]
+      )
       if (run !== fcRun.current) return
-      const steps = live.slice(0, n)
+      const median = (q: number[][]) => q.slice(0, n).map((v) => v[Q.median])
       const last = bars[bars.length - 1]
-      const future = futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe])
-      // Everything starts at the last close so the projection visibly continues the chart.
-      const start = { time: ts(last.time) }
-      const band = (lo: number, hi: number, fill: string, autoscale = true) => {
-        const s = api.chart.addCustomSeries(
-          new BandSeries(),
-          { fill, priceLineVisible: false, lastValueVisible: false, ...(!autoscale && { autoscaleInfoProvider: () => null }) },
-          0
-        )
-        s.setData([
-          { ...start, lower: last.close, upper: last.close },
-          ...steps.map((v, i) => ({ time: ts(future[i]), lower: v[lo], upper: v[hi] }))
-        ])
-        return s
-      }
-      const line = (points: { time: Time; value: number }[], color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
-        const s = api.chart.addSeries(
-          LineSeries,
-          { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
-          0
-        )
-        s.setData(points)
-        return s
-      }
-      // The bands overlap, so the fan gets denser towards the median. The outer 90 % band may run off the
-      // chart rather than squeeze the candles.
-      const series: ISeriesApi<SeriesType>[] = [
-        band(Q.p05, Q.p95, 'rgba(255, 213, 79, 0.07)', false),
-        band(Q.p10, Q.p90, 'rgba(255, 213, 79, 0.10)'),
-        band(Q.p25, Q.p75, 'rgba(255, 213, 79, 0.16)'),
-        line(
-          [{ ...start, value: last.close }, ...steps.map((v, i) => ({ time: ts(future[i]), value: v[Q.median] }))],
-          '#ffd54f',
-          2,
-          LineStyle.Dashed
-        )
-      ]
-      // The latest backtest's median over the real bars that followed it.
-      if (cutoffs.length) {
-        const c = cutoffs[0]
-        series.push(
-          line(
-            [
-              { time: ts(times[c - 1]), value: closes[c - 1] },
-              ...past[0].slice(0, n).map((v, i) => ({ time: ts(times[c + i]), value: v[Q.median] }))
-            ],
-            '#b0bec5aa',
-            1,
-            LineStyle.Dotted
-          )
-        )
-      }
-      fcSeries.current = series
-      // Widen the view so the whole fan is visible; the left edge stays where the user put it.
+      const c = cutoffs[0]
+      setFc({
+        state: 'shown',
+        result: {
+          times: futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe]),
+          steps: live.slice(0, n),
+          upperWicks: median(liveUpper),
+          lowerWicks: median(liveLower),
+          base: last.close,
+          baseTime: last.time,
+          check: cutoffs.length ? backtest(closes, cutoffs, past, n) : null,
+          // The latest backtest's median over the real bars that followed its cutoff.
+          backtestPath:
+            c === undefined
+              ? null
+              : [
+                  { time: times[c - 1], value: closes[c - 1] },
+                  ...median(past[0]).map((value, i) => ({ time: times[c + i], value }))
+                ]
+        }
+      })
+      // Widen the view so the whole forecast is visible; the left edge stays where the user put it.
       const view = api.chart.timeScale().getVisibleLogicalRange()
       if (view && view.to < bars.length + n)
         api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
-      const check =cutoffs.length ? backtest(closes, cutoffs, past, n) : null
-      setFc({ state: 'shown', result: { times: future, steps, base: last.close, check } })
     } catch (e) {
       const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
       if (run === fcRun.current) setFc({ state: 'error', error })
@@ -388,10 +356,72 @@ export default function ChartArea() {
     }
   }
 
+  // Draws a computed forecast the way the forecast settings say; a settings change only redraws.
+  useEffect(() => {
+    const r = fc.result
+    if (!api || !r) return
+    const { chart } = api
+    const view = forecastView
+    // Everything starts at the last close so the projection visibly continues the chart.
+    const start = { time: ts(r.baseTime) }
+    const series: ISeriesApi<SeriesType>[] = []
+    const band = (lo: number, hi: number, fill: string, autoscale = true) => {
+      const s = chart.addCustomSeries(
+        new BandSeries(),
+        { fill, priceLineVisible: false, lastValueVisible: false, ...(!autoscale && { autoscaleInfoProvider: () => null }) },
+        0
+      )
+      s.setData([
+        { ...start, lower: r.base, upper: r.base },
+        ...r.steps.map((v, i) => ({ time: ts(r.times[i]), lower: v[lo], upper: v[hi] }))
+      ])
+      series.push(s)
+    }
+    const line = (points: { time: number; value: number }[], color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
+      const s = chart.addSeries(
+        LineSeries,
+        { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
+        0
+      )
+      s.setData(points.map((p) => ({ time: ts(p.time), value: p.value })))
+      series.push(s)
+    }
+    // The bands overlap, so the fan gets denser towards the median. The outer 90 % band may run off the
+    // chart rather than squeeze the candles.
+    if (view.band90) band(Q.p05, Q.p95, 'rgba(255, 213, 79, 0.07)', false)
+    if (view.band80) band(Q.p10, Q.p90, 'rgba(255, 213, 79, 0.10)')
+    if (view.band50) band(Q.p25, Q.p75, 'rgba(255, 213, 79, 0.16)')
+    const medians = r.steps.map((v) => v[Q.median])
+    if (view.style === 'candles') {
+      // Forecast candles in amber, hollow when rising, so they never pass for real ones.
+      const s = chart.addSeries(
+        CandlestickSeries,
+        {
+          upColor: 'rgba(255, 213, 79, 0.08)',
+          downColor: 'rgba(255, 213, 79, 0.45)',
+          borderUpColor: FORECAST,
+          borderDownColor: FORECAST,
+          wickUpColor: FORECAST,
+          wickDownColor: FORECAST,
+          priceLineVisible: false,
+          lastValueVisible: false
+        },
+        0
+      )
+      s.setData(forecastCandles(r.base, medians, r.upperWicks, r.lowerWicks).map((c, i) => ({ time: ts(r.times[i]), ...c })))
+      series.push(s)
+    } else {
+      const path = [{ time: r.baseTime, value: r.base }, ...medians.map((value, i) => ({ time: r.times[i], value }))]
+      line(path, FORECAST, 2, LineStyle.Dashed)
+    }
+    if (view.backtest && r.backtestPath) line(r.backtestPath, '#b0bec5aa', 1, LineStyle.Dotted)
+    return () => series.forEach((s) => chart.removeSeries(s))
+  }, [api, fc.result, forecastView])
+
   // Value box for the forecast step under the crosshair.
   useEffect(() => {
     const result = fc.result
-    if (!api || !result) return
+    if (!api || !result || !forecastView.hover) return
     const onMove = (p: MouseEventParams<Time>) => {
       const index = p.time === undefined ? -1 : result.times.indexOf(p.time as number)
       setFcHover(index >= 0 && p.point ? { x: p.point.x, y: p.point.y, index } : null)
@@ -401,7 +431,7 @@ export default function ChartArea() {
       api.chart.unsubscribeCrosshairMove(onMove)
       setFcHover(null)
     }
-  }, [api, fc.result])
+  }, [api, fc.result, forecastView.hover])
 
   // Declared last on purpose: React runs effect cleanups in declaration order, so the chart is removed after its series.
   useEffect(() => {
@@ -464,38 +494,58 @@ export default function ChartArea() {
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
-          {fc.result && <ForecastCheck check={fc.result.check} />}
+          {fc.result && forecastView.backtest && <ForecastCheck check={fc.result.check} />}
         </div>
-        {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis. */}
-        <button
-          onClick={toggleForecast}
-          onMouseDown={(e) => e.stopPropagation()}
-          disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
+        {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
+            with its display settings right next to it. */}
+        <div
+          className="absolute top-2 z-10 flex"
           style={{ right: (api?.chart.priceScale('right').width() ?? 60) + 12 }}
-          title={
-            data.length && data.length < FORECAST_MIN_BARS
-              ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
-                'Eine kürzere Kerzengröße wählen.'
-              : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
-                'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
-                (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
-          }
-          className={`absolute top-2 z-10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
-            fc.state === 'shown'
-              ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
-              : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
-          } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
-          {fc.state === 'shown'
-            ? 'Prognose aus'
-            : fc.state === 'loading'
-              ? fc.pct !== undefined && fc.pct < 100
-                ? `Lade Modell ${fc.pct} %`
-                : 'Rechne …'
-              : 'KI-Prognose'}
-        </button>
+          <button
+            onClick={toggleForecast}
+            disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
+            title={
+              data.length && data.length < FORECAST_MIN_BARS
+                ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
+                  'Eine kürzere Kerzengröße wählen.'
+                : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
+                  'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
+                  'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
+                  (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+            }
+            className={`inline-flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
+              fc.state === 'shown'
+                ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
+                : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
+            } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
+          >
+            {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
+            {fc.state === 'shown'
+              ? 'Prognose aus'
+              : fc.state === 'loading'
+                ? fc.pct !== undefined && fc.pct < 100
+                  ? `Lade Modell ${fc.pct} %`
+                  : 'Rechne …'
+                : 'KI-Prognose'}
+          </button>
+          <button
+            onClick={() => setFcMenu((o) => !o)}
+            aria-expanded={fcMenu}
+            aria-haspopup="dialog"
+            title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick"
+            aria-label="Prognose-Anzeige einstellen"
+            className={`rounded-r-lg border-l border-white/20 px-2 transition ${
+              fc.state === 'shown'
+                ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
+                : 'bg-brand text-white shadow-glow hover:brightness-110'
+            }`}
+          >
+            <SlidersHorizontal size={15} />
+          </button>
+          {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} />}
+        </div>
         {fc.result && fcHover && (
           <ForecastTip
             result={fc.result}
@@ -505,6 +555,7 @@ export default function ChartArea() {
             width={containerRef.current?.clientWidth ?? 0}
             height={containerRef.current?.clientHeight ?? 0}
             intraday={TF_SECONDS[timeframe] < 86400}
+            candles={forecastView.style === 'candles'}
           />
         )}
         {status && (
