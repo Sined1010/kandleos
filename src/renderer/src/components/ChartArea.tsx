@@ -444,7 +444,7 @@ export default function ChartArea() {
       <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
         <div ref={containerRef} className="absolute inset-0 isolate" />
-        {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
+        {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
         <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">

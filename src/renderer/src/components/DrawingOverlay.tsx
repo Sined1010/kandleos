@@ -1,7 +1,8 @@
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { futureTimes } from '../../../shared/calendar'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
-import { TF_SECONDS, type Candle } from '../../../shared/types'
+import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
 import { useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
@@ -12,6 +13,8 @@ const SELECTED = '#f5c542'
 const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043' }
 const WAVE_LABELS = { elliott: ['0', '1', '2', '3', '4', '5'], abc: ['0', 'A', 'B', 'C'] }
 const NO_DRAWINGS: Drawing[] = []
+// How far right of the last candle drawings follow the trading calendar; beyond that, even steps.
+const FUTURE_BARS = 500
 
 /** Clicks each tool needs; the drawing is created on the last one. */
 const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
@@ -51,10 +54,12 @@ interface Props {
   chart: IChartApi
   series: ISeriesApi<'Candlestick'>
   data: Candle[]
+  /** Exchange time zone of the symbol (stocks), for the trading calendar right of the last candle. */
+  timeZone?: string
 }
 
 /** SVG layer over the main pane. Drawings are stored as {time, price} and projected to pixels on every render. */
-export default function DrawingOverlay({ chart, series, data }: Props) {
+export default function DrawingOverlay({ chart, series, data, timeZone }: Props) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
   const drawings = useStore((s) => s.drawings[s.symbol] ?? NO_DRAWINGS)
@@ -75,6 +80,15 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   const [, redraw] = useState(0)
   const times = useMemo(() => data.map((c) => c.time), [data])
   const step = TF_SECONDS[timeframe]
+  // Bar times plus the coming bars on the exchange's trading calendar. Points right of the last candle are
+  // stored as real trading times (not "last bar + n × step", which lands in nights and weekends), so a
+  // drawing keeps its place when the bars change, e.g. when pre-market and after-hours candles are added.
+  // Rebuilt only when a bar is added, not on every tick of the open bar.
+  const lastTime = times[times.length - 1]
+  const axis = useMemo(
+    () => (times.length ? [...times, ...futureTimes(times, step, FUTURE_BARS, timeZone, TF_MONTHS[timeframe])] : times),
+    [times.length, lastTime, step, timeZone, timeframe]
+  )
 
   // Lightweight Charts has no event for price-scale changes (axis drag, autoscale), so compare a
   // cheap viewport signature every frame and re-render only when it actually moved.
@@ -120,7 +134,7 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedId, setTool, removeDrawing])
 
-  const logicalOf = (time: number) => timeToLogical(times, time, step)
+  const logicalOf = (time: number) => timeToLogical(axis, time, step)
   const toX = (time: number) => (times.length ? chart.timeScale().logicalToCoordinate(logicalOf(time) as Logical) : null)
   const toY = (price: number) => series.priceToCoordinate(price)
   const fmt = (price: number) => series.priceFormatter().format(price)
@@ -133,7 +147,7 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
   }
   const pointAt = (e: { clientX: number; clientY: number }): Point | null => {
     const at = logicalAt(e)
-    return at && { time: logicalToTime(times, at.logical, step), price: at.price }
+    return at && { time: logicalToTime(axis, at.logical, step), price: at.price }
   }
 
   const startDrag = (e: React.MouseEvent, d: Drawing, handle: Handle) => {
@@ -156,9 +170,9 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       if (!d || !at) return
       const dPrice = at.price - d.from.price
       // Shift in bar space, not seconds, so a shape keeps its form across weekend/overnight gaps.
-      const shiftTime = (t: number) => logicalToTime(times, logicalOf(t) + at.logical - d.from.logical, step)
+      const shiftTime = (t: number) => logicalToTime(axis, logicalOf(t) + at.logical - d.from.logical, step)
       const o = d.orig
-      const cursor = { time: logicalToTime(times, at.logical, step), price: at.price }
+      const cursor = { time: logicalToTime(axis, at.logical, step), price: at.price }
       const current: Drawing =
         o.type === 'hline'
           ? { ...o, price: o.price + dPrice }
@@ -182,7 +196,7 @@ export default function DrawingOverlay({ chart, series, data }: Props) {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-    // Handlers read the live drag via dragRef; times/step only change on new bars, which is harmless mid-drag.
+    // Handlers read the live drag via dragRef; the axis only changes on new bars, which is harmless mid-drag.
   }, [dragging])
 
   const onClick = (e: React.MouseEvent) => {

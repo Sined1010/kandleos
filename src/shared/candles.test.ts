@@ -57,3 +57,17 @@ test('mergeTick keeps month-based bars open until the calendar period ends', () 
   assert.equal(mergeTick(october, 8, at(2026, 12, 20), 7776000, 3).time, at(2026, 10))
   assert.equal(mergeTick(october, 8, at(2027, 1, 4), 7776000, 3).time, at(2027, 1))
 })
+
+test('drawing points right of the last candle follow the trading calendar, not nights and weekends', async () => {
+  const { futureTimes } = await import('./calendar.ts')
+  // 15-minute regular-session bars 15:30-21:45 Berlin (13:30-19:45 UTC), Mon 12 to Tue 20 Oct 2026.
+  const times: number[] = []
+  for (const d of [12, 13, 14, 15, 16, 19, 20]) for (let i = 0; i < 26; i++) times.push(at(2026, 10, d, 13) + 1800 + i * 900)
+  const axis = [...times, ...futureTimes(times, 900, 40, 'America/New_York')]
+  // Ten bars after the last one is Wednesday 15:45 UTC (the session opens 13:30), not 00:15 at night.
+  const wed = at(2026, 10, 21, 15) + 2700
+  assert.equal(logicalToTime(axis, times.length - 1 + 10, 900), wed)
+  // That time maps back to the same place, and after-hours candles added later (19:45 UTC onward) leave it
+  // right of every bar instead of pulling it into the evening.
+  assert.equal(timeToLogical(axis, wed, 900), times.length - 1 + 10)
+})
