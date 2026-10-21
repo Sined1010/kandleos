@@ -13,7 +13,7 @@ import {
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
-import { Moon, Sparkles, Sunrise } from 'lucide-react'
+import { Moon, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
@@ -462,34 +462,40 @@ export default function ChartArea() {
               </span>
             )}
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
-            <button
-              onClick={toggleForecast}
-              onMouseDown={(e) => e.stopPropagation()}
-              disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
-              title={
-                data.length && data.length < FORECAST_MIN_BARS
-                  ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
-                    'Eine kürzere Kerzengröße wählen.'
-                  : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                    'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
-                    'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
-                    (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
-              }
-              className={`pointer-events-auto inline-flex items-center gap-1 rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200 transition hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
-            >
-              <Sparkles size={12} className="text-[#ffd54f]" />
-              {fc.state === 'shown'
-                ? 'Prognose aus'
-                : fc.state === 'loading'
-                  ? fc.pct !== undefined && fc.pct < 100
-                    ? `Lade Modell ${fc.pct} %`
-                    : 'Rechne …'
-                  : 'Prognose'}
-            </button>
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
           {fc.result && <ForecastCheck check={fc.result.check} />}
         </div>
+        {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis. */}
+        <button
+          onClick={toggleForecast}
+          onMouseDown={(e) => e.stopPropagation()}
+          disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
+          style={{ right: (api?.chart.priceScale('right').width() ?? 60) + 12 }}
+          title={
+            data.length && data.length < FORECAST_MIN_BARS
+              ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
+                'Eine kürzere Kerzengröße wählen.'
+              : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
+                'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
+                'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
+                (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+          }
+          className={`absolute top-2 z-10 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
+            fc.state === 'shown'
+              ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
+              : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
+          } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
+        >
+          {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
+          {fc.state === 'shown'
+            ? 'Prognose aus'
+            : fc.state === 'loading'
+              ? fc.pct !== undefined && fc.pct < 100
+                ? `Lade Modell ${fc.pct} %`
+                : 'Rechne …'
+              : 'KI-Prognose'}
+        </button>
         {fc.result && fcHover && (
           <ForecastTip
             result={fc.result}
