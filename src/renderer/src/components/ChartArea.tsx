@@ -446,39 +446,44 @@ export default function ChartArea() {
         <div ref={containerRef} className="absolute inset-0 isolate" />
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
         <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
-          <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
-          <QuoteChip quote={quote} />
-          {currency && (
-            <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
-              {MINOR_UNITS[currency] ?? currency}
+          {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
             </span>
-          )}
-          <MarketBadge symbol={symbol} timeZone={exchangeZone} />
-          <button
-            onClick={toggleForecast}
-            onMouseDown={(e) => e.stopPropagation()}
-            disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
-            title={
-              data.length && data.length < FORECAST_MIN_BARS
-                ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
-                  'Eine kürzere Kerzengröße wählen.'
-                : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                  'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
-                  'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
-                  (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
-            }
-            className={`pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
-          >
-            <Sparkles size={12} className="text-[#ffd54f]" />
-            {fc.state === 'shown'
-              ? 'Prognose aus'
-              : fc.state === 'loading'
-                ? fc.pct !== undefined && fc.pct < 100
-                  ? `Lade Modell ${fc.pct} %`
-                  : 'Rechne …'
-                : 'Prognose'}
-          </button>
-          {fc.state === 'error' && <span className="ml-2 text-down">{fc.error}</span>}
+            <QuoteChip quote={quote} />
+            {currency && (
+              <span className="rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
+                {MINOR_UNITS[currency] ?? currency}
+              </span>
+            )}
+            <MarketBadge symbol={symbol} timeZone={exchangeZone} />
+            <button
+              onClick={toggleForecast}
+              onMouseDown={(e) => e.stopPropagation()}
+              disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
+              title={
+                data.length && data.length < FORECAST_MIN_BARS
+                  ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
+                    'Eine kürzere Kerzengröße wählen.'
+                  : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
+                    'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
+                    'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
+                    (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+              }
+              className={`pointer-events-auto inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
+            >
+              <Sparkles size={12} className="text-[#ffd54f]" />
+              {fc.state === 'shown'
+                ? 'Prognose aus'
+                : fc.state === 'loading'
+                  ? fc.pct !== undefined && fc.pct < 100
+                    ? `Lade Modell ${fc.pct} %`
+                    : 'Rechne …'
+                  : 'Prognose'}
+            </button>
+            {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
+          </div>
           {fc.result && <ForecastCheck check={fc.result.check} />}
         </div>
         {fc.result && fcHover && (

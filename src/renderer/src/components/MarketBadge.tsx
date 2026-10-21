@@ -65,7 +65,7 @@ export default function MarketBadge({ symbol, timeZone }: { symbol: string; time
   return (
     <span
       title={d.title}
-      className="pointer-events-auto ml-2 inline-flex items-center gap-1.5 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200"
+      className="pointer-events-auto inline-flex items-center gap-1.5 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200"
     >
       <span className={`h-2 w-2 rounded-full ${d.dot}`} aria-hidden />
       {d.label}
@@ -106,7 +106,7 @@ export function QuoteChip({ quote }: { quote?: Quote }) {
   if (!quote) return null
   const color = (pct: number) => (pct >= 0 ? 'text-up' : 'text-down')
   return (
-    <span className="pointer-events-auto ml-2 inline-flex items-center gap-2 tabular-nums">
+    <span className="pointer-events-auto inline-flex items-center gap-2 tabular-nums">
       <span title="Regulärer Kurs und Veränderung zum Vortag">
         <span className="font-medium text-slate-200">{formatPrice(quote.price)}</span>{' '}
         <span className={color(quote.changePct)}>{formatChange(quote.changePct)}</span>
