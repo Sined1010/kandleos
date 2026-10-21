@@ -88,7 +88,7 @@ export default function ChartArea() {
   /** Scrolls to the preset's span, or to the last 150 bars when no preset is active. */
   const showRange = (bars: Candle[], id: RangeId | null) => {
     if (!api || !bars.length) return
-    const from = id ? rangeStartIndex(bars.map((c) => c.time), id) : bars.length - 150
+    const from = id ? rangeStartIndex(bars.map((c) => c.time), id) : Math.max(0, bars.length - 150)
     api.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + (id ? 3 : 10) })
   }
 

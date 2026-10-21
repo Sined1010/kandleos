@@ -1,15 +1,13 @@
-import { Activity, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
+import { Activity, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
-import { isCrypto, TIMEFRAMES, tfLabel } from '../../../shared/types'
+import { isCrypto, tfLabel, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import SymbolSearch from './SymbolSearch'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
   const symbol = useStore((s) => s.symbol)
-  const timeframe = useStore((s) => s.timeframe)
   const setSymbol = useStore((s) => s.setSymbol)
-  const setTimeframe = useStore((s) => s.setTimeframe)
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -29,18 +27,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
 
       <AddToWatchlist symbol={symbol} />
 
-      <div className="flex rounded bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
-        {TIMEFRAMES.map((tf) => (
-          <button
-            key={tf}
-            onClick={() => setTimeframe(tf)}
-            aria-pressed={tf === timeframe}
-            className={`rounded px-2 py-0.5 text-xs ${tf === timeframe ? 'bg-accent text-white' : 'text-muted hover:text-white'}`}
-          >
-            {tfLabel(tf)}
-          </button>
-        ))}
-      </div>
+      <TimeframePicker />
 
       <div className="relative">
         <button
@@ -71,6 +58,71 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
         <Info size={16} />
       </button>
     </header>
+  )
+}
+
+// Shown as buttons; every candle size, these included, is in the dropdown next to them.
+const MAIN: Timeframe[] = ['15m', '1h', '4h', '1D', '1W', '1M']
+const GROUPS: [title: string, items: [Timeframe, string][]][] = [
+  ['Minuten', [['1m', '1 Minute'], ['5m', '5 Minuten'], ['15m', '15 Minuten'], ['30m', '30 Minuten']]],
+  ['Stunden', [['1h', '1 Stunde'], ['2h', '2 Stunden'], ['4h', '4 Stunden']]],
+  ['Tage', [['1D', '1 Tag'], ['1W', '1 Woche']]],
+  ['Monate', [['1M', '1 Monat'], ['3M', '1 Quartal'], ['6M', '1 Halbjahr'], ['12M', '1 Jahr']]]
+]
+
+/** Main candle sizes as buttons, the rest in a dropdown; a size picked there shows on the dropdown button. */
+function TimeframePicker() {
+  const timeframe = useStore((s) => s.timeframe)
+  const setTimeframe = useStore((s) => s.setTimeframe)
+  const [open, setOpen] = useState(false)
+  const pick = (tf: Timeframe) => {
+    setTimeframe(tf)
+    setOpen(false)
+  }
+  const other = !MAIN.includes(timeframe)
+  const btn = (active: boolean) => `rounded px-2 py-0.5 text-xs ${active ? 'bg-accent text-white' : 'text-muted hover:text-white'}`
+  return (
+    <div className="relative flex rounded bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
+      {MAIN.map((tf) => (
+        <button key={tf} onClick={() => pick(tf)} aria-pressed={tf === timeframe} className={btn(tf === timeframe)}>
+          {tfLabel(tf)}
+        </button>
+      ))}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="Alle Kerzengrößen"
+        className={`${btn(other)} flex items-center gap-0.5 ${other ? '' : 'px-1'}`}
+      >
+        {other && tfLabel(timeframe)}
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded border border-line bg-panel py-1 shadow-xl">
+            {GROUPS.map(([title, items]) => (
+              <div key={title}>
+                <p className="px-3 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wider text-muted">{title}</p>
+                {items.map(([tf, name]) => (
+                  <button
+                    key={tf}
+                    role="menuitemradio"
+                    aria-checked={tf === timeframe}
+                    onClick={() => pick(tf)}
+                    className={`flex w-full items-center px-3 py-1 text-left text-sm hover:bg-bg ${tf === timeframe ? 'text-accent' : 'text-white'}`}
+                  >
+                    {name}
+                    <span className="ml-auto text-xs text-muted/60">{tfLabel(tf)}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
