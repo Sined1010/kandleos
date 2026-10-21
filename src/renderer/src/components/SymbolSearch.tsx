@@ -102,7 +102,7 @@ export default function SymbolSearch({
       {open && results.length > 0 && (
         <ul
           role="listbox"
-          className={`absolute top-full z-30 mt-2 max-h-80 overflow-y-auto rounded border border-line bg-panel py-1 shadow-xl ${
+          className={`absolute top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50 ${
             compact ? 'inset-x-0' : '-left-8 w-80'
           }`}
         >

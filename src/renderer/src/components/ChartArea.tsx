@@ -29,6 +29,7 @@ import {
   type Candle
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
+import { THEME } from '../lib/theme'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
@@ -37,9 +38,7 @@ import DrawingOverlay from './DrawingOverlay'
 import { ForecastCheck, ForecastTip, type ForecastResult } from './ForecastInfo'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
-const UP = '#26a69a'
-const DOWN = '#ef5350'
-const LINE = '#232838'
+const { up: UP, down: DOWN, line: LINE } = THEME
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
@@ -409,13 +408,18 @@ export default function ChartArea() {
     const chart = createChart(containerRef.current!, {
       autoSize: true,
       layout: {
-        background: { color: '#0b0e14' },
-        textColor: '#8b93a7',
+        background: { color: THEME.bg },
+        textColor: THEME.text,
         fontSize: 11,
-        panes: { separatorColor: LINE, separatorHoverColor: '#2962ff55' }
+        panes: { separatorColor: LINE, separatorHoverColor: THEME.brandFrom + '55' }
       },
-      grid: { vertLines: { color: '#161b26' }, horzLines: { color: '#161b26' } },
-      crosshair: { mode: CrosshairMode.Normal },
+      grid: { vertLines: { color: THEME.grid }, horzLines: { color: THEME.grid } },
+      // Crosshair in the icon's indigo, its axis labels filled with it.
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: THEME.brandFrom + '99', labelBackgroundColor: THEME.brandFrom },
+        horzLine: { color: THEME.brandFrom + '99', labelBackgroundColor: THEME.brandFrom }
+      },
       rightPriceScale: { borderColor: LINE },
       timeScale: { borderColor: LINE, rightOffset: 10, tickMarkFormatter: tickMark },
       localization: { locale: 'de-DE' }
@@ -453,7 +457,7 @@ export default function ChartArea() {
             </span>
             <QuoteChip quote={quote} />
             {currency && (
-              <span className="rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
+              <span className="rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
                 {MINOR_UNITS[currency] ?? currency}
               </span>
             )}
@@ -471,7 +475,7 @@ export default function ChartArea() {
                     'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
                     (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
               }
-              className={`pointer-events-auto inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
+              className={`pointer-events-auto inline-flex items-center gap-1 rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200 transition hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
             >
               <Sparkles size={12} className="text-[#ffd54f]" />
               {fc.state === 'shown'
@@ -509,7 +513,7 @@ export default function ChartArea() {
               onClick={() => setRange(r.id)}
               title={`${r.title} (${tfLabel(r.tf)}-Kerzen)`}
               aria-pressed={range === r.id}
-              className={`rounded px-2 py-0.5 text-xs ${range === r.id ? 'bg-accent text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+              className={`rounded-md px-2 py-0.5 text-xs ${range === r.id ? 'bg-brand text-white shadow-glow' : 'text-muted hover:bg-line hover:text-white'}`}
             >
               {r.id}
             </button>
@@ -524,8 +528,8 @@ export default function ChartArea() {
               ? 'Vorbörse und Nachbörse (US-Aktien, 10:00–15:30 und 22:00–02:00 deutscher Zeit) als Kerzen zeigen, grau hinterlegt'
               : 'Vor-/Nachbörse gibt es nur bei Aktien und Kerzen unter einem Tag'
           }
-          className={`ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs disabled:opacity-40 ${
-            extended ? 'bg-accent text-white' : 'text-muted enabled:hover:bg-line enabled:hover:text-white'
+          className={`ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 text-xs disabled:opacity-40 ${
+            extended ? 'bg-brand text-white shadow-glow' : 'text-muted enabled:hover:bg-line enabled:hover:text-white'
           }`}
         >
           <Sunrise size={12} />

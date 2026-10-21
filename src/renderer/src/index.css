@@ -1,13 +1,30 @@
 @import 'tailwindcss';
 
+/* Colours follow the app icon: an indigo-to-cyan gradient on deep, slightly indigo-tinted night blue.
+   Keep in sync with lib/theme.ts, which feeds the same values to the chart canvas. */
 @theme {
-  --color-bg: #0b0e14;
-  --color-panel: #151924;
-  --color-line: #232838;
-  --color-muted: #8b93a7;
-  --color-up: #26a69a;
-  --color-down: #ef5350;
-  --color-accent: #2962ff;
+  --color-bg: #0a0c16;
+  --color-panel: #10131f;
+  --color-line: #1e2336;
+  --color-muted: #8b91ad;
+  --color-up: #14b8a6;
+  --color-down: #f43f5e;
+  --color-accent: #7c7ff7;
+  --color-brand-from: #6366f1;
+  --color-brand-to: #06b6d4;
+}
+
+/* Active and primary controls: the icon's gradient with a soft glow. */
+@utility bg-brand {
+  background-image: linear-gradient(135deg, var(--color-brand-from), var(--color-brand-to));
+}
+@utility text-brand {
+  background-image: linear-gradient(135deg, #8b8ef9, #22d3ee);
+  background-clip: text;
+  color: transparent;
+}
+@utility shadow-glow {
+  box-shadow: 0 0 14px -3px color-mix(in srgb, var(--color-brand-from) 70%, transparent);
 }
 
 html,
@@ -17,8 +34,25 @@ body,
   margin: 0;
   background: var(--color-bg);
   font-family: system-ui, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 input[type='number']::-webkit-inner-spin-button {
   opacity: 0.4;
+}
+
+/* Slim scrollbars in the panel colours instead of the bright system ones. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-brand-from) 45%, var(--color-line));
 }

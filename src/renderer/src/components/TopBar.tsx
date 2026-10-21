@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { isCrypto, tfLabel, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
+import Logo from './Logo'
 import SymbolSearch from './SymbolSearch'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
@@ -11,10 +12,12 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel px-3">
-      <span className="font-semibold tracking-wide text-white">KandleOS</span>
+    <header className="relative flex h-12 shrink-0 items-center gap-3 border-b border-line bg-panel px-3">
+      <Logo />
+      {/* Hairline in the icon's gradient under the bar. */}
+      <div className="pointer-events-none absolute inset-x-0 -bottom-px h-px bg-brand opacity-40" />
 
-      <div className="flex items-center gap-2 rounded bg-bg px-2 py-1 ring-1 ring-line focus-within:ring-accent">
+      <div className="flex items-center gap-2 rounded-lg bg-bg px-2.5 py-1.5 ring-1 ring-line transition focus-within:shadow-glow focus-within:ring-accent">
         <Search size={14} className="text-muted" />
         <SymbolSearch
           value={symbol}
@@ -80,9 +83,9 @@ function TimeframePicker() {
     setOpen(false)
   }
   const other = !MAIN.includes(timeframe)
-  const btn = (active: boolean) => `rounded px-2 py-0.5 text-xs ${active ? 'bg-accent text-white' : 'text-muted hover:text-white'}`
+  const btn = (active: boolean) => `rounded-md px-2 py-0.5 text-xs ${active ? 'bg-brand text-white shadow-glow' : 'text-muted hover:text-white'}`
   return (
-    <div className="relative flex rounded bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
+    <div className="relative flex rounded-lg bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
       {MAIN.map((tf) => (
         <button key={tf} onClick={() => pick(tf)} aria-pressed={tf === timeframe} className={btn(tf === timeframe)}>
           {tfLabel(tf)}
@@ -101,7 +104,7 @@ function TimeframePicker() {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded border border-line bg-panel py-1 shadow-xl">
+          <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
             {GROUPS.map(([title, items]) => (
               <div key={title}>
                 <p className="px-3 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wider text-muted">{title}</p>
@@ -178,14 +181,14 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         title={`${symbol} zur Watchlist hinzufügen`}
-        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-accent ring-1 ring-accent/50 hover:bg-accent/15"
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-accent ring-1 ring-accent/50 transition hover:bg-accent/15 hover:shadow-glow"
       >
         <Plus size={14} /> Watchlist
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-56 rounded border border-line bg-panel py-1 shadow-xl">
+          <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
             <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted">{symbol} hinzufügen zu</p>
             {folders.map((f) => (
               <button key={f.id} role="menuitem" onClick={() => put(f.id)} className={`${item} text-white`}>
@@ -226,7 +229,7 @@ function IndicatorMenu({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-10" onClick={onClose} />
-      <div className="absolute left-0 top-full z-20 mt-1 w-80 rounded border border-line bg-panel p-2 shadow-xl">
+      <div className="absolute left-0 top-full z-20 mt-1 w-80 rounded-lg border border-line bg-panel/95 backdrop-blur p-2 shadow-2xl shadow-black/50">
         {(Object.keys(ROWS) as (keyof Indicators)[]).map((name) => {
           const cfg = indicators[name] as unknown as Record<string, number | boolean>
           return (

@@ -39,7 +39,7 @@ export default function DrawingToolbar() {
   const removeDrawing = useStore((s) => s.removeDrawing)
   const clearDrawings = useStore((s) => s.clearDrawings)
 
-  const btn = 'flex h-8 w-8 items-center justify-center rounded'
+  const btn = 'flex h-8 w-8 items-center justify-center rounded-lg transition'
   return (
     <nav className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2">
       {TOOLS.map(([id, Icon, label]) => (
@@ -49,7 +49,7 @@ export default function DrawingToolbar() {
           title={label}
           aria-label={label}
           aria-pressed={tool === id}
-          className={`${btn} ${tool === id ? 'bg-accent text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+          className={`${btn} ${tool === id ? 'bg-brand text-white shadow-glow' : 'text-muted hover:bg-line hover:text-white'}`}
         >
           <Icon size={17} />
         </button>

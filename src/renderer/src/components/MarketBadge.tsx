@@ -65,7 +65,7 @@ export default function MarketBadge({ symbol, timeZone }: { symbol: string; time
   return (
     <span
       title={d.title}
-      className="pointer-events-auto inline-flex items-center gap-1.5 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200"
+      className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200"
     >
       <span className={`h-2 w-2 rounded-full ${d.dot}`} aria-hidden />
       {d.label}

@@ -47,7 +47,7 @@ export function ForecastTip({ result, index, x, y, width, height, intraday }: {
   const flipY = y > height - 170
   return (
     <div
-      className="pointer-events-none absolute z-10 whitespace-nowrap rounded border border-line bg-panel/95 px-2.5 py-2 text-xs shadow-xl"
+      className="pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-line bg-panel/95 backdrop-blur/95 px-2.5 py-2 text-xs shadow-2xl shadow-black/50"
       style={{
         left: x,
         top: y,

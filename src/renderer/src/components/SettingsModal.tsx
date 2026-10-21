@@ -22,14 +22,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <form
         onSubmit={save}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-[440px] rounded-lg border border-line bg-panel p-5 shadow-2xl"
+        className="w-[440px] rounded-xl border border-line bg-panel/95 backdrop-blur p-5 shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 id="settings-title" className="text-base font-semibold text-white">
@@ -50,7 +50,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           onChange={(e) => setKey(e.target.value)}
           autoFocus
           spellCheck={false}
-          className={`w-full rounded bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
+          className={`w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
         />
         <p className="mt-2 text-xs leading-relaxed text-muted">
           Ohne Key kommen Aktienkurse über Yahoo Finance (alle 15 s aktualisiert). Mit Key gibt es Echtzeit-Trades über den
@@ -67,7 +67,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
             Abbrechen
           </button>
-          <button type="submit" disabled={!valid} className="rounded bg-accent px-3 py-1.5 text-white disabled:opacity-40">
+          <button type="submit" disabled={!valid} className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-3 py-1.5 disabled:opacity-40 disabled:shadow-none">
             Speichern
           </button>
         </div>

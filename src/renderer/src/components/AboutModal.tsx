@@ -26,13 +26,13 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
   const link = 'text-accent hover:underline'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={dismiss}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={dismiss}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-title"
-        className="max-h-[85vh] w-[560px] overflow-y-auto rounded-lg border border-line bg-panel p-5 text-xs leading-relaxed text-slate-300 shadow-2xl"
+        className="max-h-[85vh] w-[560px] overflow-y-auto rounded-xl border border-line bg-panel/95 backdrop-blur p-5 text-xs leading-relaxed text-slate-300 shadow-2xl"
       >
         <div className="flex items-center justify-between">
           <h2 id="about-title" className="text-base font-semibold text-white">
@@ -90,7 +90,7 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
 
         {firstRun && (
           <div className="mt-5 flex justify-end">
-            <button onClick={confirm} className="rounded bg-accent px-4 py-1.5 text-sm text-white">
+            <button onClick={confirm} className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-4 py-1.5 text-sm">
               Verstanden
             </button>
           </div>

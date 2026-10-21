@@ -4,12 +4,13 @@ import { futureTimes } from '../../../shared/calendar'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
+import { THEME } from '../lib/theme'
 import { useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
-const COLOR = '#2962ff'
-const SELECTED = '#f5c542'
+const COLOR = THEME.drawing
+const SELECTED = THEME.selected
 const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043' }
 const WAVE_LABELS = { elliott: ['0', '1', '2', '3', '4', '5'], abc: ['0', 'A', 'B', 'C'] }
 const NO_DRAWINGS: Drawing[] = []
@@ -272,7 +273,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           cx={x}
           cy={ys[i]}
           r={5}
-          fill="#0b0e14"
+          fill={THEME.bg}
           stroke={stroke}
           strokeWidth={1.5}
           style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
@@ -306,7 +307,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (d.type === 'rect' || d.type === 'measure') {
       const box = { x: Math.min(...xs), y: Math.min(...ys), width: Math.abs(xs[1] - xs[0]), height: Math.abs(ys[1] - ys[0]) }
       const up = pts[1].price >= pts[0].price
-      const color = d.type === 'rect' ? stroke : up ? '#26a69a' : '#ef5350'
+      const color = d.type === 'rect' ? stroke : up ? THEME.up : THEME.down
       return (
         <g key={d.id}>
           <rect {...box} fill={color} fillOpacity={0.12} stroke={color} strokeWidth={selected ? 2 : 1} />
@@ -441,7 +442,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         {preview && render(preview, true)}
       </svg>
       {tool !== 'cursor' && CLICKS[tool] > 1 && (
-        <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded bg-panel/90 px-2 py-1 text-xs text-slate-200 ring-1 ring-line">
+        // Bottom centre: the top is taken by the legend row.
+        <div className="pointer-events-none absolute bottom-12 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-panel/90 px-2.5 py-1 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur">
           Punkt {draft.length + 1} von {CLICKS[tool]} · Esc bricht ab
         </div>
       )}

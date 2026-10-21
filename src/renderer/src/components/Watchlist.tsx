@@ -205,7 +205,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
               onDragEnd={() => (drag.current = null)}
               onClick={() => setSymbol(s)}
               className={`group/row grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
-                s === active ? 'bg-accent/15' : 'hover:bg-bg'
+                s === active ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-brand-to)]' : 'hover:bg-bg'
               }`}
             >
               {renaming === s ? (
