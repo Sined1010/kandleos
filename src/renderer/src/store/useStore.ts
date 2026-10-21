@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
 import { rangeById, type RangeId } from '../lib/ranges'
+import { moveSymbolTo } from '../lib/watchlist'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -59,7 +60,8 @@ interface State {
   toggleFolder: (id: string) => void
   addToFolder: (id: string, symbol: string) => void
   removeFromFolder: (id: string, symbol: string) => void
-  moveSymbol: (symbol: string, fromId: string, toId: string) => void
+  /** Into folder `toId` in front of `before`, or at its end; also reorders within one folder. */
+  moveSymbol: (symbol: string, fromId: string, toId: string, before?: string | null) => void
   setFinnhubKey: (key: string) => void
   /** Whether the disclaimer shown on first start has been confirmed. */
   disclaimerAccepted: boolean
@@ -128,16 +130,8 @@ export const useStore = create<State>()(
       toggleFolder: (id) => set((s) => mapFolder(s, id, (f) => ({ ...f, collapsed: !f.collapsed }))),
       addToFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withSymbol({ ...f, collapsed: false }, symbol))),
       removeFromFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withoutSymbol(f, symbol))),
-      moveSymbol: (symbol, fromId, toId) =>
-        set((s) =>
-          fromId === toId
-            ? s
-            : {
-                folders: s.folders.map((f) =>
-                  f.id === fromId ? withoutSymbol(f, symbol) : f.id === toId ? withSymbol(f, symbol) : f
-                )
-              }
-        ),
+      moveSymbol: (symbol, fromId, toId, before) =>
+        set((s) => ({ folders: moveSymbolTo(s.folders, symbol, fromId, toId, before) })),
       setFinnhubKey: (finnhubKey) => {
         set({ finnhubKey })
         void window.api.keySet(finnhubKey)

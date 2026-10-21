@@ -89,6 +89,17 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
   const [adding, setAdding] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState(false)
+  // Where a dragged symbol would land: in front of this symbol, null = at the end, undefined = nowhere.
+  const [insertBefore, setInsertBefore] = useState<string | null | undefined>(undefined)
+  const endDrag = () => {
+    setDropTarget(false)
+    setInsertBefore(undefined)
+  }
+  // Dropping a symbol right where it already is changes nothing, so no marker for it.
+  const dragged = drag.current
+  const own = dragged?.from === f.id ? f.symbols.indexOf(dragged.symbol) : -1
+  const noop = own >= 0 && (insertBefore === dragged!.symbol || insertBefore === (f.symbols[own + 1] ?? null))
+  const markerAt = noop ? undefined : insertBefore
 
   const iconBtn = 'rounded p-1 text-muted hover:bg-line hover:text-white'
   return (
@@ -98,14 +109,15 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
         e.preventDefault()
         setDropTarget(true)
       }}
-      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropTarget(false)}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && endDrag()}
       onDrop={(e) => {
         e.preventDefault()
-        setDropTarget(false)
-        if (drag.current) moveSymbol(drag.current.symbol, drag.current.from, f.id)
+        if (drag.current) moveSymbol(drag.current.symbol, drag.current.from, f.id, insertBefore ?? null)
         drag.current = null
+        endDrag()
       }}
-      className={dropTarget ? 'bg-accent/10 ring-1 ring-inset ring-accent' : ''}
+      // Another folder lights up as a whole; within the own folder only the insertion line shows.
+      className={dropTarget && dragged?.from !== f.id ? 'bg-accent/10 ring-1 ring-inset ring-accent' : ''}
     >
       <div className="group/head flex items-center gap-1 px-2 pb-1 pt-3">
         <button
@@ -191,23 +203,42 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
       )}
 
       {!f.collapsed &&
-        f.symbols.map((s) => {
+        f.symbols.map((s, i) => {
           const q = quotes[s]
+          const last = i === f.symbols.length - 1
           return (
             <div
               key={s}
               draggable={renaming !== s}
+              title="Ziehen zum Sortieren oder in einen anderen Ordner"
               onDragStart={(e) => {
                 drag.current = { symbol: s, from: f.id }
                 e.dataTransfer.effectAllowed = 'move'
                 e.dataTransfer.setData('text/plain', s)
               }}
-              onDragEnd={() => (drag.current = null)}
+              onDragEnd={() => {
+                drag.current = null
+                endDrag()
+              }}
+              onDragOver={(e) => {
+                if (!drag.current) return
+                // Upper half: in front of this row, lower half: in front of the next one.
+                const r = e.currentTarget.getBoundingClientRect()
+                const target = e.clientY < r.top + r.height / 2 ? s : (f.symbols[i + 1] ?? null)
+                if (target !== insertBefore) setInsertBefore(target)
+              }}
               onClick={() => setSymbol(s)}
-              className={`group/row grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
+              className={`group/row relative grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
                 s === active ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-brand-to)]' : 'hover:bg-bg'
               }`}
             >
+              {(markerAt === s || (last && markerAt === null)) && (
+                <span
+                  className={`pointer-events-none absolute inset-x-2 h-0.5 rounded-full bg-brand shadow-glow ${
+                    markerAt === s ? '-top-px' : '-bottom-px'
+                  }`}
+                />
+              )}
               {renaming === s ? (
                 <input
                   autoFocus
