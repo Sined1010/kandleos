@@ -1,10 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#151924"/>
-  <path d="M12 46 L26 34 L36 40 L52 20" fill="none" stroke="#2962ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="18" y1="16" x2="18" y2="48" stroke="#ef5350" stroke-width="2"/>
-  <rect x="14" y="22" width="8" height="16" rx="1" fill="#ef5350"/>
-  <line x1="32" y1="12" x2="32" y2="44" stroke="#26a69a" stroke-width="2"/>
-  <rect x="28" y="18" width="8" height="18" rx="1" fill="#26a69a"/>
-  <line x1="46" y1="22" x2="46" y2="54" stroke="#26a69a" stroke-width="2"/>
-  <rect x="42" y="28" width="8" height="18" rx="1" fill="#26a69a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <!-- A "K" built from three candlesticks (wick + body): the stem and both arms. -->
+  <g stroke-linecap="round">
+    <line x1="154" y1="92" x2="154" y2="420" stroke="#ffffff" stroke-width="14"/>
+    <rect x="121" y="148" width="66" height="216" rx="16" fill="#ffffff"/>
+    <line x1="208" y1="252" x2="378" y2="84" stroke="#ffffff" stroke-width="14"/>
+    <rect x="253" y="113" width="62" height="128" rx="14" fill="#ffffff" transform="rotate(45.6 284 177)"/>
+    <line x1="208" y1="262" x2="378" y2="428" stroke="#d9f4fb" stroke-width="14"/>
+    <rect x="255" y="283" width="62" height="112" rx="14" fill="#d9f4fb" transform="rotate(-45.7 286 339)"/>
+  </g>
 </svg>
