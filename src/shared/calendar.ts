@@ -152,10 +152,34 @@ export function isHoliday(timeZone: string, date: string): boolean {
   return set.has(date)
 }
 
+/**
+ * Early close on `date` (YYYY-MM-DD) as seconds after local midnight, if the exchange in `timeZone` closes
+ * early that day: NYSE at 13:00 before July 4th, after Thanksgiving and on Christmas Eve; London at 12:30
+ * and Euronext at 14:05 on Christmas Eve and New Year's Eve. XETRA and SIX are closed on those days anyway.
+ */
+export function earlyClose(timeZone: string, date: string): number | undefined {
+  const market = MARKETS[timeZone]
+  const [y, m, d] = date.split('-').map(Number)
+  const wd = weekday(date)
+  if (wd % 6 === 0 || isHoliday(timeZone, date)) return undefined
+  switch (market) {
+    case 'US': {
+      const afterThanksgiving = iso(addDays(nth(y, 11, 4, 4), 1))
+      return (m === 7 && d === 3) || (m === 12 && d === 24) || date === afterThanksgiving ? 13 * 3600 : undefined
+    }
+    case 'UK':
+      return m === 12 && (d === 24 || d === 31) ? 12.5 * 3600 : undefined
+    case 'EURONEXT':
+      return m === 12 && (d === 24 || d === 31) ? 14 * 3600 + 5 * 60 : undefined
+    default:
+      return undefined
+  }
+}
+
 const formats = new Map<string, Intl.DateTimeFormat>()
 
 /** Wall-clock date and second of day of a UTC timestamp in a time zone. */
-function wall(t: number, timeZone: string): { date: string; sec: number } {
+export function wall(t: number, timeZone: string): { date: string; sec: number } {
   let f = formats.get(timeZone)
   if (!f) {
     const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' } as const
@@ -168,7 +192,7 @@ function wall(t: number, timeZone: string): { date: string; sec: number } {
 const dateSeconds = (date: string) => Date.parse(`${date}T00:00:00Z`) / 1000
 
 /** UTC timestamp of a wall-clock time in a time zone, respecting that day's DST offset. */
-function fromWall(date: string, sec: number, timeZone: string): number {
+export function fromWall(date: string, sec: number, timeZone: string): number {
   const naive = dateSeconds(date) + sec
   let t = naive
   // Two rounds settle the offset even when the first guess lands on the other side of a DST switch.
@@ -202,8 +226,9 @@ export function periodStart(index: number, months: number, timeZone: string): nu
   return fromWall(date, 0, timeZone)
 }
 
-const weekday = (date: string) => new Date(dateSeconds(date) * 1000).getUTCDay()
-const nextDate = (date: string) => iso(new Date((dateSeconds(date) + 86_400) * 1000))
+/** 0 = Sunday for a YYYY-MM-DD date. */
+export const weekday = (date: string): number => new Date(dateSeconds(date) * 1000).getUTCDay()
+export const nextDate = (date: string): string => iso(new Date((dateSeconds(date) + 86_400) * 1000))
 
 /**
  * Timestamps of the next `count` bars on the exchange's trading calendar: trading weekdays and session times

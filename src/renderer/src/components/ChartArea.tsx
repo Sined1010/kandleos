@@ -30,6 +30,7 @@ import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
+import MarketBadge from './MarketBadge'
 
 const UP = '#26a69a'
 const DOWN = '#ef5350'
@@ -78,6 +79,7 @@ export default function ChartArea() {
   const [currency, setCurrency] = useState('')
   // Exchange time zone of the loaded symbol; the forecast's time axis follows that exchange's calendar.
   const timezoneRef = useRef<string | undefined>(undefined)
+  const [exchangeZone, setExchangeZone] = useState<string | undefined>()
   const [fc, setFc] = useState<{ state: 'idle' | 'loading' | 'shown' | 'error'; pct?: number; error?: string }>({
     state: 'idle'
   })
@@ -89,7 +91,9 @@ export default function ChartArea() {
   const showRange = (bars: Candle[], id: RangeId | null) => {
     if (!api || !bars.length) return
     const from = id ? rangeStartIndex(bars.map((c) => c.time), id) : Math.max(0, bars.length - 150)
-    api.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + (id ? 3 : 10) })
+    // Free space right of the last bar; a few yearly bars would otherwise leave half the chart empty.
+    const margin = id ? 3 : Math.min(10, Math.max(2, Math.round(bars.length / 10)))
+    api.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + margin })
   }
 
   // History + live updates for the current symbol/timeframe.
@@ -112,6 +116,7 @@ export default function ChartArea() {
     api.volume.setData([])
     setStatus(`Lade ${symbol} …`)
     setCurrency('')
+    setExchangeZone(undefined)
 
     const push = (bar: Candle) => {
       const arr = dataRef.current
@@ -137,6 +142,7 @@ export default function ChartArea() {
         setData([...bars])
         setCurrency(currency)
         timezoneRef.current = timezone
+        setExchangeZone(timezone)
         setStatus(null)
       })
       .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
@@ -356,6 +362,7 @@ export default function ChartArea() {
               {MINOR_UNITS[currency] ?? currency}
             </span>
           )}
+          <MarketBadge symbol={symbol} timeZone={exchangeZone} />
           <button
             onClick={toggleForecast}
             onMouseDown={(e) => e.stopPropagation()}
