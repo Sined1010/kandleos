@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
 // Runtime dependencies are shipped as node_modules; these devDependencies are bundled into the app's JavaScript.
-const BUNDLED = ['react', 'react-dom', 'zustand', 'lucide-react', 'lightweight-charts']
+const BUNDLED = ['react', 'react-dom', 'zustand', 'lucide-react', 'lightweight-charts', 'markdown-it']
 const roots = [...Object.keys(pkg.dependencies ?? {}), ...BUNDLED]
 
 /** Directory of package `name` as Node would resolve it from `from` (nearest node_modules upwards). */
@@ -51,6 +51,9 @@ const out = [
   '- Prognosemodell Amazon Chronos-2 (Apache-2.0, https://huggingface.co/amazon/chronos-2) als ONNX-Export',
   '  von sktime (https://huggingface.co/sktime/chronos2-onnx). Es ist nicht im Installer enthalten, sondern',
   '  wird beim ersten Start einer Prognose heruntergeladen.',
+  '- Umfassende Analyse (optional): TradingAgents von Tauric Research (Apache-2.0,',
+  '  https://github.com/TauricResearch/TradingAgents), Python (PSF-Lizenz) und uv von Astral (MIT/Apache-2.0).',
+  '  Nichts davon ist im Installer enthalten; alles wird erst beim Einrichten der Analyse heruntergeladen.',
   '',
   'Übersicht:',
   ...entries.map((e) => `- ${e.key} (${e.license})`),
