@@ -16,7 +16,9 @@ export default function App() {
   const folders = useStore((s) => s.folders)
   const finnhubKey = useStore((s) => s.finnhubKey)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
-  const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].join(',')
+  // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
+  // keeps the Finnhub and Binance connections open instead of reconnecting.
+  const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].sort().join(',')
 
   useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote, setFeedStatus), [feed, finnhubKey])
 
