@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useQuotes, useStore, type Folder } from '../store/useStore'
+import { MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
 
 export const formatPrice = (p: number): string =>
@@ -239,7 +240,10 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
                     setRenaming(s)
                   }}
                 >
-                  <span className="block truncate font-medium text-white">{names[s] ?? s}</span>
+                  <span className="flex items-center gap-1.5">
+                    <MarketDot symbol={s} timeZone={q?.timezone} />
+                    <span className="truncate font-medium text-white">{names[s] ?? s}</span>
+                  </span>
                   {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
                 </span>
               )}

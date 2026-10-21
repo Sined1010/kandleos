@@ -199,5 +199,8 @@ export const useQuotes = create<{ quotes: Record<string, Quote>; feed: FeedStatu
   feed: { state: 'off' }
 }))
 export const setFeedStatus = (feed: FeedStatus): void => useQuotes.setState({ feed })
+// Finnhub ticks name no exchange; keep the time zone an earlier Yahoo quote reported.
 export const setQuote = (symbol: string, q: Quote): void =>
-  useQuotes.setState((s) => ({ quotes: { ...s.quotes, [symbol]: q } }))
+  useQuotes.setState((s) => ({
+    quotes: { ...s.quotes, [symbol]: { ...q, timezone: q.timezone ?? s.quotes[symbol]?.timezone } }
+  }))

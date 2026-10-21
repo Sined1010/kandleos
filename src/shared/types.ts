@@ -52,6 +52,8 @@ export interface Quote {
   changePct: number
   time: number
   prevClose?: number
+  /** IANA time zone of the exchange, when the quote source names it (Yahoo). */
+  timezone?: string
 }
 
 export interface SearchResult {

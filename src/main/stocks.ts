@@ -223,7 +223,8 @@ async function yahooQuote(symbol: string): Promise<Quote> {
     price: m.regularMarketPrice,
     changePct: (m.regularMarketPrice / prev - 1) * 100,
     time: m.regularMarketTime,
-    prevClose: prev
+    prevClose: prev,
+    timezone: validTimeZone(m.exchangeTimezoneName)
   }
 }
 
