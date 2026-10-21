@@ -130,7 +130,7 @@ let installing: Promise<AgentsStatus> | null = null
 
 /** Sets up Python and TradingAgents (a few hundred MB, several minutes on first use). */
 export function installAgents(onProgress: (p: SetupProgress) => void): Promise<AgentsStatus> {
-  if (!build()) return Promise.reject(new Error('KI-Analyse gibt es nur für Windows und Linux (x64)'))
+  if (!build()) return Promise.reject(new Error('Die umfassende Analyse gibt es nur für Windows und Linux (x64)'))
   installing ??= (async () => {
     await rm(markerFile(), { force: true })
     if (!existsSync(uvExe())) await downloadUv(onProgress)
@@ -247,7 +247,7 @@ function checkRequest(req: unknown): AgentsRequest {
     r.debateRounds >= 1 &&
     r.debateRounds <= 3 &&
     (r.ollamaUrl === undefined || /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl))
-  if (!ok) throw new Error('Ungültige Anfrage für die KI-Analyse')
+  if (!ok) throw new Error('Ungültige Anfrage für die Analyse')
   return r
 }
 
@@ -257,8 +257,8 @@ let current: ChildProcess | null = null
 /** Runs TradingAgents for a symbol as of today; progress goes to `onEvent`, the saved result is returned. */
 export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => void): Promise<SavedAnalysis> {
   const req = checkRequest(reqArg)
-  if (!agentsStatus().installed) throw new Error('KI-Analyse ist noch nicht eingerichtet')
-  if (current) throw new Error('Es läuft bereits eine KI-Analyse')
+  if (!agentsStatus().installed) throw new Error('Die umfassende Analyse ist noch nicht eingerichtet')
+  if (current) throw new Error('Es läuft bereits eine Analyse')
   const keys = readKeys()
   const keyEnv = keyEnvFor(req.provider)
   if (keyEnv && !keys[req.provider]) throw new Error(`Kein API-Key für ${PROVIDERS.find((p) => p.id === req.provider)?.label} hinterlegt`)
@@ -306,7 +306,7 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
         current = null
         if (done) resolve(done)
         else if (signal || child.killed) reject(new Error('Abgebrochen'))
-        else reject(new Error(error || stderr.slice(-8).join('\n') || `KI-Analyse beendet mit Code ${code}`))
+        else reject(new Error(error || stderr.slice(-8).join('\n') || `Analyse beendet mit Code ${code}`))
       })
       child.stdin.end(
         JSON.stringify({

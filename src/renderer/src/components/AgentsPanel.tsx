@@ -1,6 +1,6 @@
 import { BrainCircuit, Check, Circle, Loader2, Settings2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { parseDecision, providerById, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
+import { parseDecision, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
 import { formatPrice } from '../lib/format'
 import { renderMarkdown } from '../lib/markdown'
 import { useStore } from '../store/useStore'
@@ -58,7 +58,7 @@ interface Running {
   tokensOut: number
 }
 
-/** Side panel of the KI-Analyse (TradingAgents): start a run, follow it, read saved results. */
+/** Side panel of the comprehensive analysis with TradingAgents: start a run, follow it, read saved results. */
 export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, onClose, onSetup, onLevels }: {
   /** Hidden panels stay mounted, so a running analysis keeps its progress while the panel is closed. */
   open: boolean
@@ -165,13 +165,13 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
         open ? 'flex' : 'hidden'
       }`}
       onMouseDown={(e) => e.stopPropagation()}
-      aria-label="KI-Analyse"
+      aria-label="Umfassende Analyse"
     >
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <BrainCircuit size={16} className="text-accent" />
-        <span className="font-semibold text-white">KI-Analyse</span>
-        <span className="text-muted">· {symbol}</span>
-        <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title="Einrichten" aria-label="KI-Analyse einrichten">
+        <span className="font-semibold text-white">Umfassende Analyse</span>
+        <span className="text-muted">mit TradingAgents · {symbol}</span>
+        <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title="Einrichten" aria-label="Umfassende Analyse einrichten">
           <Settings2 size={15} />
         </button>
         <button onClick={onClose} className="rounded p-1 text-muted hover:bg-line hover:text-white" aria-label="Schließen">
@@ -218,20 +218,14 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
           <div className="p-3">
             {!status ? (
               <p className="text-muted">Prüfe …</p>
+            ) : !status.installed ? (
+              <Intro symbol={symbol} supported={status.supported} onSetup={onSetup} />
             ) : !ready ? (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
-                <p className="text-slate-200">
-                  {!status.supported
-                    ? 'Die KI-Analyse gibt es nur für Windows und Linux (x64).'
-                    : !status.installed
-                      ? 'Die KI-Analyse ist noch nicht eingerichtet.'
-                      : `Für ${provider.label} ist noch kein API-Key hinterlegt.`}
-                </p>
-                {status.supported && (
-                  <button onClick={onSetup} className="mt-2 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110">
-                    Einrichten
-                  </button>
-                )}
+                <p className="text-slate-200">Für {provider.label} ist noch kein API-Key hinterlegt.</p>
+                <button onClick={onSetup} className="mt-2 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110">
+                  Einrichten
+                </button>
               </div>
             ) : (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
@@ -360,5 +354,114 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
         )}
       </div>
     </aside>
+  )
+}
+
+const STEPS = [
+  ['Vier Analysten sammeln Daten', 'Chart und Indikatoren, Stimmung (Reddit, StockTwits), Nachrichten und Fundamentaldaten wie Bilanzen.'],
+  ['Bull und Bear debattieren', 'Ein Optimist und ein Skeptiker streiten über Chancen und Risiken.'],
+  ['Ein Trader macht einen Plan', 'Kaufen, halten oder verkaufen, mit Einstieg, Stop-Loss und Positionsgröße.'],
+  ['Drei Risiko-Prüfer hinterfragen ihn', 'Offensiv, neutral und vorsichtig.'],
+  ['Der Portfolio-Manager entscheidet', 'Einschätzung in fünf Stufen, Kursziel und Zeithorizont.']
+] as const
+
+const COMPARE: [string, string, string][] = [
+  ['Methode', 'Statistisches Modell (Chronos-2) aus dem Kursverlauf', 'Sprachmodelle lesen Daten, Nachrichten und Zahlen'],
+  ['Ergebnis', 'Kursverlauf mit Wahrscheinlichkeitsfächer', 'Einschätzung, Kursziel, Trade-Plan und Berichte'],
+  ['Dauer', 'Sekunden', 'Einige Minuten'],
+  ['Kosten', 'Kostenlos, läuft lokal', 'Eigener API-Key (kostet je Analyse) oder lokal mit Ollama']
+]
+
+/** What the optional comprehensive analysis is, before anything is downloaded. */
+function Intro({ symbol, supported, onSetup }: { symbol: string; supported: boolean; onSetup: () => void }) {
+  const h = 'mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-wider text-muted'
+  return (
+    <div className="leading-relaxed">
+      <p className="text-sm font-semibold text-white">Ein Team aus KI-Agenten analysiert {symbol}</p>
+      <p className="mt-1 text-slate-300">
+        Wie in einem Analystenhaus prüfen mehrere spezialisierte KI-Agenten die Aktie oder Kryptowährung, diskutieren das
+        Für und Wider und schreiben einen ausführlichen Bericht mit Einschätzung. Grundlage ist das Open-Source-Projekt
+        TradingAgents.
+      </p>
+
+      <p className={h}>So läuft eine Analyse</p>
+      <ol className="space-y-1.5">
+        {STEPS.map(([title, text], i) => (
+          <li key={title} className="flex gap-2">
+            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/20 text-[10px] font-semibold text-accent">
+              {i + 1}
+            </span>
+            <span>
+              <span className="text-slate-200">{title}.</span> <span className="text-muted">{text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className={h}>Das bekommst du</p>
+      <div className="flex flex-wrap gap-1">
+        {RATINGS.map((r) => (
+          <span key={r} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${RATING[r][1]}`}>
+            {RATING[r][0]}
+          </span>
+        ))}
+      </div>
+      <p className="mt-1.5 text-muted">
+        Dazu Kursziel und Zeithorizont, Einstieg und Stop-Loss als Linien im Chart sowie alle Einzelberichte zum Nachlesen.
+        Jede Analyse wird gespeichert.
+      </p>
+
+      <p className={h}>Unterschied zur KI-Prognose</p>
+      <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-lg ring-1 ring-line">
+        <thead>
+          <tr className="bg-bg text-left text-[10px] uppercase tracking-wider text-muted">
+            <th className="px-2 py-1 font-semibold" />
+            <th className="px-2 py-1 font-semibold">KI-Prognose</th>
+            <th className="px-2 py-1 font-semibold">Umfassende Analyse</th>
+          </tr>
+        </thead>
+        <tbody>
+          {COMPARE.map(([label, forecast, agents]) => (
+            <tr key={label} className="align-top">
+              <td className="border-t border-line px-2 py-1 text-muted">{label}</td>
+              <td className="border-t border-line px-2 py-1 text-slate-300">{forecast}</td>
+              <td className="border-t border-line px-2 py-1 text-slate-300">{agents}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className={h}>Was du brauchst</p>
+      <ul className="ml-4 list-disc space-y-1 text-muted">
+        <li>
+          <span className="text-slate-300">Einen API-Key</span> von Anthropic (Claude), OpenAI, Google, DeepSeek oder Alibaba
+          (Qwen). Jede Analyse kostet dort Guthaben, weil viele Modellaufrufe nötig sind.
+        </li>
+        <li>
+          <span className="text-slate-300">Oder Ollama</span> für KI auf dem eigenen Rechner: kostenlos und offline, aber
+          langsamer und mit schwächeren Ergebnissen; braucht einen leistungsstarken PC.
+        </li>
+        <li>
+          <span className="text-slate-300">Einmalig rund 350 MB</span> Download (Python und TradingAgents). Alles bleibt im
+          Datenordner von KandleOS und lässt sich jederzeit wieder entfernen.
+        </li>
+      </ul>
+      <p className="mt-3 rounded-lg bg-bg p-2 text-[11px] text-muted ring-1 ring-line">
+        Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich
+        irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research
+        (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.
+      </p>
+
+      {supported ? (
+        <button
+          onClick={onSetup}
+          className="mt-3 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110"
+        >
+          Einrichten
+        </button>
+      ) : (
+        <p className="mt-3 text-down">Die umfassende Analyse gibt es nur für Windows und Linux (x64).</p>
+      )}
+    </div>
   )
 }

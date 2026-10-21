@@ -49,7 +49,7 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
         <h3 className={h}>Keine Anlageberatung</h3>
         <p>
           KandleOS ist ein Werkzeug zur technischen Chartanalyse. Indikatoren, Zeichnungen, die Kursprognose
-          (Chronos-2) und die KI-Analyse (TradingAgents, Texte von Sprachmodellen, die irren können) sind Hilfsmittel und{' '}
+          (Chronos-2) und die umfassende Analyse mit TradingAgents (Texte von Sprachmodellen, die irren können) sind Hilfsmittel und{' '}
           <strong className="text-white">keine Anlageberatung</strong> und
           keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr: Daten können verzögert, unvollständig oder
           fehlerhaft sein. Die Nutzung erfolgt auf eigenes Risiko; Anlageentscheidungen triffst du selbst.
@@ -69,7 +69,7 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
           <li>Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“</li>
         </ul>
         <p className="mt-2">
-          Nur wenn du die <strong className="text-white">KI-Analyse</strong> einrichtest und startest: Beim Einrichten
+          Nur wenn du die <strong className="text-white">umfassende Analyse mit TradingAgents</strong> einrichtest und startest: Beim Einrichten
           lädt KandleOS Python und TradingAgents von GitHub und dem Python-Paketindex (PyPI). Bei jeder Analyse gehen das
           Symbol und die gesammelten Markt-, Nachrichten- und Unternehmensdaten an den von dir gewählten KI-Anbieter
           (Anthropic, OpenAI, Google, DeepSeek oder Alibaba; mit Ollama bleibt die KI auf deinem Rechner). Die Daten holt
@@ -84,7 +84,7 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
           <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className={link}>
             tradingview.com
           </a>
-          . Prognosemodell: Amazon Chronos-2 (Apache-2.0) als ONNX-Export von sktime. KI-Analyse: TradingAgents von
+          . Prognosemodell: Amazon Chronos-2 (Apache-2.0) als ONNX-Export von sktime. Umfassende Analyse: TradingAgents von
           Tauric Research (Apache-2.0), bei Bedarf installiert mit uv von Astral (MIT/Apache-2.0). Alle Marken gehören ihren
           jeweiligen Inhabern; KandleOS steht in keiner Verbindung zu diesen Unternehmen.
         </p>

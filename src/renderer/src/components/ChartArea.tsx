@@ -14,7 +14,7 @@ import {
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
-import { BrainCircuit, Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
+import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
@@ -44,7 +44,7 @@ import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
 const FORECAST = '#ffd54f'
-// Width of the KI-Analyse panel (w-[400px] in AgentsPanel).
+// Width of the analysis panel (w-[400px] in AgentsPanel).
 const AGENTS_WIDTH = 400
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
@@ -107,7 +107,8 @@ export default function ChartArea() {
   // Forecast step under the crosshair, for the value box.
   const [fcHover, setFcHover] = useState<{ x: number; y: number; index: number } | null>(null)
   const [fcMenu, setFcMenu] = useState(false)
-  // KI-Analyse (TradingAgents): side panel, its setup dialog and the levels of the analysis shown.
+  // Comprehensive analysis with TradingAgents (opened from the KI-Prognose menu): side panel, its setup
+  // dialog and the levels of the analysis shown.
   const [agentsOpen, setAgentsOpen] = useState(false)
   const [agentsSetup, setAgentsSetup] = useState(false)
   const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
@@ -428,7 +429,7 @@ export default function ChartArea() {
     return () => series.forEach((s) => chart.removeSeries(s))
   }, [api, fc.result, forecastView])
 
-  // Price target, entry and stop of the KI-Analyse as labelled lines on the price axis.
+  // Price target, entry and stop of the TradingAgents analysis as labelled lines on the price axis.
   useEffect(() => {
     if (!api || !agentLevels) return
     const levels: [number | null, string, string, LineStyle][] = [
@@ -514,13 +515,13 @@ export default function ChartArea() {
     <div className="absolute inset-0 flex flex-col">
       <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
-        {/* The KI-Analyse panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
+        {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
         <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: agentsOpen ? AGENTS_WIDTH : 0 }} />
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
-          // Wraps before the buttons at the top right (about 290 px wide) instead of running under them.
-          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 300 }}
+          // Wraps before the buttons at the top right (about 200 px wide) instead of running under them.
+          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 215 }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -545,17 +546,6 @@ export default function ChartArea() {
           style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => setAgentsOpen((o) => !o)}
-            aria-pressed={agentsOpen}
-            title="KI-Analyse mit TradingAgents: ein Team aus KI-Agenten bewertet Technik, Stimmung, Nachrichten und Fundamentaldaten und gibt Einschätzung, Kursziel und Trade-Plan"
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 backdrop-blur transition ${
-              agentsOpen ? 'bg-accent/20 text-white ring-accent' : 'bg-panel/90 text-slate-200 ring-accent/60 hover:bg-line'
-            }`}
-          >
-            <BrainCircuit size={15} className="text-accent" />
-            KI-Analyse
-          </button>
           <div className="relative flex">
             <button
               onClick={toggleForecast}
@@ -588,7 +578,7 @@ export default function ChartArea() {
               onClick={() => setFcMenu((o) => !o)}
               aria-expanded={fcMenu}
               aria-haspopup="dialog"
-              title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick"
+              title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick – und die umfassende Analyse mit TradingAgents"
               aria-label="Prognose-Anzeige einstellen"
               className={`rounded-r-lg border-l border-white/20 px-2 transition ${
                 fc.state === 'shown'
@@ -598,7 +588,7 @@ export default function ChartArea() {
             >
               <SlidersHorizontal size={15} />
             </button>
-            {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} />}
+            {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} onOpenAnalysis={() => setAgentsOpen(true)} />}
           </div>
         </div>
         {fc.result && fcHover && (

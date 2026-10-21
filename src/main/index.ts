@@ -78,7 +78,7 @@ ipcMain.handle('forecast:run', (e, series, groups) => {
     if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))
   })
 })
-// KI-Analyse with TradingAgents (see agents.ts). Keys only go in, never back out to the window.
+// Comprehensive analysis with TradingAgents (see agents.ts). Keys only go in, never back out to the window.
 ipcMain.handle('agents:status', () => agentsStatus())
 ipcMain.handle('agents:install', (e) =>
   installAgents((p) => !e.sender.isDestroyed() && e.sender.send('agents:setup', p))

@@ -1,3 +1,4 @@
+import { BrainCircuit, ChevronRight } from 'lucide-react'
 import { forecastCandles, probabilityAbove, Q, type BacktestResult } from '../../../shared/forecast'
 import { formatPrice } from '../lib/format'
 import { useStore, type ForecastView } from '../store/useStore'
@@ -120,7 +121,7 @@ const BANDS: [keyof ForecastView, string, string][] = [
 ]
 
 /** What a forecast shows; changes apply to a shown forecast at once, without recomputing. */
-export function ForecastSettings({ onClose }: { onClose: () => void }) {
+export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => void; onOpenAnalysis: () => void }) {
   const view = useStore((s) => s.forecastView)
   const set = useStore((s) => s.setForecastView)
   const check = (key: keyof ForecastView, label: string, hint?: string) => (
@@ -172,6 +173,24 @@ export function ForecastSettings({ onClose }: { onClose: () => void }) {
         <p className={heading}>Zusätzlich</p>
         {check('backtest', 'Rückblick', 'Treffsicherheit und frühere Prognose (grau)')}
         {check('hover', 'Werte beim Überfahren')}
+        <p className={heading}>Erweitert · optional</p>
+        <button
+          onClick={() => {
+            onOpenAnalysis()
+            onClose()
+          }}
+          className="flex w-full items-start gap-2 rounded-md px-1 py-1.5 text-left hover:bg-bg"
+        >
+          <BrainCircuit size={14} className="mt-0.5 shrink-0 text-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-slate-200">Umfassende Analyse mit TradingAgents</span>
+            <span className="block text-[11px] leading-snug text-muted">
+              KI-Agenten werten Nachrichten, Zahlen und Stimmung aus und geben Einschätzung und Kursziel. Eigener
+              API-Key oder Ollama nötig.
+            </span>
+          </span>
+          <ChevronRight size={14} className="mt-0.5 shrink-0 text-muted" />
+        </button>
       </div>
     </>
   )

@@ -81,7 +81,7 @@ function KeyField({ name, label, hint, stored, onSaved }: {
   )
 }
 
-/** Setup for the KI-Analyse: Python environment, AI provider with key and models, FRED key, analysts. */
+/** Setup for the TradingAgents analysis: Python environment, AI provider with key and models, FRED key, analysts. */
 export default function AgentsSetup({ onClose }: { onClose: () => void }) {
   const config = useStore((s) => s.agentsConfig)
   const setConfig = useStore((s) => s.setAgentsConfig)
@@ -122,7 +122,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
     }
   }
   const remove = async () => {
-    if (confirm('Python-Umgebung der KI-Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.'))
+    if (confirm('Python-Umgebung der umfassenden Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.'))
       setStatus(await window.api.agents.remove())
   }
   const setModel = (tier: 'deep' | 'quick', value: string) =>
@@ -140,7 +140,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
       >
         <div className="mb-1 flex items-center justify-between">
           <h2 id="agents-title" className="text-base font-semibold text-white">
-            KI-Analyse einrichten
+            Umfassende Analyse mit TradingAgents einrichten
           </h2>
           <button type="button" onClick={onClose} className="text-muted hover:text-white" aria-label="Schließen">
             <X size={18} />
@@ -155,7 +155,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
         {!status ? (
           <p className="text-xs text-muted">Prüfe …</p>
         ) : !status.supported ? (
-          <p className="text-xs text-down">Die KI-Analyse gibt es nur für Windows und Linux (x64).</p>
+          <p className="text-xs text-down">Die umfassende Analyse gibt es nur für Windows und Linux (x64).</p>
         ) : status.installed ? (
           <div className="flex items-center justify-between rounded-lg bg-bg px-3 py-2 ring-1 ring-line">
             <span className="flex items-center gap-1.5 text-xs text-slate-200">

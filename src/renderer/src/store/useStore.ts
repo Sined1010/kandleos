@@ -34,7 +34,7 @@ export interface ForecastView {
   hover: boolean
 }
 
-/** KI-Analyse (TradingAgents) choices; the API keys themselves live encrypted in the main process. */
+/** Choices for the analysis with TradingAgents; the API keys themselves live encrypted in the main process. */
 export interface AgentsConfig {
   provider: ProviderId
   /** Chosen models per provider, so switching providers keeps each one's choice. */

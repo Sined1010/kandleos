@@ -57,7 +57,7 @@ input[type='number']::-webkit-inner-spin-button {
   background: color-mix(in srgb, var(--color-brand-from) 45%, var(--color-line));
 }
 
-/* Markdown reports of the KI-Analyse. */
+/* Markdown reports of the analysis with TradingAgents. */
 .md {
   font-size: 12px;
   line-height: 1.55;

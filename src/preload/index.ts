@@ -32,7 +32,7 @@ const api = {
     ipcRenderer.invoke('forecast:run', series, groups),
   /** Model download progress in percent; returns an unsubscribe function. */
   onForecastProgress: (cb: (pct: number) => void): (() => void) => listen('forecast:progress', cb),
-  /** KI-Analyse (TradingAgents): setup, keys (stored encrypted, only their presence comes back), runs. */
+  /** Comprehensive analysis with TradingAgents: setup, keys (stored encrypted, only their presence comes back), runs. */
   agents: {
     status: (): Promise<AgentsStatus> => ipcRenderer.invoke('agents:status'),
     install: (): Promise<AgentsStatus> => ipcRenderer.invoke('agents:install'),
