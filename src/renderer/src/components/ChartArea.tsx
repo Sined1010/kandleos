@@ -16,8 +16,9 @@ import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
-import { isCrypto, TF_SECONDS, type Candle } from '../../../shared/types'
+import { isCrypto, TF_SECONDS, tfLabel, type Candle } from '../../../shared/types'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
+import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
@@ -58,6 +59,8 @@ export default function ChartArea() {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const indicators = useStore((s) => s.indicators)
   const select = useStore((s) => s.select)
+  const range = useStore((s) => s.range)
+  const setRange = useStore((s) => s.setRange)
   const containerRef = useRef<HTMLDivElement>(null)
   const dataRef = useRef<Candle[]>([])
   const [api, setApi] = useState<ChartApi | null>(null)
@@ -73,6 +76,13 @@ export default function ChartArea() {
   const fcSeries = useRef<ISeriesApi<'Line'>[]>([])
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
   const fcRun = useRef(0)
+
+  /** Scrolls to the preset's span, or to the last 150 bars when no preset is active. */
+  const showRange = (bars: Candle[], id: RangeId | null) => {
+    if (!api || !bars.length) return
+    const from = id ? rangeStartIndex(bars.map((c) => c.time), id) : bars.length - 150
+    api.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + (id ? 3 : 10) })
+  }
 
   // History + live updates for the current symbol/timeframe.
   useEffect(() => {
@@ -113,7 +123,7 @@ export default function ChartArea() {
         api.candles.applyOptions({ priceFormat: { type: 'price', precision, minMove: 10 ** -precision } })
         api.candles.setData(bars.map(toBar))
         api.volume.setData(bars.map(toVol))
-        api.chart.timeScale().setVisibleLogicalRange({ from: bars.length - 150, to: bars.length + 10 })
+        showRange(bars, useStore.getState().range)
         dataRef.current = bars
         setData([...bars])
         setCurrency(currency)
@@ -134,6 +144,12 @@ export default function ChartArea() {
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey])
+
+  // A preset with the already loaded candle size only needs a scroll; otherwise the load above applies it.
+  // Declared after the load effect, which empties dataRef first when the candle size changes.
+  useEffect(() => {
+    if (range) showRange(dataRef.current, range)
+  }, [api, range])
 
   // (Re)build indicator series; oscillators get their own panes, which share the main time scale.
   useEffect(() => {
@@ -315,42 +331,57 @@ export default function ChartArea() {
   }, [])
 
   return (
-    <div className="absolute inset-0" onMouseDown={() => select(null)}>
-      {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
-      <div ref={containerRef} className="absolute inset-0 isolate" />
-      {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
-      <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
-        <span className="font-semibold text-white">{symbol}</span> · {timeframe}
-        {currency && (
-          <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
-            {MINOR_UNITS[currency] ?? currency}
-          </span>
+    <div className="absolute inset-0 flex flex-col">
+      <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
+        {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
+        <div ref={containerRef} className="absolute inset-0 isolate" />
+        {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
+        <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
+          <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
+          {currency && (
+            <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
+              {MINOR_UNITS[currency] ?? currency}
+            </span>
+          )}
+          <button
+            onClick={toggleForecast}
+            onMouseDown={(e) => e.stopPropagation()}
+            disabled={fc.state === 'loading' || data.length < 32}
+            title={
+              'Statistische Prognose der nächsten 64 Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) ' +
+              'und 80 %-Band (gepunktet). Keine Anlageberatung.' +
+              (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+            }
+            className="pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:cursor-wait disabled:opacity-70"
+          >
+            <Sparkles size={12} className="text-[#ffd54f]" />
+            {fc.state === 'shown'
+              ? 'Prognose aus'
+              : fc.state === 'loading'
+                ? fc.pct !== undefined && fc.pct < 100
+                  ? `Lade Modell ${fc.pct} %`
+                  : 'Rechne …'
+                : 'Prognose'}
+          </button>
+          {fc.state === 'error' && <span className="ml-2 text-down">{fc.error}</span>}
+        </div>
+        {status && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
         )}
-        <button
-          onClick={toggleForecast}
-          onMouseDown={(e) => e.stopPropagation()}
-          disabled={fc.state === 'loading' || data.length < 32}
-          title={
-            'Statistische Prognose der nächsten 64 Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) ' +
-            'und 80 %-Band (gepunktet). Keine Anlageberatung.' +
-            (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
-          }
-          className="pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:cursor-wait disabled:opacity-70"
-        >
-          <Sparkles size={12} className="text-[#ffd54f]" />
-          {fc.state === 'shown'
-            ? 'Prognose aus'
-            : fc.state === 'loading'
-              ? fc.pct !== undefined && fc.pct < 100
-                ? `Lade Modell ${fc.pct} %`
-                : 'Rechne …'
-              : 'Prognose'}
-        </button>
-        {fc.state === 'error' && <span className="ml-2 text-down">{fc.error}</span>}
       </div>
-      {status && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
-      )}
+      <div className="flex h-8 shrink-0 items-center gap-0.5 border-t border-line bg-panel px-2" role="group" aria-label="Zeitraum">
+        {RANGES.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => setRange(r.id)}
+            title={`${r.title} (${tfLabel(r.tf)}-Kerzen)`}
+            aria-pressed={range === r.id}
+            className={`rounded px-2 py-0.5 text-xs ${range === r.id ? 'bg-accent text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+          >
+            {r.id}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

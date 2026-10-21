@@ -1,4 +1,4 @@
-export const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1D', '1W'] as const
+export const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M'] as const
 export type Timeframe = (typeof TIMEFRAMES)[number]
 
 export const TF_SECONDS: Record<Timeframe, number> = {
@@ -8,8 +8,13 @@ export const TF_SECONDS: Record<Timeframe, number> = {
   '1h': 3600,
   '4h': 14400,
   '1D': 86400,
-  '1W': 604800
+  '1W': 604800,
+  // shortcut: a month is taken as 30 days (live ticks, drawing math); exact calendar months only matter at bar edges.
+  '1M': 2592000
 }
+
+/** Button label; monthly candles read "1Mo" so they are not confused with the "1M" (one month) range preset. */
+export const tfLabel = (tf: Timeframe): string => (tf === '1M' ? '1Mo' : tf)
 
 /** time = bar open in UTC seconds */
 export interface Candle {

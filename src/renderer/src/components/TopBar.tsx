@@ -1,6 +1,6 @@
 import { Activity, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
-import { isCrypto, TIMEFRAMES } from '../../../shared/types'
+import { isCrypto, TIMEFRAMES, tfLabel } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import SymbolSearch from './SymbolSearch'
@@ -37,7 +37,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
             aria-pressed={tf === timeframe}
             className={`rounded px-2 py-0.5 text-xs ${tf === timeframe ? 'bg-accent text-white' : 'text-muted hover:text-white'}`}
           >
-            {tf}
+            {tfLabel(tf)}
           </button>
         ))}
       </div>

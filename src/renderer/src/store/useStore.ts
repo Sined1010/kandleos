@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
+import { rangeById, type RangeId } from '../lib/ranges'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -44,6 +45,9 @@ interface State {
   selectedId: string | null
   setSymbol: (symbol: string) => void
   setTimeframe: (tf: Timeframe) => void
+  /** Active time-range preset (also picks its candle size); null after a manual timeframe choice. */
+  range: RangeId | null
+  setRange: (id: RangeId) => void
   /** An empty name removes it, so the automatic name is looked up again. */
   setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
@@ -101,7 +105,9 @@ export const useStore = create<State>()(
       tool: 'cursor',
       selectedId: null,
       setSymbol: (symbol) => set({ symbol, selectedId: null, tool: 'cursor' }),
-      setTimeframe: (timeframe) => set({ timeframe }),
+      setTimeframe: (timeframe) => set({ timeframe, range: null }),
+      range: null,
+      setRange: (range) => set({ range, timeframe: rangeById(range).tf }),
       setName: (symbol, name) =>
         set((s) => {
           const { [symbol]: _, ...rest } = s.names
@@ -173,7 +179,8 @@ export const useStore = create<State>()(
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, folders, names, indicators, drawings, disclaimerAccepted }) => ({
+      partialize: ({ symbol, timeframe, range, folders, names, indicators, drawings, disclaimerAccepted }) => ({
+        range,
         disclaimerAccepted,
         names,
         symbol,

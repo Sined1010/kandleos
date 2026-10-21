@@ -20,7 +20,8 @@ const YAHOO: Record<Timeframe, [interval: string, range: string]> = {
   '1h': ['60m', '6mo'],
   '4h': ['60m', '1y'],
   '1D': ['1d', '5y'],
-  '1W': ['1wk', '10y']
+  '1W': ['1wk', '10y'],
+  '1M': ['1mo', 'max']
 }
 const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
   '1m': ['1', 5],
@@ -29,7 +30,8 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
   '1h': ['60', 180],
   '4h': ['60', 365],
   '1D': ['D', 1825],
-  '1W': ['W', 3650]
+  '1W': ['W', 3650],
+  '1M': ['M', 18250]
 }
 
 async function getJson(url: string): Promise<any> {

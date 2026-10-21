@@ -16,7 +16,8 @@ const BINANCE_TF: Record<Timeframe, string> = {
   '1h': '1h',
   '4h': '4h',
   '1D': '1d',
-  '1W': '1w'
+  '1W': '1w',
+  '1M': '1M'
 }
 
 /** WebSocket that reconnects after drops (Binance closes streams every 24h). Returns a close function. */
