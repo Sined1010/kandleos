@@ -56,3 +56,70 @@ input[type='number']::-webkit-inner-spin-button {
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--color-brand-from) 45%, var(--color-line));
 }
+
+/* Markdown reports of the KI-Analyse. */
+.md {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #cbd2e4;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 0.9em 0 0.35em;
+  font-weight: 600;
+  color: #fff;
+}
+.md h1 {
+  font-size: 15px;
+}
+.md h2 {
+  font-size: 14px;
+}
+.md h3,
+.md h4 {
+  font-size: 13px;
+}
+.md p,
+.md ul,
+.md ol,
+.md table {
+  margin: 0.45em 0;
+}
+.md ul,
+.md ol {
+  padding-left: 1.3em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md strong {
+  color: #fff;
+}
+.md a {
+  color: var(--color-accent);
+}
+.md code {
+  border-radius: 4px;
+  background: var(--color-bg);
+  padding: 0 3px;
+}
+.md table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.md th,
+.md td {
+  border: 1px solid var(--color-line);
+  padding: 3px 6px;
+  text-align: left;
+}
+.md hr {
+  margin: 0.8em 0;
+  border-color: var(--color-line);
+}

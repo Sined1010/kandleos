@@ -9,6 +9,9 @@ files:
 extraResources:
   - from: resources/THIRD_PARTY_LICENSES.txt
     to: THIRD_PARTY_LICENSES.txt
+  # Bridge to TradingAgents for the KI-Analyse; Python and TradingAgents themselves are installed on first use.
+  - from: resources/agents/kandleos_agents.py
+    to: agents/kandleos_agents.py
 # Hardening of the packaged Electron binary: no "run as plain Node", no Node debugging/option injection,
 # app code only from the (integrity-checked) app.asar, encrypted cookies.
 electronFuses:

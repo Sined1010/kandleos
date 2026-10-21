@@ -9,15 +9,17 @@ import {
   type IChartApi,
   type ISeriesApi,
   type MouseEventParams,
+  type AutoscaleInfo,
   type SeriesType,
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
-import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
+import { BrainCircuit, Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
 import { backtest, backtestCutoffs, forecastCandles, Q } from '../../../shared/forecast'
+import type { Decision } from '../../../shared/agents'
 import { phaseAt } from '../../../shared/market'
 import {
   FORECAST_MIN_BARS,
@@ -34,12 +36,16 @@ import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } fro
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
+import AgentsPanel from './AgentsPanel'
+import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
 import { ForecastCheck, ForecastSettings, ForecastTip, type ForecastResult } from './ForecastInfo'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
 const FORECAST = '#ffd54f'
+// Width of the KI-Analyse panel (w-[400px] in AgentsPanel).
+const AGENTS_WIDTH = 400
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
@@ -101,6 +107,10 @@ export default function ChartArea() {
   // Forecast step under the crosshair, for the value box.
   const [fcHover, setFcHover] = useState<{ x: number; y: number; index: number } | null>(null)
   const [fcMenu, setFcMenu] = useState(false)
+  // KI-Analyse (TradingAgents): side panel, its setup dialog and the levels of the analysis shown.
+  const [agentsOpen, setAgentsOpen] = useState(false)
+  const [agentsSetup, setAgentsSetup] = useState(false)
+  const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
   const fcRun = useRef(0)
 
@@ -418,6 +428,33 @@ export default function ChartArea() {
     return () => series.forEach((s) => chart.removeSeries(s))
   }, [api, fc.result, forecastView])
 
+  // Price target, entry and stop of the KI-Analyse as labelled lines on the price axis.
+  useEffect(() => {
+    if (!api || !agentLevels) return
+    const levels: [number | null, string, string, LineStyle][] = [
+      [agentLevels.priceTarget, THEME.brandTo, 'KI-Ziel', LineStyle.Dashed],
+      [agentLevels.entry, THEME.drawing, 'Einstieg', LineStyle.Dotted],
+      [agentLevels.stopLoss, THEME.down, 'Stop', LineStyle.Dashed]
+    ]
+    const lines = levels.flatMap(([price, color, title, lineStyle]) =>
+      price === null ? [] : [api.candles.createPriceLine({ price, color, title, lineStyle, lineWidth: 1, axisLabelVisible: true })]
+    )
+    // Keep the levels in view: the price scale also spans them, not only the candles.
+    const prices = levels.flatMap(([p]) => (p === null ? [] : [p]))
+    api.candles.applyOptions({
+      autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        const r = original()
+        if (!r?.priceRange) return r
+        const { minValue, maxValue } = r.priceRange
+        return { ...r, priceRange: { minValue: Math.min(minValue, ...prices), maxValue: Math.max(maxValue, ...prices) } }
+      }
+    })
+    return () => {
+      lines.forEach((l) => api.candles.removePriceLine(l))
+      api.candles.applyOptions({ autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => original() })
+    }
+  }, [api, agentLevels])
+
   // Value box for the forecast step under the crosshair.
   useEffect(() => {
     const result = fc.result
@@ -477,9 +514,14 @@ export default function ChartArea() {
     <div className="absolute inset-0 flex flex-col">
       <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
-        <div ref={containerRef} className="absolute inset-0 isolate" />
+        {/* The KI-Analyse panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
+        <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: agentsOpen ? AGENTS_WIDTH : 0 }} />
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
-        <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
+        <div
+          className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
+          // Wraps before the buttons at the top right (about 290 px wide) instead of running under them.
+          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 300 }}
+        >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
             <span>
@@ -499,52 +541,65 @@ export default function ChartArea() {
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
             with its display settings right next to it. */}
         <div
-          className="absolute top-2 z-10 flex"
-          style={{ right: (api?.chart.priceScale('right').width() ?? 60) + 12 }}
+          className="absolute top-2 z-30 flex gap-2"
+          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <button
-            onClick={toggleForecast}
-            disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
-            title={
-              data.length && data.length < FORECAST_MIN_BARS
-                ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
-                  'Eine kürzere Kerzengröße wählen.'
-                : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                  'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
-                  'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
-                  (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
-            }
-            className={`inline-flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
-              fc.state === 'shown'
-                ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
-                : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
-            } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
-          >
-            {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
-            {fc.state === 'shown'
-              ? 'Prognose aus'
-              : fc.state === 'loading'
-                ? fc.pct !== undefined && fc.pct < 100
-                  ? `Lade Modell ${fc.pct} %`
-                  : 'Rechne …'
-                : 'KI-Prognose'}
-          </button>
-          <button
-            onClick={() => setFcMenu((o) => !o)}
-            aria-expanded={fcMenu}
-            aria-haspopup="dialog"
-            title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick"
-            aria-label="Prognose-Anzeige einstellen"
-            className={`rounded-r-lg border-l border-white/20 px-2 transition ${
-              fc.state === 'shown'
-                ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
-                : 'bg-brand text-white shadow-glow hover:brightness-110'
+            onClick={() => setAgentsOpen((o) => !o)}
+            aria-pressed={agentsOpen}
+            title="KI-Analyse mit TradingAgents: ein Team aus KI-Agenten bewertet Technik, Stimmung, Nachrichten und Fundamentaldaten und gibt Einschätzung, Kursziel und Trade-Plan"
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 backdrop-blur transition ${
+              agentsOpen ? 'bg-accent/20 text-white ring-accent' : 'bg-panel/90 text-slate-200 ring-accent/60 hover:bg-line'
             }`}
           >
-            <SlidersHorizontal size={15} />
+            <BrainCircuit size={15} className="text-accent" />
+            KI-Analyse
           </button>
-          {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} />}
+          <div className="relative flex">
+            <button
+              onClick={toggleForecast}
+              disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
+              title={
+                data.length && data.length < FORECAST_MIN_BARS
+                  ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
+                    'Eine kürzere Kerzengröße wählen.'
+                  : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
+                    'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
+                    'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
+                    (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+              }
+              className={`inline-flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
+                fc.state === 'shown'
+                  ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
+                  : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
+              } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
+            >
+              {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
+              {fc.state === 'shown'
+                ? 'Prognose aus'
+                : fc.state === 'loading'
+                  ? fc.pct !== undefined && fc.pct < 100
+                    ? `Lade Modell ${fc.pct} %`
+                    : 'Rechne …'
+                  : 'KI-Prognose'}
+            </button>
+            <button
+              onClick={() => setFcMenu((o) => !o)}
+              aria-expanded={fcMenu}
+              aria-haspopup="dialog"
+              title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick"
+              aria-label="Prognose-Anzeige einstellen"
+              className={`rounded-r-lg border-l border-white/20 px-2 transition ${
+                fc.state === 'shown'
+                  ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
+                  : 'bg-brand text-white shadow-glow hover:brightness-110'
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+            </button>
+            {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} />}
+          </div>
         </div>
         {fc.result && fcHover && (
           <ForecastTip
@@ -561,7 +616,20 @@ export default function ChartArea() {
         {status && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
         )}
+        <AgentsPanel
+          open={agentsOpen}
+          setupOpen={agentsSetup}
+          symbol={symbol}
+          price={quote?.price ?? data[data.length - 1]?.close}
+          chronos={
+            fc.result ? { value: fc.result.steps[fc.result.steps.length - 1][Q.median], steps: fc.result.steps.length } : null
+          }
+          onClose={() => setAgentsOpen(false)}
+          onSetup={() => setAgentsSetup(true)}
+          onLevels={setAgentLevels}
+        />
       </div>
+      {agentsSetup && <AgentsSetup onClose={() => setAgentsSetup(false)} />}
       <div className="flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
         <div className="flex gap-0.5" role="group" aria-label="Zeitraum">
           {RANGES.map((r) => (

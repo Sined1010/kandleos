@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo } from '../lib/watchlist'
+import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -31,6 +32,16 @@ export interface ForecastView {
   backtest: boolean
   /** Value box for the forecast step under the mouse. */
   hover: boolean
+}
+
+/** KI-Analyse (TradingAgents) choices; the API keys themselves live encrypted in the main process. */
+export interface AgentsConfig {
+  provider: ProviderId
+  /** Chosen models per provider, so switching providers keeps each one's choice. */
+  models: Partial<Record<ProviderId, { deep: string; quick: string }>>
+  analysts: AnalystId[]
+  debateRounds: number
+  ollamaUrl: string
 }
 
 export interface Indicators {
@@ -67,6 +78,8 @@ interface State {
   toggleExtendedHours: () => void
   forecastView: ForecastView
   setForecastView: (patch: Partial<ForecastView>) => void
+  agentsConfig: AgentsConfig
+  setAgentsConfig: (patch: Partial<AgentsConfig>) => void
   /** An empty name removes it, so the automatic name is looked up again. */
   setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
@@ -132,6 +145,14 @@ export const useStore = create<State>()(
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
       forecastView: { style: 'line', band50: true, band80: true, band90: true, backtest: true, hover: true },
       setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
+      agentsConfig: {
+        provider: 'anthropic',
+        models: {},
+        analysts: ['market', 'social', 'news', 'fundamentals'],
+        debateRounds: 1,
+        ollamaUrl: 'http://localhost:11434'
+      },
+      setAgentsConfig: (patch) => set((s) => ({ agentsConfig: { ...s.agentsConfig, ...patch } })),
       setName: (symbol, name) =>
         set((s) => {
           const { [symbol]: _, ...rest } = s.names
@@ -192,7 +213,8 @@ export const useStore = create<State>()(
           ...current,
           ...p,
           indicators: { ...current.indicators, ...p.indicators },
-          forecastView: { ...current.forecastView, ...p.forecastView }
+          forecastView: { ...current.forecastView, ...p.forecastView },
+          agentsConfig: { ...current.agentsConfig, ...p.agentsConfig }
         }
       },
       storage: createJSONStorage(() => ({
@@ -206,12 +228,14 @@ export const useStore = create<State>()(
         range,
         extendedHours,
         forecastView,
+        agentsConfig,
         folders,
         names,
         indicators,
         drawings,
         disclaimerAccepted
       }) => ({
+        agentsConfig,
         range,
         extendedHours,
         forecastView,

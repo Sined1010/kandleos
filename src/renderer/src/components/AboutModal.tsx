@@ -48,8 +48,9 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
 
         <h3 className={h}>Keine Anlageberatung</h3>
         <p>
-          KandleOS ist ein Werkzeug zur technischen Chartanalyse. Indikatoren, Zeichnungen und die Kursprognose
-          (Chronos-2) sind statistische Hilfsmittel und <strong className="text-white">keine Anlageberatung</strong> und
+          KandleOS ist ein Werkzeug zur technischen Chartanalyse. Indikatoren, Zeichnungen, die Kursprognose
+          (Chronos-2) und die KI-Analyse (TradingAgents, Texte von Sprachmodellen, die irren können) sind Hilfsmittel und{' '}
+          <strong className="text-white">keine Anlageberatung</strong> und
           keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr: Daten können verzögert, unvollständig oder
           fehlerhaft sein. Die Nutzung erfolgt auf eigenes Risiko; Anlageentscheidungen triffst du selbst.
         </p>
@@ -67,6 +68,14 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
           <li>Finnhub – Echtzeit-Aktienkurse, nur wenn ein eigener API-Key eingetragen ist</li>
           <li>Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“</li>
         </ul>
+        <p className="mt-2">
+          Nur wenn du die <strong className="text-white">KI-Analyse</strong> einrichtest und startest: Beim Einrichten
+          lädt KandleOS Python und TradingAgents von GitHub und dem Python-Paketindex (PyPI). Bei jeder Analyse gehen das
+          Symbol und die gesammelten Markt-, Nachrichten- und Unternehmensdaten an den von dir gewählten KI-Anbieter
+          (Anthropic, OpenAI, Google, DeepSeek oder Alibaba; mit Ollama bleibt die KI auf deinem Rechner). Die Daten holt
+          TradingAgents u. a. von Yahoo Finance, SEC EDGAR, Reddit, StockTwits, Polymarket und – mit eigenem Key – FRED.
+          Deine API-Keys werden verschlüsselt gespeichert und nur an das lokale Analyseprogramm übergeben.
+        </p>
 
         <h3 className={h}>Datenquellen und Marken</h3>
         <p>
@@ -75,7 +84,8 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
           <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className={link}>
             tradingview.com
           </a>
-          . Prognosemodell: Amazon Chronos-2 (Apache-2.0) als ONNX-Export von sktime. Alle Marken gehören ihren
+          . Prognosemodell: Amazon Chronos-2 (Apache-2.0) als ONNX-Export von sktime. KI-Analyse: TradingAgents von
+          Tauric Research (Apache-2.0), bei Bedarf installiert mit uv von Astral (MIT/Apache-2.0). Alle Marken gehören ihren
           jeweiligen Inhabern; KandleOS steht in keiner Verbindung zu diesen Unternehmen.
         </p>
 

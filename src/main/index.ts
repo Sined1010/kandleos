@@ -2,6 +2,17 @@ import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from 'electr
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import {
+  agentsStatus,
+  cancelAgents,
+  installAgents,
+  keyStatus,
+  listAnalyses,
+  ollamaModels,
+  removeAgents,
+  runAgents,
+  setKey
+} from './agents'
 import { forecast } from './forecast'
 import { finnhubCheck, searchSymbols, stockCandles, stockQuotes, symbolName } from './stocks'
 
@@ -67,6 +78,18 @@ ipcMain.handle('forecast:run', (e, series, groups) => {
     if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))
   })
 })
+// KI-Analyse with TradingAgents (see agents.ts). Keys only go in, never back out to the window.
+ipcMain.handle('agents:status', () => agentsStatus())
+ipcMain.handle('agents:install', (e) =>
+  installAgents((p) => !e.sender.isDestroyed() && e.sender.send('agents:setup', p))
+)
+ipcMain.handle('agents:remove', () => removeAgents())
+ipcMain.handle('agents:keys', () => keyStatus())
+ipcMain.handle('agents:key-set', (_e, name, value) => setKey(name, value))
+ipcMain.handle('agents:run', (e, req) => runAgents(req, (ev) => !e.sender.isDestroyed() && e.sender.send('agents:event', ev)))
+ipcMain.handle('agents:cancel', () => cancelAgents())
+ipcMain.handle('agents:results', (_e, symbol) => listAnalyses(symbol))
+ipcMain.handle('agents:ollama-models', (_e, url) => ollamaModels(url))
 
 function createWindow(): void {
   const win = new BrowserWindow({
