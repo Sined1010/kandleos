@@ -59,9 +59,9 @@ ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
-ipcMain.handle('forecast:run', (e, closes) => {
+ipcMain.handle('forecast:run', (e, series) => {
   let last = -1
-  return forecast(closes, (share) => {
+  return forecast(series, (share) => {
     // Report whole percents only; the download emits thousands of chunks.
     const pct = Math.floor(share * 100)
     if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))

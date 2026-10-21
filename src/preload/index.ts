@@ -15,8 +15,8 @@ const api = {
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
   /** Opens the third-party license file; resolves to an error message, or '' on success. */
   openLicenses: (): Promise<string> => ipcRenderer.invoke('app:licenses'),
-  /** Chronos-2 forecast: [p10, median, p90] for each of the next 64 bars. */
-  forecast: (closes: number[]): Promise<number[][]> => ipcRenderer.invoke('forecast:run', closes),
+  /** Chronos-2 forecast per close series: the 21 quantiles (shared/forecast.ts) for each of the next 64 bars. */
+  forecast: (series: number[][]): Promise<number[][][]> => ipcRenderer.invoke('forecast:run', series),
   /** Model download progress in percent; returns an unsubscribe function. */
   onForecastProgress: (cb: (pct: number) => void): (() => void) => {
     const handler = (_e: unknown, pct: number) => cb(pct)

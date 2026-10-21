@@ -15,10 +15,10 @@ const MODEL = {
   sha256: 'f06aba77b0445061b78639008074d71f45af8c0edf16c9dbe4c9ea513c422c0e'
 }
 const CONTEXT = 2048
+// The quantile levels behind each step's 21 values are listed in shared/forecast.ts (QUANTILES).
 const LEVELS = 21
-const P10 = 2
-const MEDIAN = 10
-const P90 = 18
+// Live forecast plus a few backtests; more series in one run gain nothing.
+const MAX_SERIES = 8
 
 const modelFile = (): string => join(app.getPath('userData'), 'models', 'chronos2-ctx2048-h64.onnx')
 
@@ -64,20 +64,30 @@ function getSession(onProgress: (share: number) => void): Promise<InferenceSessi
   return session
 }
 
-/** Forecast for the next 64 bars as [p10, median, p90] per step, from up to the last 2048 closes. */
-export async function forecast(closesArg: unknown, onProgress: (share: number) => void): Promise<number[][]> {
-  if (!Array.isArray(closesArg) || closesArg.length < FORECAST_MIN_BARS || !closesArg.every((v) => Number.isFinite(v)))
-    throw new Error(`Zu wenige Kursdaten für eine Prognose (mindestens ${FORECAST_MIN_BARS} Kerzen)`)
-  const closes = (closesArg as number[]).slice(-CONTEXT)
+/**
+ * Forecasts the next 64 bars of each close series (up to the last 2048 closes each) in one model run.
+ * Returns per series and step the 21 quantile values. Each series gets its own group id, so the model
+ * treats them as unrelated instead of learning across them.
+ */
+export async function forecast(seriesArg: unknown, onProgress: (share: number) => void): Promise<number[][][]> {
+  if (!Array.isArray(seriesArg) || !seriesArg.length || seriesArg.length > MAX_SERIES)
+    throw new Error('Ungültige Prognose-Anfrage')
+  for (const closes of seriesArg)
+    if (!Array.isArray(closes) || closes.length < FORECAST_MIN_BARS || !closes.every((v) => Number.isFinite(v)))
+      throw new Error(`Zu wenige Kursdaten für eine Prognose (mindestens ${FORECAST_MIN_BARS} Kerzen)`)
+  const series = (seriesArg as number[][]).map((c) => c.slice(-CONTEXT))
   const s = await getSession(onProgress)
   const ort = await import('onnxruntime-node')
   // Shorter histories are left-padded with NaN, which the model treats as missing.
-  const context = new Float32Array(CONTEXT).fill(NaN)
-  context.set(closes, CONTEXT - closes.length)
+  const context = new Float32Array(series.length * CONTEXT).fill(NaN)
+  series.forEach((closes, b) => context.set(closes, (b + 1) * CONTEXT - closes.length))
   const out = await s.run({
-    context: new ort.Tensor('float32', context, [1, CONTEXT]),
-    group_ids: new ort.Tensor('int64', BigInt64Array.from([0n]), [1])
+    context: new ort.Tensor('float32', context, [series.length, CONTEXT]),
+    group_ids: new ort.Tensor('int64', BigInt64Array.from(series, (_, b) => BigInt(b)), [series.length])
   })
   const q = out.quantiles.data as Float32Array
-  return Array.from({ length: q.length / LEVELS }, (_, i) => [P10, MEDIAN, P90].map((l) => q[i * LEVELS + l]))
+  const steps = q.length / series.length / LEVELS
+  return series.map((_, b) =>
+    Array.from({ length: steps }, (_, i) => Array.from(q.subarray((b * steps + i) * LEVELS, (b * steps + i + 1) * LEVELS)))
+  )
 }

@@ -8,6 +8,7 @@ import {
   TickMarkType,
   type IChartApi,
   type ISeriesApi,
+  type MouseEventParams,
   type SeriesType,
   type Time,
   type UTCTimestamp
@@ -16,6 +17,7 @@ import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
+import { backtest, backtestCutoffs, Q } from '../../../shared/forecast'
 import {
   FORECAST_MIN_BARS,
   forecastSteps,
@@ -25,11 +27,13 @@ import {
   tfLabel,
   type Candle
 } from '../../../shared/types'
+import { BandSeries } from '../lib/bandSeries'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
+import { ForecastCheck, ForecastTip, type ForecastResult } from './ForecastInfo'
 import MarketBadge from './MarketBadge'
 
 const UP = '#26a69a'
@@ -80,10 +84,15 @@ export default function ChartArea() {
   // Exchange time zone of the loaded symbol; the forecast's time axis follows that exchange's calendar.
   const timezoneRef = useRef<string | undefined>(undefined)
   const [exchangeZone, setExchangeZone] = useState<string | undefined>()
-  const [fc, setFc] = useState<{ state: 'idle' | 'loading' | 'shown' | 'error'; pct?: number; error?: string }>({
-    state: 'idle'
-  })
-  const fcSeries = useRef<ISeriesApi<'Line'>[]>([])
+  const [fc, setFc] = useState<{
+    state: 'idle' | 'loading' | 'shown' | 'error'
+    pct?: number
+    error?: string
+    result?: ForecastResult
+  }>({ state: 'idle' })
+  const fcSeries = useRef<ISeriesApi<SeriesType>[]>([])
+  // Forecast step under the crosshair, for the value box.
+  const [fcHover, setFcHover] = useState<{ x: number; y: number; index: number } | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
   const fcRun = useRef(0)
 
@@ -276,36 +285,74 @@ export default function ChartArea() {
     setFc({ state: 'loading' })
     const stop = window.api.onForecastProgress((pct) => run === fcRun.current && setFc({ state: 'loading', pct }))
     try {
-      const all = await window.api.forecast(bars.map((c) => c.close))
+      const closes = bars.map((c) => c.close)
+      const times = bars.map((c) => c.time)
+      const n = forecastSteps(timeframe, bars.length)
+      // Backtests run in the same model call: forecasts from earlier cutoffs, compared with what followed.
+      const cutoffs = backtestCutoffs(bars.length, n)
+      const [live, ...past] = await window.api.forecast([closes, ...cutoffs.map((c) => closes.slice(0, c))])
       if (run !== fcRun.current) return
-      const steps = all.slice(0, forecastSteps(timeframe, bars.length))
+      const steps = live.slice(0, n)
       const last = bars[bars.length - 1]
-      const future = futureTimes(
-        bars.map((c) => c.time),
-        TF_SECONDS[timeframe],
-        steps.length,
-        timezoneRef.current,
-        TF_MONTHS[timeframe]
-      )
-      const line = (k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
+      const future = futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe])
+      // Everything starts at the last close so the projection visibly continues the chart.
+      const start = { time: ts(last.time) }
+      const band = (lo: number, hi: number, fill: string, autoscale = true) => {
+        const s = api.chart.addCustomSeries(
+          new BandSeries(),
+          { fill, priceLineVisible: false, lastValueVisible: false, ...(!autoscale && { autoscaleInfoProvider: () => null }) },
+          0
+        )
+        s.setData([
+          { ...start, lower: last.close, upper: last.close },
+          ...steps.map((v, i) => ({ time: ts(future[i]), lower: v[lo], upper: v[hi] }))
+        ])
+        return s
+      }
+      const line = (points: { time: Time; value: number }[], color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
         const s = api.chart.addSeries(
           LineSeries,
           { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
           0
         )
-        // Starts at the last close so the projection visibly continues the chart.
-        s.setData([
-          { time: ts(last.time), value: last.close },
-          ...steps.map((v, i) => ({ time: ts(future[i]), value: v[k] }))
-        ])
+        s.setData(points)
         return s
       }
-      fcSeries.current = [
-        line(0, '#ffd54f99', 1, LineStyle.Dotted),
-        line(1, '#ffd54f', 2, LineStyle.Dashed),
-        line(2, '#ffd54f99', 1, LineStyle.Dotted)
+      // The bands overlap, so the fan gets denser towards the median. The outer 90 % band may run off the
+      // chart rather than squeeze the candles.
+      const series: ISeriesApi<SeriesType>[] = [
+        band(Q.p05, Q.p95, 'rgba(255, 213, 79, 0.07)', false),
+        band(Q.p10, Q.p90, 'rgba(255, 213, 79, 0.10)'),
+        band(Q.p25, Q.p75, 'rgba(255, 213, 79, 0.16)'),
+        line(
+          [{ ...start, value: last.close }, ...steps.map((v, i) => ({ time: ts(future[i]), value: v[Q.median] }))],
+          '#ffd54f',
+          2,
+          LineStyle.Dashed
+        )
       ]
-      setFc({ state: 'shown' })
+      // The latest backtest's median over the real bars that followed it.
+      if (cutoffs.length) {
+        const c = cutoffs[0]
+        series.push(
+          line(
+            [
+              { time: ts(times[c - 1]), value: closes[c - 1] },
+              ...past[0].slice(0, n).map((v, i) => ({ time: ts(times[c + i]), value: v[Q.median] }))
+            ],
+            '#b0bec5aa',
+            1,
+            LineStyle.Dotted
+          )
+        )
+      }
+      fcSeries.current = series
+      // Widen the view so the whole fan is visible; the left edge stays where the user put it.
+      const view = api.chart.timeScale().getVisibleLogicalRange()
+      if (view && view.to < bars.length + n)
+        api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
+      const check =cutoffs.length ? backtest(closes, cutoffs, past, n) : null
+      setFc({ state: 'shown', result: { times: future, steps, base: last.close, check } })
     } catch (e) {
       const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
       if (run === fcRun.current) setFc({ state: 'error', error })
@@ -313,6 +360,21 @@ export default function ChartArea() {
       stop()
     }
   }
+
+  // Value box for the forecast step under the crosshair.
+  useEffect(() => {
+    const result = fc.result
+    if (!api || !result) return
+    const onMove = (p: MouseEventParams<Time>) => {
+      const index = p.time === undefined ? -1 : result.times.indexOf(p.time as number)
+      setFcHover(index >= 0 && p.point ? { x: p.point.x, y: p.point.y, index } : null)
+    }
+    api.chart.subscribeCrosshairMove(onMove)
+    return () => {
+      api.chart.unsubscribeCrosshairMove(onMove)
+      setFcHover(null)
+    }
+  }, [api, fc.result])
 
   // Declared last on purpose: React runs effect cleanups in declaration order, so the chart is removed after its series.
   useEffect(() => {
@@ -372,7 +434,8 @@ export default function ChartArea() {
                 ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
                   'Eine kürzere Kerzengröße wählen.'
                 : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                  'lokal berechnet: Median (gestrichelt) und 80 %-Band (gepunktet). Keine Anlageberatung.' +
+                  'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
+                  'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
                   (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
             }
             className={`pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
@@ -387,7 +450,19 @@ export default function ChartArea() {
                 : 'Prognose'}
           </button>
           {fc.state === 'error' && <span className="ml-2 text-down">{fc.error}</span>}
+          {fc.result && <ForecastCheck check={fc.result.check} />}
         </div>
+        {fc.result && fcHover && (
+          <ForecastTip
+            result={fc.result}
+            index={fcHover.index}
+            x={fcHover.x}
+            y={fcHover.y}
+            width={containerRef.current?.clientWidth ?? 0}
+            height={containerRef.current?.clientHeight ?? 0}
+            intraday={TF_SECONDS[timeframe] < 86400}
+          />
+        )}
         {status && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
         )}
