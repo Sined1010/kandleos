@@ -54,7 +54,7 @@ ipcMain.handle('key:set', async (_e, key: unknown) => {
   // shortcut: without an OS keyring (some Linux setups) the key is plain text readable only by this user; install gnome-keyring/KWallet to get encryption.
   else await writeFile(plainKeyFile(), key, { mode: 0o600 })
 })
-ipcMain.handle('stocks:candles', (_e, symbol, tf, key) => stockCandles(symbol, tf, key))
+ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended) => stockCandles(symbol, tf, key, extended))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))

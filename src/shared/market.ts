@@ -114,6 +114,15 @@ function scheduleFor(symbol: string, timeZone: string | undefined): Schedule | n
   return hours ? exchange(timeZone, hours) : null
 }
 
+/** Session phase of a symbol at time `t` (unix seconds); null when its exchange hours are unknown. */
+export function phaseAt(symbol: string, timeZone: string | undefined, t: number): Phase | null {
+  if (isCrypto(symbol)) return 'open'
+  const s = scheduleFor(symbol, timeZone)
+  if (!s) return null
+  const { date, sec } = wall(t, s.zone)
+  return s.phase(date, sec)
+}
+
 /** Trading status of a symbol at `now` (unix seconds); null when its exchange hours are unknown. */
 export function marketStatus(symbol: string, timeZone: string | undefined, now = Date.now() / 1000): MarketStatus | null {
   if (isCrypto(symbol)) return { phase: 'open' }

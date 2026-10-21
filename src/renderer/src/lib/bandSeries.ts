@@ -67,3 +67,49 @@ export class BandSeries implements ICustomSeriesPaneView<Time, BandData, BandOpt
     return { ...customSeriesDefaultOptions, fill: 'rgba(255, 213, 79, 0.15)' }
   }
 }
+
+// Background shading for bars outside the regular session (pre-market, after-hours). Only the bars to shade
+// are in the data; each is painted full height across its bar slot.
+
+export interface ShadeData extends CustomData<Time> {
+  shade: true
+}
+export interface ShadeOptions extends CustomSeriesOptions {
+  fill: string
+}
+
+class ShadeRenderer implements ICustomSeriesPaneRenderer {
+  data: PaneRendererCustomData<Time, ShadeData> | null = null
+  fill = 'transparent'
+
+  draw(target: Parameters<ICustomSeriesPaneRenderer['draw']>[0]): void {
+    const d = this.data
+    if (!d?.bars.length) return
+    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: hr, bitmapSize }) => {
+      ctx.fillStyle = this.fill
+      const w = d.barSpacing * hr
+      for (const b of d.bars) ctx.fillRect(Math.round(b.x * hr - w / 2), 0, Math.ceil(w), bitmapSize.height)
+    })
+  }
+}
+
+export class ShadeSeries implements ICustomSeriesPaneView<Time, ShadeData, ShadeOptions> {
+  private readonly view = new ShadeRenderer()
+
+  renderer(): ICustomSeriesPaneRenderer {
+    return this.view
+  }
+  update(data: PaneRendererCustomData<Time, ShadeData>, options: ShadeOptions): void {
+    this.view.data = data
+    this.view.fill = options.fill
+  }
+  priceValueBuilder(): number[] {
+    return [0]
+  }
+  isWhitespace(row: ShadeData | CustomSeriesWhitespaceData<Time>): row is CustomSeriesWhitespaceData<Time> {
+    return !(row as ShadeData).shade
+  }
+  defaultOptions(): ShadeOptions {
+    return { ...customSeriesDefaultOptions, fill: 'rgba(139, 147, 167, 0.08)' }
+  }
+}

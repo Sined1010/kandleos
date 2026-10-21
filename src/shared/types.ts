@@ -54,6 +54,11 @@ export interface Quote {
   prevClose?: number
   /** IANA time zone of the exchange, when the quote source names it (Yahoo). */
   timezone?: string
+  /**
+   * Latest pre-market or after-hours price (US stocks), shown next to the regular one; `changePct` is
+   * relative to the regular close `price`.
+   */
+  ext?: { phase: 'pre' | 'post'; price: number; changePct: number; time: number }
 }
 
 export interface SearchResult {

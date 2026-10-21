@@ -1,4 +1,5 @@
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
+import { marketStatus, phaseAt } from '../shared/market'
 import { aggregate, aggregateMonths } from '../shared/candles'
 import { aliasName, cleanName, findAliases } from '../shared/names'
 import {
@@ -116,12 +117,13 @@ function validTimeZone(tz: unknown): string | undefined {
   }
 }
 
-async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> {
+async function yahooCandles(symbol: string, tf: Timeframe, extended = false): Promise<CandleData> {
   const [interval, range] = YAHOO[tf]
   // With range=max Yahoo silently coarsens long histories (monthly becomes quarterly); an explicit span does not.
   const span = range === 'max' ? `period1=0&period2=${Math.floor(Date.now() / 1000)}` : `range=${range}`
   const d = await getJson(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&${span}`
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&${span}` +
+      (extended ? '&includePrePost=true' : '')
   )
   const r = d.chart?.result?.[0]
   if (!r?.timestamp) throw new Error(`Keine Kursdaten für ${symbol}`)
@@ -147,12 +149,19 @@ async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> 
   return { candles: out, currency: r.meta?.currency ?? '', timezone }
 }
 
-export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: unknown): Promise<CandleData> {
+export async function stockCandles(
+  symbolArg: unknown,
+  tfArg: unknown,
+  keyArg: unknown,
+  extendedArg?: unknown
+): Promise<CandleData> {
   const [symbol, key] = checkArgs(symbolArg, keyArg)
   if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(`Ungültiger Timeframe: ${String(tfArg)}`)
   const tf = tfArg as Timeframe
+  // Pre-market and after-hours candles exist for intraday bars only, and only Yahoo serves them.
+  const extended = extendedArg === true && TF_SECONDS[tf] < 86400
   let data: CandleData | undefined
-  if (key) {
+  if (key && !extended) {
     try {
       const candles = await finnhubCandles(symbol, tf, key)
       // Finnhub candles carry no currency; Yahoo's quote metadata does.
@@ -164,7 +173,7 @@ export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: u
       console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, (e as Error).message)
     }
   }
-  data ??= await yahooCandles(symbol, tf)
+  data ??= await yahooCandles(symbol, tf, extended)
   const months = TF_MONTHS[tf]
   if (months && months > 1) return { ...data, candles: aggregateMonths(data.candles, months, data.timezone) }
   return tf === '2h' || tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS[tf]) } : data
@@ -217,15 +226,28 @@ export async function symbolName(symbolArg: unknown): Promise<string | null> {
 }
 
 async function yahooQuote(symbol: string): Promise<Quote> {
-  const m = await yahooMeta(symbol)
-  const prev = m.chartPreviousClose ?? m.previousClose ?? m.regularMarketPrice
-  return {
-    price: m.regularMarketPrice,
-    changePct: (m.regularMarketPrice / prev - 1) * 100,
-    time: m.regularMarketTime,
-    prevClose: prev,
-    timezone: validTimeZone(m.exchangeTimezoneName)
+  // 5-minute bars including pre- and after-market: the metadata holds the regular session,
+  // the last bar the latest extended-hours price.
+  const d = await getJson(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=5m&range=1d&includePrePost=true`
+  )
+  const r = d.chart?.result?.[0]
+  const m = r?.meta
+  if (!m?.regularMarketPrice) throw new Error(`Yahoo: kein Kurs für ${symbol}`)
+  const price: number = m.regularMarketPrice
+  const prev = m.chartPreviousClose ?? m.previousClose ?? price
+  const timezone = validTimeZone(m.exchangeTimezoneName)
+  const quote: Quote = { price, changePct: (price / prev - 1) * 100, time: m.regularMarketTime, prevClose: prev, timezone }
+  const times: number[] = r.timestamp ?? []
+  const closes: (number | null)[] = r.indicators?.quote?.[0]?.close ?? []
+  let i = times.length - 1
+  while (i >= 0 && closes[i] == null) i--
+  const phase = i >= 0 ? phaseAt(symbol, timezone ?? timeZoneForSymbol(symbol), times[i]) : null
+  if (phase === 'pre' || phase === 'post') {
+    const ext = closes[i] as number
+    quote.ext = { phase, price: ext, changePct: (ext / price - 1) * 100, time: times[i] }
   }
+  return quote
 }
 
 export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Record<string, Quote>> {
@@ -235,7 +257,10 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Re
     symbols.map(async (s) => {
       try {
         const [symbol, key] = checkArgs(s, keyArg)
-        out[symbol] = key ? await finnhubQuote(symbol, key).catch(() => yahooQuote(symbol)) : await yahooQuote(symbol)
+        // Outside the regular session Yahoo also has the pre-market and after-hours price; Finnhub's quote does not.
+        const regular = marketStatus(symbol, timeZoneForSymbol(symbol))?.phase === 'open'
+        out[symbol] =
+          key && regular ? await finnhubQuote(symbol, key).catch(() => yahooQuote(symbol)) : await yahooQuote(symbol)
       } catch (e) {
         console.warn((e as Error).message)
       }

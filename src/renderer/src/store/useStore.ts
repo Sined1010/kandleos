@@ -48,6 +48,9 @@ interface State {
   /** Active time-range preset (also picks its candle size); null after a manual timeframe choice. */
   range: RangeId | null
   setRange: (id: RangeId) => void
+  /** Intraday stock charts include pre-market and after-hours candles. */
+  extendedHours: boolean
+  toggleExtendedHours: () => void
   /** An empty name removes it, so the automatic name is looked up again. */
   setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
@@ -108,6 +111,8 @@ export const useStore = create<State>()(
       setTimeframe: (timeframe) => set({ timeframe, range: null }),
       range: null,
       setRange: (range) => set({ range, timeframe: rangeById(range).tf }),
+      extendedHours: false,
+      toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
       setName: (symbol, name) =>
         set((s) => {
           const { [symbol]: _, ...rest } = s.names
@@ -179,8 +184,9 @@ export const useStore = create<State>()(
         setItem: (_name, value) => void window.api.storeSet(value),
         removeItem: () => {}
       })),
-      partialize: ({ symbol, timeframe, range, folders, names, indicators, drawings, disclaimerAccepted }) => ({
+      partialize: ({ symbol, timeframe, range, extendedHours, folders, names, indicators, drawings, disclaimerAccepted }) => ({
         range,
+        extendedHours,
         disclaimerAccepted,
         names,
         symbol,

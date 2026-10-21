@@ -13,11 +13,12 @@ import {
   type Time,
   type UTCTimestamp
 } from 'lightweight-charts'
-import { Sparkles } from 'lucide-react'
+import { Moon, Sparkles, Sunrise } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
 import { backtest, backtestCutoffs, Q } from '../../../shared/forecast'
+import { phaseAt } from '../../../shared/market'
 import {
   FORECAST_MIN_BARS,
   forecastSteps,
@@ -27,14 +28,14 @@ import {
   tfLabel,
   type Candle
 } from '../../../shared/types'
-import { BandSeries } from '../lib/bandSeries'
+import { BandSeries, ShadeSeries } from '../lib/bandSeries'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import DrawingOverlay from './DrawingOverlay'
 import { ForecastCheck, ForecastTip, type ForecastResult } from './ForecastInfo'
-import MarketBadge from './MarketBadge'
+import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const UP = '#26a69a'
 const DOWN = '#ef5350'
@@ -74,6 +75,12 @@ export default function ChartArea() {
   const select = useStore((s) => s.select)
   const range = useStore((s) => s.range)
   const setRange = useStore((s) => s.setRange)
+  const extendedHours = useStore((s) => s.extendedHours)
+  const toggleExtendedHours = useStore((s) => s.toggleExtendedHours)
+  // Pre-market and after-hours candles exist only for intraday stock charts.
+  const extendable = !isCrypto(symbol) && TF_SECONDS[timeframe] < 86400
+  const extended = extendedHours && extendable
+  const quote = useQuotes((s) => s.quotes[symbol])
   const containerRef = useRef<HTMLDivElement>(null)
   const dataRef = useRef<Candle[]>([])
   const [api, setApi] = useState<ChartApi | null>(null)
@@ -137,7 +144,7 @@ export default function ChartArea() {
       setData([...arr])
     }
 
-    loadCandles(symbol, timeframe, finnhubKey)
+    loadCandles(symbol, timeframe, finnhubKey, extended)
       .then(({ candles: bars, currency, timezone }) => {
         if (!active) return
         if (!bars.length) return setStatus(`Keine Daten für ${symbol}`)
@@ -164,13 +171,34 @@ export default function ChartArea() {
           if (!q || q === prev.quotes[symbol] || !arr.length) return
           // Month-based bars end at calendar month edges, read in the zone the source dates its bars in.
           const zone = months ? barZone(arr.map((c) => c.time), timezoneRef.current) : undefined
-          push(mergeTick(arr[arr.length - 1], q.price, q.time, seconds, months, zone))
+          // With extended hours shown, pre-market and after-hours prices move the chart too.
+          const tick = extended && q.ext && q.ext.time >= q.time ? q.ext : q
+          push(mergeTick(arr[arr.length - 1], tick.price, tick.time, seconds, months, zone))
         })
     return () => {
       active = false
       stop()
     }
-  }, [api, symbol, timeframe, finnhubKey])
+  }, [api, symbol, timeframe, finnhubKey, extended])
+
+  // Grey background behind pre-market and after-hours candles. Rebuilt when bars are added, not on every tick.
+  useEffect(() => {
+    if (!api || !extended || !data.length) return
+    const zone = exchangeZone
+    const shade = api.chart.addCustomSeries(
+      new ShadeSeries(),
+      { priceScaleId: 'session', priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: () => null },
+      0
+    )
+    shade.setSeriesOrder(0)
+    shade.setData(
+      data.flatMap((c) => {
+        const phase = phaseAt(symbol, zone, c.time)
+        return phase === 'pre' || phase === 'post' ? [{ time: ts(c.time), shade: true as const }] : []
+      })
+    )
+    return () => api.chart.removeSeries(shade)
+  },[api, extended, data.length, exchangeZone, symbol])
 
   // A preset with the already loaded candle size only needs a scroll; otherwise the load above applies it.
   // Declared after the load effect, which empties dataRef first when the candle size changes.
@@ -419,6 +447,7 @@ export default function ChartArea() {
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} />}
         <div className="pointer-events-none absolute left-3 top-2 text-xs text-muted">
           <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
+          <QuoteChip quote={quote} />
           {currency && (
             <span className="ml-2 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
               {MINOR_UNITS[currency] ?? currency}
@@ -467,18 +496,37 @@ export default function ChartArea() {
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
         )}
       </div>
-      <div className="flex h-8 shrink-0 items-center gap-0.5 border-t border-line bg-panel px-2" role="group" aria-label="Zeitraum">
-        {RANGES.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => setRange(r.id)}
-            title={`${r.title} (${tfLabel(r.tf)}-Kerzen)`}
-            aria-pressed={range === r.id}
-            className={`rounded px-2 py-0.5 text-xs ${range === r.id ? 'bg-accent text-white' : 'text-muted hover:bg-line hover:text-white'}`}
-          >
-            {r.id}
-          </button>
-        ))}
+      <div className="flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
+        <div className="flex gap-0.5" role="group" aria-label="Zeitraum">
+          {RANGES.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setRange(r.id)}
+              title={`${r.title} (${tfLabel(r.tf)}-Kerzen)`}
+              aria-pressed={range === r.id}
+              className={`rounded px-2 py-0.5 text-xs ${range === r.id ? 'bg-accent text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+            >
+              {r.id}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={toggleExtendedHours}
+          disabled={!extendable}
+          aria-pressed={extendedHours}
+          title={
+            extendable
+              ? 'Vorbörse und Nachbörse (US-Aktien, 10:00–15:30 und 22:00–02:00 deutscher Zeit) als Kerzen zeigen, grau hinterlegt'
+              : 'Vor-/Nachbörse gibt es nur bei Aktien und Kerzen unter einem Tag'
+          }
+          className={`ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs disabled:opacity-40 ${
+            extended ? 'bg-accent text-white' : 'text-muted enabled:hover:bg-line enabled:hover:text-white'
+          }`}
+        >
+          <Sunrise size={12} />
+          <Moon size={11} />
+          Vor-/Nachbörse
+        </button>
       </div>
     </div>
   )

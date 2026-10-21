@@ -1,7 +1,9 @@
+import { Moon, Sunrise } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { timeZoneForSymbol } from '../../../shared/calendar'
 import { marketStatus, type Phase } from '../../../shared/market'
-import { isCrypto } from '../../../shared/types'
+import { isCrypto, type Quote } from '../../../shared/types'
+import { formatChange, formatPrice } from '../lib/format'
 
 const PHASE: Record<Phase, [dot: string, label: string]> = {
   open: ['bg-up', 'Geöffnet'],
@@ -83,5 +85,40 @@ export function MarketDot({ symbol, timeZone }: { symbol: string; timeZone?: str
       aria-label={d.label}
       className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${d.dot}`}
     />
+  )
+}
+
+type Ext = NonNullable<Quote['ext']>
+const EXT_LABEL: Record<Ext['phase'], string> = { pre: 'Vorbörse', post: 'Nachbörse' }
+
+/** Sun for pre-market, moon for after-hours prices. */
+export function ExtIcon({ phase, size = 10 }: { phase: Ext['phase']; size?: number }) {
+  const Icon = phase === 'pre' ? Sunrise : Moon
+  return <Icon size={size} className={phase === 'pre' ? 'text-amber-300' : 'text-indigo-300'} aria-label={EXT_LABEL[phase]} />
+}
+
+export const extTitle = (ext: Ext): string =>
+  `${EXT_LABEL[ext.phase]}: ${formatPrice(ext.price)} (${formatChange(ext.changePct)} zum regulären Schlusskurs), ` +
+  `Stand ${new Date(ext.time * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+
+/** Regular price and change for the chart legend, plus the pre-/after-market price when there is one. */
+export function QuoteChip({ quote }: { quote?: Quote }) {
+  if (!quote) return null
+  const color = (pct: number) => (pct >= 0 ? 'text-up' : 'text-down')
+  return (
+    <span className="pointer-events-auto ml-2 inline-flex items-center gap-2 tabular-nums">
+      <span title="Regulärer Kurs und Veränderung zum Vortag">
+        <span className="font-medium text-slate-200">{formatPrice(quote.price)}</span>{' '}
+        <span className={color(quote.changePct)}>{formatChange(quote.changePct)}</span>
+      </span>
+      {quote.ext && (
+        <span className="inline-flex items-center gap-1" title={extTitle(quote.ext)}>
+          <ExtIcon phase={quote.ext.phase} size={12} />
+          <span className="text-muted">{EXT_LABEL[quote.ext.phase]}</span>
+          <span className="font-medium text-slate-200">{formatPrice(quote.ext.price)}</span>
+          <span className={color(quote.ext.changePct)}>{formatChange(quote.ext.changePct)}</span>
+        </span>
+      )}
+    </span>
   )
 }

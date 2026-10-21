@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { marketStatus } from './market.ts'
+import { marketStatus, phaseAt } from './market.ts'
 
 const utc = (m: number, d: number, h = 0, min = 0) => Date.UTC(2026, m - 1, d, h, min) / 1000
 const NY = 'America/New_York'
@@ -47,4 +47,11 @@ test('futures pause daily 17:00-18:00 New York; crypto never closes; unknown exc
   assert.deepEqual(marketStatus('BTCUSDT', undefined), { phase: 'open' })
   assert.equal(marketStatus('ABC.XY', 'Africa/Lagos'), null)
   assert.equal(marketStatus('^XYZ', undefined), null)
+})
+
+test('phaseAt classifies single bars: US pre-market, regular session and after-hours', () => {
+  assert.equal(phaseAt('AAPL', NY, utc(10, 21, 8, 20)), 'pre') // 04:20 New York
+  assert.equal(phaseAt('AAPL', NY, utc(10, 21, 13, 30)), 'open') // 09:30
+  assert.equal(phaseAt('AAPL', NY, utc(10, 21, 20)), 'post') // 16:00
+  assert.equal(phaseAt('SAP.DE', 'Europe/Berlin', utc(10, 21, 6)), 'closed') // XETRA has no pre-market
 })

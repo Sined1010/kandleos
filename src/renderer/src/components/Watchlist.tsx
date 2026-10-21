@@ -1,11 +1,9 @@
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { formatChange, formatPrice } from '../lib/format'
 import { useQuotes, useStore, type Folder } from '../store/useStore'
-import { MarketDot } from './MarketBadge'
+import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
-
-export const formatPrice = (p: number): string =>
-  p.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: p < 1 ? 6 : p < 10 ? 4 : 2 })
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
 
@@ -247,13 +245,26 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
                   {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
                 </span>
               )}
-              <span className="text-right tabular-nums">{q ? formatPrice(q.price) : '—'}</span>
+              <span className="text-right tabular-nums">
+                {q ? formatPrice(q.price) : '—'}
+                {q?.ext && (
+                  <span className="flex items-center justify-end gap-1 text-[10px] text-muted" title={extTitle(q.ext)}>
+                    <ExtIcon phase={q.ext.phase} />
+                    {formatPrice(q.ext.price)}
+                  </span>
+                )}
+              </span>
               <span
                 className={`w-16 text-right tabular-nums group-hover/row:hidden ${
                   !q ? 'text-muted' : q.changePct >= 0 ? 'text-up' : 'text-down'
                 }`}
               >
-                {q ? `${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%` : '—'}
+                {q ? formatChange(q.changePct) : '—'}
+                {q?.ext && (
+                  <span className={`block text-[10px] ${q.ext.changePct >= 0 ? 'text-up/80' : 'text-down/80'}`}>
+                    {formatChange(q.ext.changePct)}
+                  </span>
+                )}
               </span>
               <div className="hidden w-16 justify-end gap-1.5 group-hover/row:flex">
                 <button

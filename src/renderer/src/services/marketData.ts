@@ -1,4 +1,6 @@
+import { timeZoneForSymbol } from '../../../shared/calendar'
 import { aggregateMonths } from '../../../shared/candles'
+import { phaseAt } from '../../../shared/market'
 import {
   cryptoQuoteAsset,
   isCrypto,
@@ -77,8 +79,13 @@ function socket(
   }
 }
 
-export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: string): Promise<CandleData> {
-  if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey)
+export async function loadCandles(
+  symbol: string,
+  tf: Timeframe,
+  finnhubKey: string,
+  extended = false
+): Promise<CandleData> {
+  if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey, extended)
   const candles = await klines(symbol, BINANCE_TF[tf], 1000)
   const months = combined(tf)
   return { candles: months ? aggregateMonths(candles, months) : candles, currency: cryptoQuoteAsset(symbol) }
@@ -159,7 +166,8 @@ export function watchQuotes(
     )
   }
 
-  const prevClose: Record<string, number> = {}
+  // Latest polled quote per stock: the previous close for live changes, the regular price for extended hours.
+  const polled: Record<string, Quote> = {}
   const poll = () =>
     window.api
       // A rejected key is not sent again, so quotes come straight from Yahoo.
@@ -167,7 +175,7 @@ export function watchQuotes(
       .then((quotes) => {
         if (!active) return
         for (const [s, q] of Object.entries(quotes)) {
-          if (q.prevClose) prevClose[s] = q.prevClose
+          polled[s] = q
           onQuote(s, q)
         }
       })
@@ -190,8 +198,15 @@ export function watchQuotes(
           const latest: Record<string, { p: number; t: number }> = {}
           for (const t of msg.data) latest[t.s] = t
           for (const [s, t] of Object.entries(latest)) {
-            const pc = prevClose[s]
-            if (pc) onQuote(s, { price: t.p, changePct: (t.p / pc - 1) * 100, time: t.t / 1000, prevClose: pc })
+            const base = polled[s]
+            const time = t.t / 1000
+            if (!base?.prevClose) continue
+            // Trades outside the regular session update the extra pre-/after-market price, not the regular one.
+            const phase = phaseAt(s, base.timezone ?? timeZoneForSymbol(s), time)
+            if (phase === 'pre' || phase === 'post')
+              onQuote(s, { ...base, ext: { phase, price: t.p, changePct: (t.p / base.price - 1) * 100, time } })
+            else if (phase === 'open' || phase === null)
+              onQuote(s, { price: t.p, changePct: (t.p / base.prevClose - 1) * 100, time, prevClose: base.prevClose })
           }
           lastTrade = Date.now() / 1000
           if (Date.now() - lastReport > 5000) report()

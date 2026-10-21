@@ -1,5 +1,5 @@
 import { probabilityAbove, Q, type BacktestResult } from '../../../shared/forecast'
-import { formatPrice } from './Watchlist'
+import { formatPrice } from '../lib/format'
 
 export interface ForecastResult {
   /** Bar times of the forecast steps. */
