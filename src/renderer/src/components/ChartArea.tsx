@@ -14,9 +14,17 @@ import {
 } from 'lightweight-charts'
 import { Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { futureTimes } from '../../../shared/calendar'
+import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
-import { isCrypto, TF_SECONDS, tfLabel, type Candle } from '../../../shared/types'
+import {
+  FORECAST_MIN_BARS,
+  forecastSteps,
+  isCrypto,
+  TF_MONTHS,
+  TF_SECONDS,
+  tfLabel,
+  type Candle
+} from '../../../shared/types'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { loadCandles, watchCandles } from '../services/marketData'
@@ -89,6 +97,7 @@ export default function ChartArea() {
     if (!api) return
     let active = true
     const seconds = TF_SECONDS[timeframe]
+    const months = TF_MONTHS[timeframe]
     const intraday = seconds < 86400
     api.chart.applyOptions({
       timeScale: { timeVisible: intraday },
@@ -137,7 +146,10 @@ export default function ChartArea() {
       : useQuotes.subscribe((s, prev) => {
           const q = s.quotes[symbol]
           const arr = dataRef.current
-          if (q && q !== prev.quotes[symbol] && arr.length) push(mergeTick(arr[arr.length - 1], q.price, q.time, seconds))
+          if (!q || q === prev.quotes[symbol] || !arr.length) return
+          // Month-based bars end at calendar month edges, read in the zone the source dates its bars in.
+          const zone = months ? barZone(arr.map((c) => c.time), timezoneRef.current) : undefined
+          push(mergeTick(arr[arr.length - 1], q.price, q.time, seconds, months, zone))
         })
     return () => {
       active = false
@@ -258,17 +270,18 @@ export default function ChartArea() {
     setFc({ state: 'loading' })
     const stop = window.api.onForecastProgress((pct) => run === fcRun.current && setFc({ state: 'loading', pct }))
     try {
-      const steps = await window.api.forecast(bars.map((c) => c.close))
+      const all = await window.api.forecast(bars.map((c) => c.close))
       if (run !== fcRun.current) return
+      const steps = all.slice(0, forecastSteps(timeframe, bars.length))
       const last = bars[bars.length - 1]
-      const seconds = TF_SECONDS[timeframe]
       const future = futureTimes(
         bars.map((c) => c.time),
-        seconds,
+        TF_SECONDS[timeframe],
         steps.length,
-        timezoneRef.current
+        timezoneRef.current,
+        TF_MONTHS[timeframe]
       )
-      const line =(k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
+      const line = (k: number, color: string, lineWidth: 1 | 2, lineStyle: LineStyle) => {
         const s = api.chart.addSeries(
           LineSeries,
           { color, lineWidth, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
@@ -346,13 +359,16 @@ export default function ChartArea() {
           <button
             onClick={toggleForecast}
             onMouseDown={(e) => e.stopPropagation()}
-            disabled={fc.state === 'loading' || data.length < 32}
+            disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
             title={
-              'Statistische Prognose der nächsten 64 Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) ' +
-              'und 80 %-Band (gepunktet). Keine Anlageberatung.' +
-              (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+              data.length && data.length < FORECAST_MIN_BARS
+                ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
+                  'Eine kürzere Kerzengröße wählen.'
+                : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
+                  'lokal berechnet: Median (gestrichelt) und 80 %-Band (gepunktet). Keine Anlageberatung.' +
+                  (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
             }
-            className="pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:cursor-wait disabled:opacity-70"
+            className={`pointer-events-auto ml-2 inline-flex items-center gap-1 rounded bg-line px-1.5 py-0.5 font-medium text-slate-200 hover:bg-accent/30 disabled:opacity-70 ${fc.state === 'loading' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
           >
             <Sparkles size={12} className="text-[#ffd54f]" />
             {fc.state === 'shown'

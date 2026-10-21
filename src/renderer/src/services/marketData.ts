@@ -1,6 +1,8 @@
+import { aggregateMonths } from '../../../shared/candles'
 import {
   cryptoQuoteAsset,
   isCrypto,
+  TF_MONTHS,
   type Candle,
   type CandleData,
   type Quote,
@@ -9,15 +11,42 @@ import {
 
 const BINANCE = 'https://api.binance.com/api/v3'
 const BINANCE_WS = 'wss://stream.binance.com:9443'
+// Binance has no candles longer than a month: quarters, half-years and years are built from monthly ones.
 const BINANCE_TF: Record<Timeframe, string> = {
   '1m': '1m',
   '5m': '5m',
   '15m': '15m',
+  '30m': '30m',
   '1h': '1h',
+  '2h': '2h',
   '4h': '4h',
   '1D': '1d',
   '1W': '1w',
-  '1M': '1M'
+  '1M': '1M',
+  '3M': '1M',
+  '6M': '1M',
+  '12M': '1M'
+}
+
+/** Months per candle when Binance's monthly candles have to be combined, else undefined. */
+function combined(tf: Timeframe): number | undefined {
+  const months = TF_MONTHS[tf]
+  return months && months > 1 ? months : undefined
+}
+
+const kline = (k: (string | number)[]): Candle => ({
+  time: Number(k[0]) / 1000,
+  open: +k[1],
+  high: +k[2],
+  low: +k[3],
+  close: +k[4],
+  volume: +k[5]
+})
+
+async function klines(symbol: string, interval: string, limit: number): Promise<Candle[]> {
+  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`)
+  if (!res.ok) throw new Error(`Binance: ${symbol} nicht gefunden (HTTP ${res.status})`)
+  return ((await res.json()) as (string | number)[][]).map(kline)
 }
 
 /** WebSocket that reconnects after drops (Binance closes streams every 24h). Returns a close function. */
@@ -50,25 +79,39 @@ function socket(
 
 export async function loadCandles(symbol: string, tf: Timeframe, finnhubKey: string): Promise<CandleData> {
   if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey)
-  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${BINANCE_TF[tf]}&limit=1000`)
-  if (!res.ok) throw new Error(`Binance: ${symbol} nicht gefunden (HTTP ${res.status})`)
-  const rows: (string | number)[][] = await res.json()
-  const candles = rows.map((k) => ({
-    time: Number(k[0]) / 1000,
-    open: +k[1],
-    high: +k[2],
-    low: +k[3],
-    close: +k[4],
-    volume: +k[5]
-  }))
-  return { candles, currency: cryptoQuoteAsset(symbol) }
+  const candles = await klines(symbol, BINANCE_TF[tf], 1000)
+  const months = combined(tf)
+  return { candles: months ? aggregateMonths(candles, months) : candles, currency: cryptoQuoteAsset(symbol) }
 }
 
 /** Live bars for a crypto chart. */
 export function watchCandles(symbol: string, tf: Timeframe, onBar: (c: Candle) => void): () => void {
-  return socket(`${BINANCE_WS}/ws/${symbol.toLowerCase()}@kline_${BINANCE_TF[tf]}`, ({ k }) =>
-    onBar({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v })
-  )
+  const url = `${BINANCE_WS}/ws/${symbol.toLowerCase()}@kline_${BINANCE_TF[tf]}`
+  const toBar = (k: any): Candle => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v })
+  const months = combined(tf)
+  if (!months) return socket(url, ({ k }) => onBar(toBar(k)))
+  // The stream only updates the running month; the period's earlier months come from one REST call.
+  // Until they are in, nothing is sent: a period built from the current month alone would be wrong.
+  const bars = new Map<number, Candle>()
+  let seeded = false
+  const send = () => {
+    if (!seeded) return
+    const period = aggregateMonths([...bars.values()].sort((a, b) => a.time - b.time), months)
+    onBar(period[period.length - 1])
+  }
+  klines(symbol, '1M', 12)
+    .then((list) => {
+      // A month the stream already delivered is newer than the REST copy.
+      for (const c of list) if (!bars.has(c.time)) bars.set(c.time, c)
+      seeded = true
+      send()
+    })
+    .catch(() => {})
+  return socket(url, ({ k }) => {
+    const bar = toBar(k)
+    bars.set(bar.time, bar)
+    send()
+  })
 }
 
 export interface FeedStatus {

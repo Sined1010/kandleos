@@ -179,16 +179,45 @@ function fromWall(date: string, sec: number, timeZone: string): number {
   return t
 }
 
+/**
+ * Zone to read bar dates in: Binance and Finnhub stamp days and months at 00:00 UTC as a plain date label
+ * (read in New York time that would be the previous evening), Yahoo stamps them in the exchange zone.
+ * The last bar is left out: Yahoo stamps the live bar with the current time.
+ */
+export function barZone(times: number[], timeZone = 'UTC'): string {
+  const history = times.length > 1 ? times.slice(0, -1) : times
+  return history.every((t) => t % 86400 === 0) ? 'UTC' : timeZone
+}
+
+/** Index of the calendar period a timestamp falls in: `months` months long, aligned to January. */
+export function periodIndex(t: number, months: number, timeZone: string): number {
+  const [y, m] = wall(t, timeZone).date.split('-').map(Number)
+  return Math.floor((y * 12 + m - 1) / months)
+}
+
+/** Midnight on the first day of a calendar period from periodIndex, in that time zone. */
+export function periodStart(index: number, months: number, timeZone: string): number {
+  const month = index * months
+  const date = `${Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, '0')}-01`
+  return fromWall(date, 0, timeZone)
+}
+
 const weekday = (date: string) => new Date(dateSeconds(date) * 1000).getUTCDay()
 const nextDate = (date: string) => iso(new Date((dateSeconds(date) + 86_400) * 1000))
 
 /**
  * Timestamps of the next `count` bars on the exchange's trading calendar: trading weekdays and session times
  * as seen in the history (in the exchange's own time zone, so DST is handled), minus exchange holidays.
- * Markets without gaps (crypto) and weekly bars are evenly spaced.
+ * Markets without gaps (crypto) and weekly bars are evenly spaced; month-based bars (`months` > 0) start on
+ * the first of each following calendar period.
  */
-export function futureTimes(times: number[], seconds: number, count: number, timeZone = 'UTC'): number[] {
+export function futureTimes(times: number[], seconds: number, count: number, timeZone = 'UTC', months = 0): number[] {
   const last = times[times.length - 1]
+  if (months) {
+    const zone = barZone(times, timeZone)
+    const current = periodIndex(last, months, zone)
+    return Array.from({ length: count }, (_, i) => periodStart(current + i + 1, months, zone))
+  }
   const even = () => Array.from({ length: count }, (_, i) => last + (i + 1) * seconds)
   // The calendar comes from the bars before the last one: Yahoo stamps the live bar with the current time.
   const history = times.slice(0, -1)

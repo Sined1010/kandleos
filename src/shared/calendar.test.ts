@@ -83,3 +83,21 @@ test('futureTimes skips the XETRA Christmas and New Year closures', () => {
   const jan4 = Date.UTC(2027, 0, 4, 8) / 1000
   assert.deepEqual(futureTimes(days, 86400, 4, BERLIN), [utc(12, 28, 8), utc(12, 29, 8), utc(12, 30, 8), jan4])
 })
+
+test('futureTimes steps month-based bars by calendar periods, not 30-day blocks', () => {
+  // Binance/Finnhub monthly bars at 00:00 UTC on the 1st: the months after October 2026.
+  const months = [utc(8, 1), utc(9, 1), utc(10, 1)]
+  assert.deepEqual(futureTimes(months, 2592000, 4, 'UTC', 1), [utc(11, 1), utc(12, 1), Date.UTC(2027, 0, 1) / 1000, Date.UTC(2027, 1, 1) / 1000])
+  // Quarters and years continue at the start of the next period.
+  assert.deepEqual(futureTimes([utc(4, 1), utc(7, 1), utc(10, 1)], 7776000, 2, 'UTC', 3), [Date.UTC(2027, 0, 1) / 1000, Date.UTC(2027, 3, 1) / 1000])
+  assert.deepEqual(futureTimes([Date.UTC(2025, 0, 1) / 1000, utc(1, 1)], 31104000, 1, 'UTC', 12), [Date.UTC(2027, 0, 1) / 1000])
+})
+
+test('futureTimes dates Yahoo monthly bars at midnight in the exchange zone, across the DST switch', () => {
+  // Yahoo: 00:00 New York on the 1st (EDT: 04:00 UTC), the live bar stamped "now".
+  const bars = [utc(8, 1, 4), utc(9, 1, 4), utc(10, 1, 4), utc(10, 20, 20)]
+  assert.deepEqual(futureTimes(bars, 2592000, 2, NY, 1), [utc(11, 1, 4), utc(12, 1, 5)]) // December is EST
+  // XETRA: 00:00 Berlin is 22:00 UTC the evening before in summer, 23:00 in winter.
+  const xetra = [utc(7, 31, 22), utc(8, 31, 22), utc(9, 30, 22)]
+  assert.deepEqual(futureTimes(xetra, 2592000, 2, BERLIN, 1), [utc(10, 31, 23), utc(11, 30, 23)])
+})

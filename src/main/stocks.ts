@@ -1,10 +1,11 @@
-import { timeZoneForSymbol } from '../shared/calendar'
-import { aggregate } from '../shared/candles'
+import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
+import { aggregate, aggregateMonths } from '../shared/candles'
 import { aliasName, cleanName, findAliases } from '../shared/names'
 import {
   cryptoQuoteAsset,
   isCrypto,
   SYMBOL_RE,
+  TF_MONTHS,
   TF_SECONDS,
   type Candle,
   type CandleData,
@@ -13,25 +14,36 @@ import {
   type Timeframe
 } from '../shared/types'
 
+// 2h/4h are built from hourly bars, quarters, half-years and years from monthly bars (see stockCandles).
 const YAHOO: Record<Timeframe, [interval: string, range: string]> = {
   '1m': ['1m', '5d'],
   '5m': ['5m', '1mo'],
   '15m': ['15m', '1mo'],
+  '30m': ['30m', '1mo'],
   '1h': ['60m', '6mo'],
+  '2h': ['60m', '1y'],
   '4h': ['60m', '1y'],
   '1D': ['1d', '5y'],
   '1W': ['1wk', '10y'],
-  '1M': ['1mo', 'max']
+  '1M': ['1mo', 'max'],
+  '3M': ['1mo', 'max'],
+  '6M': ['1mo', 'max'],
+  '12M': ['1mo', 'max']
 }
 const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
   '1m': ['1', 5],
   '5m': ['5', 30],
   '15m': ['15', 30],
+  '30m': ['30', 30],
   '1h': ['60', 180],
+  '2h': ['60', 365],
   '4h': ['60', 365],
   '1D': ['D', 1825],
   '1W': ['W', 3650],
-  '1M': ['M', 18250]
+  '1M': ['M', 18250],
+  '3M': ['M', 18250],
+  '6M': ['M', 18250],
+  '12M': ['M', 18250]
 }
 
 async function getJson(url: string): Promise<any> {
@@ -106,8 +118,10 @@ function validTimeZone(tz: unknown): string | undefined {
 
 async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> {
   const [interval, range] = YAHOO[tf]
+  // With range=max Yahoo silently coarsens long histories (monthly becomes quarterly); an explicit span does not.
+  const span = range === 'max' ? `period1=0&period2=${Math.floor(Date.now() / 1000)}` : `range=${range}`
   const d = await getJson(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&${span}`
   )
   const r = d.chart?.result?.[0]
   if (!r?.timestamp) throw new Error(`Keine Kursdaten für ${symbol}`)
@@ -119,6 +133,17 @@ async function yahooCandles(symbol: string, tf: Timeframe): Promise<CandleData> 
     out.push({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] ?? 0 })
   })
   const timezone = validTimeZone(r.meta?.exchangeTimezoneName) ?? timeZoneForSymbol(symbol)
+  // Weekly and monthly data end with an extra bar stamped "now" holding only today's trading, while the
+  // running week's or month's bar already includes it; keeping both would show the period twice.
+  const [prev, live] = out.slice(-2)
+  if (live && interval !== '1d' && !interval.endsWith('m')) {
+    const zone = timezone ?? 'UTC'
+    const samePeriod =
+      interval === '1wk'
+        ? live.time - prev.time < 7 * 86400
+        : periodIndex(live.time, 1, zone) === periodIndex(prev.time, 1, zone)
+    if (samePeriod) out.pop()
+  }
   return { candles: out, currency: r.meta?.currency ?? '', timezone }
 }
 
@@ -140,7 +165,9 @@ export async function stockCandles(symbolArg: unknown, tfArg: unknown, keyArg: u
     }
   }
   data ??= await yahooCandles(symbol, tf)
-  return tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS['4h']) } : data
+  const months = TF_MONTHS[tf]
+  if (months && months > 1) return { ...data, candles: aggregateMonths(data.candles, months, data.timezone) }
+  return tf === '2h' || tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS[tf]) } : data
 }
 
 /** Validates the key with one cheap request. Returns null if it works, otherwise a user-facing reason. */

@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { InferenceSession } from 'onnxruntime-node'
+import { FORECAST_MIN_BARS } from '../shared/types'
 
 // Chronos-2 (amazon/chronos-2, Apache-2.0) as fp32 ONNX export by sktime: 2048 bars in, 64 steps x 21 quantiles out.
 const MODEL = {
@@ -65,8 +66,8 @@ function getSession(onProgress: (share: number) => void): Promise<InferenceSessi
 
 /** Forecast for the next 64 bars as [p10, median, p90] per step, from up to the last 2048 closes. */
 export async function forecast(closesArg: unknown, onProgress: (share: number) => void): Promise<number[][]> {
-  if (!Array.isArray(closesArg) || closesArg.length < 32 || !closesArg.every((v) => Number.isFinite(v)))
-    throw new Error('Zu wenige Kursdaten für eine Prognose (mindestens 32 Kerzen)')
+  if (!Array.isArray(closesArg) || closesArg.length < FORECAST_MIN_BARS || !closesArg.every((v) => Number.isFinite(v)))
+    throw new Error(`Zu wenige Kursdaten für eine Prognose (mindestens ${FORECAST_MIN_BARS} Kerzen)`)
   const closes = (closesArg as number[]).slice(-CONTEXT)
   const s = await getSession(onProgress)
   const ort = await import('onnxruntime-node')
