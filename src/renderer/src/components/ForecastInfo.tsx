@@ -173,6 +173,8 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         <p className={heading}>Zusätzlich</p>
         {check('backtest', 'Rückblick', 'Treffsicherheit und frühere Prognose (grau)')}
         {check('hover', 'Werte beim Überfahren')}
+        {/* Separates the Chronos-2 settings above from the TradingAgents analysis below. */}
+        <div className="mx-1 mt-2 h-px bg-line" />
         <p className={heading}>Erweitert · optional</p>
         <button
           onClick={() => {
