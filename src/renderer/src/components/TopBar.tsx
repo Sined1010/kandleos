@@ -1,7 +1,7 @@
 import { Activity, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { locale, msg, t } from '../../../shared/i18n'
-import { isCrypto, tfLabel, type Timeframe } from '../../../shared/types'
+import { isCrypto, tfLabel, type StockSource, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import Logo from './Logo'
@@ -130,18 +130,25 @@ function TimeframePicker() {
   )
 }
 
-const FEED: Record<FeedStatus['state'], [dot: string, label: string, hint: string]> = {
-  off: ['bg-muted', msg('Yahoo · verzögert'), msg('Kein Finnhub-Key: Aktienkurse alle 15 s über Yahoo. Klicken zum Eintragen.')],
+/** Without Finnhub the badge names the stock source. */
+const SOURCE: Record<StockSource, [dot: string, label: string, hint: string]> = {
+  alpaca: ['bg-up', msg('Alpaca · IEX'), msg('Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.')],
+  yahoo: ['bg-muted', msg('Yahoo · verzögert'), msg('Aktienkurse alle 15 s über Yahoo Finance (inoffiziell). Klicken für die Einstellungen.')],
+  none: ['bg-muted', msg('Nur Krypto'), msg('Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.')]
+}
+
+const FEED: Record<Exclude<FeedStatus['state'], 'off'>, [dot: string, label: string, hint: string]> = {
   checking: ['bg-yellow-400 animate-pulse', msg('Finnhub · prüfe Key…'), msg('API-Key wird geprüft.')],
   connecting: ['bg-yellow-400 animate-pulse', msg('Finnhub · verbinde…'), msg('Key gültig, Echtzeit-Verbindung wird aufgebaut.')],
   live: ['bg-up', msg('Finnhub · live'), msg('Key gültig, Echtzeit-Verbindung aktiv.')],
-  error: ['bg-down', msg('Finnhub · Fehler'), msg('Aktienkurse kommen ersatzweise über Yahoo.')]
+  error: ['bg-down', msg('Finnhub · Fehler'), msg('Aktienkurse kommen ersatzweise über die gewählte Datenquelle.')]
 }
 
-/** Finnhub connection status; opens the settings on click. */
+/** Stock data source, or the Finnhub connection when a key is set; opens the settings on click. */
 function FeedBadge({ onClick }: { onClick: () => void }) {
   const feed = useQuotes((s) => s.feed)
-  const [dot, label, hint] = FEED[feed.state]
+  const source = useStore((s) => s.stockSource) ?? 'none'
+  const [dot, label, hint] = feed.state === 'off' ? SOURCE[source] : FEED[feed.state]
   const details = [
     feed.detail,
     t(hint),

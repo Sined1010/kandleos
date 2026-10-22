@@ -25,6 +25,11 @@ test('aggregate groups hourly bars into 4h buckets', () => {
   assert.deepEqual(out, [c(0, 1, 3, 0.5, 2, 2), c(14400, 2, 2.5, 1.8, 2.2)])
 })
 
+test('aggregate with an offset builds hours from half hours starting at :30', () => {
+  const half = [c(1800, 1, 2, 1, 2), c(3600, 2, 4, 2, 3), c(5400, 3, 3, 1, 1)]
+  assert.deepEqual(aggregate(half, 3600, 1800), [c(1800, 1, 4, 1, 3, 2), c(5400, 3, 3, 1, 1)])
+})
+
 test('mergeTick updates the open bar and opens the next one on the grid', () => {
   const last = c(1000, 10, 11, 9, 10)
   assert.deepEqual(mergeTick(last, 12, 1030, 60), c(1000, 10, 12, 9, 12))

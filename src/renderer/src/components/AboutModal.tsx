@@ -1,34 +1,22 @@
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
-import { useStore } from '../store/useStore'
-import LanguageSwitch from './LanguageSwitch'
 
-/**
- * About KandleOS: disclaimer, privacy notes, data sources and third-party licenses.
- * On first start (`firstRun`) it doubles as the notice the user confirms before using the app.
- */
-export default function AboutModal({ onClose, firstRun }: { onClose: () => void; firstRun?: boolean }) {
-  const acceptDisclaimer = useStore((s) => s.acceptDisclaimer)
+/** About KandleOS: disclaimer, privacy notes, data sources and third-party licenses (first start: WelcomeModal). */
+export default function AboutModal({ onClose }: { onClose: () => void }) {
   const [licenseError, setLicenseError] = useState('')
-  // The first-start notice must be confirmed explicitly; Escape and clicking outside only close the normal dialog.
-  const dismiss = firstRun ? () => {} : onClose
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dismiss])
+  }, [onClose])
 
-  const confirm = () => {
-    acceptDisclaimer()
-    onClose()
-  }
   const h = 'mb-1 mt-4 text-xs font-semibold uppercase tracking-wider text-muted'
   const link = 'text-accent hover:underline'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={dismiss}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -38,17 +26,11 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id="about-title" className="text-base font-semibold text-white">
-            {firstRun ? t('Willkommen bei KandleOS') : t('Über KandleOS')}{' '}
-            <span className="text-xs font-normal text-muted">Version {__APP_VERSION__}</span>
+            {t('Über KandleOS')} <span className="text-xs font-normal text-muted">Version {__APP_VERSION__}</span>
           </h2>
-          {/* On first start the language can be picked right here, before anything else. */}
-          {firstRun ? (
-            <LanguageSwitch />
-          ) : (
-            <button onClick={onClose} className="text-muted hover:text-white" aria-label={t('Schließen')}>
-              <X size={18} />
-            </button>
-          )}
+          <button onClick={onClose} className="text-muted hover:text-white" aria-label={t('Schließen')}>
+            <X size={18} />
+          </button>
         </div>
 
         <h3 className={h}>{t('Keine Anlageberatung')}</h3>
@@ -65,12 +47,13 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
         <h3 className={h}>{t('Datenschutz')}</h3>
         <p>
           {t(
-            'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, der Finnhub-API-Key wird verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:'
+            'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:'
           )}
         </p>
         <ul className="ml-4 mt-1 list-disc">
           <li>{t('Binance – Kryptokurse')}</li>
-          <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche und Namen')}</li>
+          <li>{t('Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key')}</li>
+          <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (inoffizielle Schnittstelle)')}</li>
           <li>{t('Finnhub – Echtzeit-Aktienkurse, nur wenn ein eigener API-Key eingetragen ist')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
         </ul>
@@ -102,13 +85,6 @@ export default function AboutModal({ onClose, firstRun }: { onClose: () => void;
           {licenseError && <span className="ml-2 text-down">({licenseError})</span>}
         </p>
 
-        {firstRun && (
-          <div className="mt-5 flex justify-end">
-            <button onClick={confirm} className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-4 py-1.5 text-sm">
-              {t('Verstanden')}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )

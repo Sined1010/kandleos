@@ -17,9 +17,10 @@ function group(candles: Candle[], bucketOf: (t: number) => number): Candle[] {
   return out
 }
 
-// shortcut: buckets are aligned to UTC, not exchange sessions; switch to session-aligned bars if that matters.
-export function aggregate(candles: Candle[], seconds: number): Candle[] {
-  return group(candles, (t) => Math.floor(t / seconds) * seconds)
+// shortcut: buckets are aligned to UTC (shifted by `offset` seconds), not exchange sessions; switch to
+// session-aligned bars if that matters.
+export function aggregate(candles: Candle[], seconds: number, offset = 0): Candle[] {
+  return group(candles, (t) => Math.floor((t - offset) / seconds) * seconds + offset)
 }
 
 /**

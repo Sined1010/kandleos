@@ -9,6 +9,7 @@ import {
   type Candle,
   type CandleData,
   type Quote,
+  type StockSource,
   type Timeframe
 } from '../../../shared/types'
 
@@ -130,17 +131,21 @@ export interface FeedStatus {
 }
 
 /**
- * Live quotes: Binance ticker for crypto; Finnhub trades (valid key) or Yahoo polling via IPC for stocks.
+ * Live quotes: Binance ticker for crypto; for stocks polling of the chosen source via IPC (Alpaca every 5 s,
+ * its free real-time IEX prices; Yahoo every 15 s), plus Finnhub trades with a valid key.
  * `onStatus` reports the Finnhub connection for the status badge.
  */
 export function watchQuotes(
   symbols: string[],
   finnhubKey: string,
+  source: StockSource | null,
   onQuote: (s: string, q: Quote) => void,
   onStatus: (s: FeedStatus) => void
 ): () => void {
   const crypto = symbols.filter(isCrypto)
-  const stocks = symbols.filter((s) => !isCrypto(s))
+  // Without a stock source there are no stock prices; Finnhub trades need a polled quote to build on.
+  const stocks = source === 'alpaca' || source === 'yahoo' ? symbols.filter((s) => !isCrypto(s)) : []
+  if (!stocks.length) finnhubKey = ''
   const cleanups: (() => void)[] = []
   let active = true
 
@@ -171,7 +176,7 @@ export function watchQuotes(
   const polled: Record<string, Quote> = {}
   const poll = () =>
     window.api
-      // A rejected key is not sent again, so quotes come straight from Yahoo.
+      // A rejected key is not sent again, so quotes come straight from the chosen source.
       .stockQuotes(stocks, error ? '' : finnhubKey)
       .then((quotes) => {
         if (!active) return
@@ -182,7 +187,7 @@ export function watchQuotes(
       })
       .catch((e) => console.warn('Aktienkurse:', e))
   const startPolling = () => {
-    const id = setInterval(poll, 15_000)
+    const id = setInterval(poll, source === 'alpaca' ? 5_000 : 15_000)
     cleanups.push(() => clearInterval(id))
   }
   const openFinnhub = () =>
@@ -236,7 +241,7 @@ export function watchQuotes(
         error = err
         report()
         if (!stocks.length) return
-        // An invalid key would only make the socket reconnect forever; fall back to Yahoo polling.
+        // An invalid key would only make the socket reconnect forever; fall back to polling.
         if (err) startPolling()
         else openFinnhub()
       })

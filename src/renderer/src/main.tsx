@@ -13,5 +13,10 @@ const applyLanguage = (lang: Lang) => {
 applyLanguage(useStore.getState().language)
 useStore.subscribe((s, prev) => s.language !== prev.language && applyLanguage(s.language))
 
+// Main routes stock requests by the chosen source, so it needs it before the first request.
+const applySource = (source: string | null) => source && window.api.setStockSource(source)
+applySource(useStore.getState().stockSource)
+useStore.subscribe((s, prev) => s.stockSource !== prev.stockSource && applySource(s.stockSource))
+
 // No StrictMode: its mount/unmount/remount cycle would run chart effects against an already removed chart instance.
 createRoot(document.getElementById('root')!).render(<App />)

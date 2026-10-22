@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
+import { isCrypto, type Quote, type StockSource, type Timeframe } from '../../../shared/types'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
@@ -124,6 +124,9 @@ interface State {
   /** Into folder `toId` in front of `before`, or at its end; also reorders within one folder. */
   moveSymbol: (symbol: string, fromId: string, toId: string, before?: string | null) => void
   setFinnhubKey: (key: string) => void
+  /** Where stock prices come from; null until chosen in the first-start window (Yahoo is never on by default). */
+  stockSource: StockSource | null
+  setStockSource: (source: StockSource) => void
   /** Whether the disclaimer shown on first start has been confirmed. */
   disclaimerAccepted: boolean
   acceptDisclaimer: () => void
@@ -194,6 +197,8 @@ export const useStore = create<State>()(
       // Created on first start, when the language is still the default English.
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       names: {},
+      stockSource: null,
+      setStockSource: (stockSource) => set({ stockSource }),
       disclaimerAccepted: false,
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
       finnhubKey: window.api.keyGet(),
@@ -324,8 +329,10 @@ export const useStore = create<State>()(
         names,
         indicators,
         drawings,
+        stockSource,
         disclaimerAccepted
       }) => ({
+        stockSource,
         language,
         agentsConfig,
         range,

@@ -49,10 +49,7 @@ export const EN: Record<string, string> = {
   'und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr: Daten können verzögert, unvollständig oder fehlerhaft sein. Die Nutzung erfolgt auf eigenes Risiko; Anlageentscheidungen triffst du selbst.':
     'nor a recommendation to buy or sell. All prices without guarantee: data may be delayed, incomplete or wrong. Use at your own risk; investment decisions are yours alone.',
   Datenschutz: 'Privacy',
-  'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, der Finnhub-API-Key wird verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:':
-    'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; the Finnhub API key is stored encrypted. To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
   'Binance – Kryptokurse': 'Binance – crypto prices',
-  'Yahoo Finance – Aktienkurse, Symbolsuche und Namen': 'Yahoo Finance – stock prices, symbol search and names',
   'Finnhub – Echtzeit-Aktienkurse, nur wenn ein eigener API-Key eingetragen ist':
     'Finnhub – real-time stock prices, only if you enter your own API key',
   'Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“':
@@ -70,7 +67,6 @@ export const EN: Record<string, string> = {
   'KandleOS nutzt Open-Source-Software, u. a. Electron, React und Lightweight Charts.':
     'KandleOS uses open-source software, including Electron, React and Lightweight Charts.',
   'Lizenzen von Drittanbietern anzeigen': 'Show third-party licenses',
-  Verstanden: 'Got it',
 
   // Comprehensive analysis panel
   Kaufen: 'Buy',
@@ -350,9 +346,6 @@ export const EN: Record<string, string> = {
   // Settings
   Einstellungen: 'Settings',
   Sprache: 'Language',
-  'Finnhub API-Key': 'Finnhub API key',
-  'Ohne Key kommen Aktienkurse über Yahoo Finance (alle 15 s aktualisiert). Mit Key gibt es Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:':
-    'Without a key, stock prices come from Yahoo Finance (updated every 15 s). With a key you get real-time trades via the Finnhub WebSocket. Free key:',
   'Der Key wird getrennt von kandleos-store.json gespeichert – verschlüsselt für dein Benutzerkonto, sofern das System einen Schlüsselbund hat (Windows immer, Linux mit gnome-keyring/KWallet). Nach einem Gerätewechsel hier einfach neu eintragen.':
     'The key is stored separately from kandleos-store.json – encrypted for your user account if the system has a keyring (always on Windows, on Linux with gnome-keyring/KWallet). After moving to another device, just enter it here again.',
 
@@ -382,8 +375,6 @@ export const EN: Record<string, string> = {
   Zeiteinheit: 'Candle size',
   'Alle Kerzengrößen': 'All candle sizes',
   'Yahoo · verzögert': 'Yahoo · delayed',
-  'Kein Finnhub-Key: Aktienkurse alle 15 s über Yahoo. Klicken zum Eintragen.':
-    'No Finnhub key: stock prices every 15 s via Yahoo. Click to enter one.',
   'Finnhub · prüfe Key…': 'Finnhub · checking key…',
   'API-Key wird geprüft.': 'Checking the API key.',
   'Finnhub · verbinde…': 'Finnhub · connecting…',
@@ -391,7 +382,6 @@ export const EN: Record<string, string> = {
   'Finnhub · live': 'Finnhub · live',
   'Key gültig, Echtzeit-Verbindung aktiv.': 'Key valid, real-time connection active.',
   'Finnhub · Fehler': 'Finnhub · error',
-  'Aktienkurse kommen ersatzweise über Yahoo.': 'Stock prices come from Yahoo instead.',
   'Letzter Trade: {time}': 'Last trade: {time}',
   'Noch keine Trades empfangen (Börse evtl. geschlossen).': 'No trades received yet (the exchange may be closed).',
   '{symbol} zur Watchlist hinzufügen': 'Add {symbol} to the watchlist',
@@ -468,5 +458,58 @@ export const EN: Record<string, string> = {
   'Uran (U3O8)': 'Uranium (U3O8)',
   Weizen: 'Wheat',
   Mais: 'Corn',
-  'VIX (Volatilität)': 'VIX (volatility)'
+  'VIX (Volatilität)': 'VIX (volatility)',
+
+  // Stock data sources: Alpaca, Yahoo, crypto only
+  'Kein Alpaca-Key hinterlegt. In den Einstellungen eintragen.': 'No Alpaca key saved. Enter one in the settings.',
+  'Alpaca: API-Key ungültig': 'Alpaca: invalid API key',
+  'Alpaca: Anfragelimit erreicht, gleich erneut versuchen': 'Alpaca: rate limit reached, try again shortly',
+  'Alpaca nicht erreichbar': 'Alpaca unreachable',
+  '{symbol} gibt es bei Alpaca nicht: Alpaca liefert nur US-Aktien und ETFs. Indizes, Rohstoffe und ausländische Börsen gibt es mit Yahoo Finance (Einstellungen).':
+    '{symbol} is not available on Alpaca: Alpaca only serves US stocks and ETFs. Indices, commodities and foreign exchanges are available with Yahoo Finance (settings).',
+  'Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.':
+    'Stock prices are switched off. Choose a data source for stocks in the settings.',
+  'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:':
+    'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; API keys are stored encrypted. To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
+  'Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key':
+    'Alpaca – stock prices, symbol search and names, only with your own API key',
+  'Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (inoffizielle Schnittstelle)':
+    'Yahoo Finance – stock prices, symbol search and names, only if chosen as the data source (unofficial interface)',
+  'Datenquelle für Aktien': 'Data source for stocks',
+  'Finnhub API-Key (optional)': 'Finnhub API key (optional)',
+  'Mit Key kommen zusätzlich Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:':
+    'With a key, real-time trades also arrive via the Finnhub WebSocket. Free key:',
+  empfohlen: 'recommended',
+  'US-Aktien und ETFs, Echtzeit von der Börse IEX. Offizielle Schnittstelle, kostenloser eigener API-Key nötig.':
+    'US stocks and ETFs, real time from the IEX exchange. Official interface, requires your own free API key.',
+  'Keys gespeichert': 'Keys saved',
+  'API-Key-ID (neu eingeben zum Ersetzen)': 'API key ID (enter a new one to replace it)',
+  'API-Key-ID': 'API key ID',
+  'Secret Key': 'Secret key',
+  'Kostenlos registrieren, dann unter „API Keys“ ein Schlüsselpaar erstellen (ein Paper-Konto genügt):':
+    'Sign up for free, then create a key pair under “API Keys” (a paper account is enough):',
+  'Die Keys werden verschlüsselt auf diesem Rechner gespeichert.': 'The keys are stored encrypted on this computer.',
+  'Yahoo Finance (inoffiziell)': 'Yahoo Finance (unofficial)',
+  'Aktien weltweit, Indizes und Rohstoffe, ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.':
+    'Stocks worldwide, indices and commodities, no sign-up, delayed by about 15 seconds. Yahoo offers no official interface for this; using it may breach Yahoo’s terms of service and can stop working at any time.',
+  'Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS ist nicht mit Yahoo verbunden.':
+    'I use Yahoo Finance privately and at my own responsibility only. KandleOS is not affiliated with Yahoo.',
+  'Yahoos Nutzungsbedingungen': 'Yahoo’s terms of service',
+  'Nur Krypto': 'Crypto only',
+  'Kryptokurse von Binance, ohne Registrierung. Aktien lassen sich später in den Einstellungen hinzufügen.':
+    'Crypto prices from Binance, no sign-up. Stocks can be added later in the settings.',
+  'Alpaca · IEX': 'Alpaca · IEX',
+  'Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.':
+    'Stock prices via Alpaca: real time from the IEX exchange, every 5 s. Click for the settings.',
+  'Aktienkurse alle 15 s über Yahoo Finance (inoffiziell). Klicken für die Einstellungen.':
+    'Stock prices every 15 s via Yahoo Finance (unofficial). Click for the settings.',
+  'Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.': 'No data source for stocks chosen. Click for the settings.',
+  'Aktienkurse kommen ersatzweise über die gewählte Datenquelle.': 'Stock prices come from the chosen data source instead.',
+  'Kryptokurse kommen immer von Binance. Für Aktien eine Quelle wählen; das lässt sich später in den Einstellungen ändern.':
+    'Crypto prices always come from Binance. Choose a source for stocks; you can change it later in the settings.',
+  'KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.':
+    'KandleOS is a tool for chart analysis. Forecasts and analyses are not investment advice nor a recommendation to buy or sell. All prices without guarantee; use at your own risk.',
+  'Mehr zu Haftung, Datenschutz und Lizenzen': 'More on disclaimer, privacy and licenses',
+  'Prüfe Keys …': 'Checking keys …',
+  'Verstanden, los geht’s': 'Got it, let’s go'
 }

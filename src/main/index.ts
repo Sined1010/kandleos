@@ -15,7 +15,8 @@ import {
 } from './agents'
 import { setLang } from '../shared/i18n'
 import { forecast } from './forecast'
-import { finnhubCheck, searchSymbols, stockCandles, stockQuotes, symbolName } from './stocks'
+import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
+import { finnhubCheck, searchSymbols, setStockSource, stockCandles, stockQuotes, symbolName } from './stocks'
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
 // those would be two different folders. All data (store, key, single-instance lock) lives here.
@@ -25,6 +26,10 @@ const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.js
 let writeQueue = Promise.resolve()
 
 ipcMain.on('app:language', (_e, lang) => setLang(lang))
+ipcMain.on('app:stock-source', (_e, s) => setStockSource(s))
+// Alpaca keys only go in; the window learns whether they are set.
+ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
+ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))
 ipcMain.on('store:get', (e) => {
   try {
     e.returnValue = readFileSync(storeFile(), 'utf8')

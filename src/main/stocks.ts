@@ -1,8 +1,9 @@
+import { alpacaCandles, alpacaName, alpacaQuotes, alpacaSearch } from './alpaca'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
 import { aggregate, aggregateMonths } from '../shared/candles'
-import { aliasName, cleanName, findAliases } from '../shared/names'
+import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
 import {
   cryptoQuoteAsset,
   isCrypto,
@@ -13,8 +14,18 @@ import {
   type CandleData,
   type Quote,
   type SearchResult,
+  type StockSource,
   type Timeframe
 } from '../shared/types'
+
+// Chosen by the user on first start or in the settings; the window tells main (see index.ts).
+let source: StockSource | null = null
+export function setStockSource(s: unknown): void {
+  if (s === 'alpaca' || s === 'yahoo' || s === 'none') source = s
+}
+
+const sourceOff = () =>
+  new Error(t('Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.'))
 
 // 2h/4h are built from hourly bars, quarters, half-years and years from monthly bars (see stockCandles).
 const YAHOO: Record<Timeframe, [interval: string, range: string]> = {
@@ -56,8 +67,33 @@ async function getJson(url: string): Promise<any> {
   return res.json()
 }
 
+/**
+ * Coins on Binance matching the query, without Yahoo: by name from the list of common coins, or the query as
+ * a coin symbol traded against USDT (checked with one cheap Binance request).
+ */
+async function coinSearch(query: string): Promise<SearchResult[]> {
+  const q = query.trim().toUpperCase().replace(/USDT$/, '')
+  const out = Object.entries(COINS)
+    .filter(([sym, name]) => sym.startsWith(q) || name.toUpperCase().startsWith(q))
+    .map(([sym, name]) => ({ symbol: sym + 'USDT', name, exchange: 'Binance' }))
+  if (/^[A-Z0-9]{2,10}$/.test(q) && !COINS[q]) {
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${q}USDT`, {
+      signal: AbortSignal.timeout(5000)
+    }).catch(() => null)
+    if (res?.ok) out.unshift({ symbol: q + 'USDT', name: q, exchange: 'Binance' })
+  }
+  return out.slice(0, 5)
+}
+
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   if (typeof query !== 'string' || !query.trim() || query.length > 40) return []
+  if (source !== 'yahoo') {
+    const [coins, stocks] = await Promise.all([
+      coinSearch(query),
+      source === 'alpaca' ? alpacaSearch(query).catch(() => []) : []
+    ])
+    return [...stocks, ...coins]
+  }
   // German names for futures and indices come first; Yahoo's search does not know them.
   const curated: SearchResult[] = findAliases(query).map((a) => ({
     symbol: a.symbol,
@@ -159,8 +195,10 @@ export async function stockCandles(
   const [symbol, key] = checkArgs(symbolArg, keyArg)
   if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(t('Ungültiger Timeframe: {tf}', { tf: String(tfArg) }))
   const tf = tfArg as Timeframe
-  // Pre-market and after-hours candles exist for intraday bars only, and only Yahoo serves them.
+  // Pre-market and after-hours candles exist for intraday bars only.
   const extended = extendedArg === true && TF_SECONDS[tf] < 86400
+  if (source === 'alpaca') return alpacaCandles(symbol, tf, extended)
+  if (source !== 'yahoo') throw sourceOff()
   let data: CandleData | undefined
   if (key && !extended) {
     try {
@@ -211,10 +249,14 @@ async function yahooMeta(symbol: string): Promise<any> {
   return m
 }
 
-/** Display name for a watchlist symbol, or null if Yahoo does not know it. */
+/** Display name for a watchlist symbol, or null if the data source does not know it. */
 export async function symbolName(symbolArg: unknown): Promise<string | null> {
   const [symbol] = checkArgs(symbolArg, '')
   const crypto = isCrypto(symbol)
+  if (source !== 'yahoo') {
+    if (crypto) return COINS[symbol.slice(0, -cryptoQuoteAsset(symbol).length)] ?? null
+    return source === 'alpaca' ? alpacaName(symbol).catch(() => null) : null
+  }
   // Yahoo lists coins against USD (BTC-USD), not as exchange pairs (BTCUSDT).
   const lookup = crypto ? `${symbol.slice(0, -cryptoQuoteAsset(symbol).length)}-USD` : symbol
   try {
@@ -254,6 +296,8 @@ async function yahooQuote(symbol: string): Promise<Quote> {
 export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Record<string, Quote>> {
   const out: Record<string, Quote> = {}
   if (!Array.isArray(symbols)) return out
+  if (source === 'alpaca') return alpacaQuotes(symbols.filter((s) => typeof s === 'string' && SYMBOL_RE.test(s)))
+  if (source !== 'yahoo') return out
   await Promise.all(
     symbols.map(async (s) => {
       try {

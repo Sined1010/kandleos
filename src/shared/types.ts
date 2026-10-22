@@ -62,6 +62,10 @@ export interface Quote {
   ext?: { phase: 'pre' | 'post'; price: number; changePct: number; time: number }
 }
 
+/** Where stock prices come from: Alpaca (own key), Yahoo Finance (unofficial, opt-in) or none (crypto only). */
+export type StockSource = 'alpaca' | 'yahoo' | 'none'
+export const STOCK_SOURCES: StockSource[] = ['alpaca', 'yahoo', 'none']
+
 export interface SearchResult {
   symbol: string
   name: string

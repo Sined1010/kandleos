@@ -23,6 +23,30 @@ export function cleanName(raw: string, crypto: boolean): string {
   return crypto ? name.replace(/ USD$/, '') : name
 }
 
+/** Names of common coins, for the watchlist and search when Yahoo is not used. */
+export const COINS: Record<string, string> = {
+  BTC: 'Bitcoin',
+  ETH: 'Ethereum',
+  SOL: 'Solana',
+  XRP: 'XRP',
+  BNB: 'BNB',
+  ADA: 'Cardano',
+  DOGE: 'Dogecoin',
+  TRX: 'TRON',
+  AVAX: 'Avalanche',
+  DOT: 'Polkadot',
+  LINK: 'Chainlink',
+  LTC: 'Litecoin',
+  BCH: 'Bitcoin Cash',
+  SHIB: 'Shiba Inu',
+  TON: 'Toncoin',
+  SUI: 'Sui',
+  PEPE: 'Pepe',
+  UNI: 'Uniswap',
+  ATOM: 'Cosmos',
+  XLM: 'Stellar'
+}
+
 /**
  * German names and search terms for futures and indices: Yahoo's search only knows them in English or by
  * symbol ("Silber" finds nothing, "Gold" ranks a company first).

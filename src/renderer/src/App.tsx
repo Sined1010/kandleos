@@ -7,6 +7,7 @@ import { FULLSCREEN_ID } from './components/FullscreenButton'
 import SettingsModal from './components/SettingsModal'
 import TopBar from './components/TopBar'
 import Watchlist from './components/Watchlist'
+import WelcomeModal from './components/WelcomeModal'
 import { watchQuotes } from './services/marketData'
 import { setFeedStatus, setQuote, useStore } from './store/useStore'
 
@@ -18,13 +19,17 @@ export default function App() {
   const folders = useStore((s) => s.folders)
   const finnhubKey = useStore((s) => s.finnhubKey)
   const language = useStore((s) => s.language)
+  const stockSource = useStore((s) => s.stockSource)
   const activeTab = useStore((s) => s.activeTab)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
   // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
   // keeps the Finnhub and Binance connections open instead of reconnecting.
   const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].sort().join(',')
 
-  useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote, setFeedStatus), [feed, finnhubKey])
+  useEffect(
+    () => watchQuotes(feed.split(','), finnhubKey, stockSource, setQuote, setFeedStatus),
+    [feed, finnhubKey, stockSource]
+  )
 
   return (
     // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.
@@ -46,9 +51,9 @@ export default function App() {
         <Watchlist />
       </div>
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-      {(aboutOpen || !disclaimerAccepted) && (
-        <AboutModal firstRun={!disclaimerAccepted} onClose={() => setAboutOpen(false)} />
-      )}
+      {/* First start, and once for users from before the stock source choice. */}
+      {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAboutOpen(true)} />}
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
     </div>
   )
 }

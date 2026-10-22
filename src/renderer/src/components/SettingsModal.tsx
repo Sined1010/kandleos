@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
 import { useStore } from '../store/useStore'
 import LanguageSwitch from './LanguageSwitch'
+import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const setFinnhubKey = useStore((s) => s.setFinnhubKey)
   const [key, setKey] = useState(finnhubKey)
   const valid = key === '' || /^[A-Za-z0-9]{1,64}$/.test(key.trim())
+  const source = useSourceForm()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -16,9 +18,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const save = (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!valid) return
+    if (!valid || !(await source.apply())) return
     setFinnhubKey(key.trim())
     onClose()
   }
@@ -31,7 +33,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-[440px] rounded-xl border border-line bg-panel/95 backdrop-blur p-5 shadow-2xl"
+        className="max-h-[90vh] w-[480px] overflow-y-auto rounded-xl border border-line bg-panel/95 backdrop-blur p-5 shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 id="settings-title" className="text-base font-semibold text-white">
@@ -48,20 +50,22 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           <LanguageSwitch />
         </div>
 
-        <label className="mb-1 block text-xs text-muted" htmlFor="finnhub-key">
-          {t('Finnhub API-Key')}
+        <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>
+        <StockSourcePicker form={source} />
+
+        <label className="mb-1 mt-5 block text-xs text-muted" htmlFor="finnhub-key">
+          {t('Finnhub API-Key (optional)')}
         </label>
         <input
           id="finnhub-key"
           type="password"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          autoFocus
           spellCheck={false}
           className={`w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
         />
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t('Ohne Key kommen Aktienkurse über Yahoo Finance (alle 15 s aktualisiert). Mit Key gibt es Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:')}{' '}
+          {t('Mit Key kommen zusätzlich Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:')}{' '}
           <a href="https://finnhub.io/register" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             finnhub.io/register
           </a>
@@ -77,7 +81,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            disabled={!valid}
+            disabled={!valid || !source.ready || source.busy}
             className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-3 py-1.5 disabled:opacity-40 disabled:shadow-none"
           >
             {t('Speichern')}
