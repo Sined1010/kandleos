@@ -265,6 +265,10 @@ export const EN: Record<string, string> = {
   '{n} Kerzen': '{n} candles',
   'Vollbild (Umschalt+F)': 'Fullscreen (Shift+F)',
   'Vollbild beenden (Esc)': 'Exit fullscreen (Esc)',
+  '{name} schließen': 'Close {name}',
+  'Tab schließen': 'Close tab',
+  'Höchstens {max} Charts gleichzeitig': 'At most {max} charts at once',
+  'Neuer Chart-Tab': 'New chart tab',
 
   // Forecast tooltip and settings
   Median: 'Median',

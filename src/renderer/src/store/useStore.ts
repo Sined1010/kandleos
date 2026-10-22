@@ -45,6 +45,15 @@ export interface AgentsConfig {
   ollamaUrl: string
 }
 
+/** One chart tab; the active one is mirrored in the store's symbol, timeframe and range. */
+export interface ChartTab {
+  id: string
+  symbol: string
+  timeframe: Timeframe
+  range: RangeId | null
+}
+export const MAX_TABS = 3
+
 export interface Indicators {
   sma: { on: boolean; period: number }
   ema: { on: boolean; period: number }
@@ -59,8 +68,15 @@ export interface Indicators {
 }
 
 interface State {
+  /** Symbol, timeframe and range of the active tab; the rest of the app only ever reads these. */
   symbol: string
   timeframe: Timeframe
+  tabs: ChartTab[]
+  activeTab: string
+  /** Opens a new tab with the current chart (up to MAX_TABS). */
+  addTab: () => void
+  closeTab: (id: string) => void
+  selectTab: (id: string) => void
   folders: Folder[]
   /** Display names per symbol (automatic or set by the user); missing means "show the ticker". */
   names: Record<string, string>
@@ -107,6 +123,26 @@ interface State {
   clearDrawings: () => void
 }
 
+const chartTab = (symbol: string, timeframe: Timeframe, range: RangeId | null): ChartTab => ({
+  id: crypto.randomUUID(),
+  symbol,
+  timeframe,
+  range
+})
+const firstTab = chartTab('BTCUSDT', '1h', null)
+/** Applies a chart change to the top-level fields and to the active tab. */
+const syncTab = (s: State, patch: Partial<Omit<ChartTab, 'id'>>) => ({
+  ...patch,
+  tabs: s.tabs.map((t) => (t.id === s.activeTab ? { ...t, ...patch } : t))
+})
+const showTab = (t: ChartTab) => ({
+  activeTab: t.id,
+  symbol: t.symbol,
+  timeframe: t.timeframe,
+  range: t.range,
+  selectedId: null,
+  tool: 'cursor' as const
+})
 const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [s.symbol]: list } })
 const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
 const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
@@ -119,8 +155,29 @@ const withoutSymbol = (f: Folder, symbol: string): Folder => ({ ...f, symbols: f
 export const useStore = create<State>()(
   persist(
     (set) => ({
-      symbol: 'BTCUSDT',
-      timeframe: '1h',
+      symbol: firstTab.symbol,
+      timeframe: firstTab.timeframe,
+      tabs: [firstTab],
+      activeTab: firstTab.id,
+      addTab: () =>
+        set((s) => {
+          if (s.tabs.length >= MAX_TABS) return {}
+          const t = chartTab(s.symbol, s.timeframe, s.range)
+          return { tabs: [...s.tabs, t], ...showTab(t) }
+        }),
+      closeTab: (id) =>
+        set((s) => {
+          const i = s.tabs.findIndex((t) => t.id === id)
+          if (s.tabs.length < 2 || i < 0) return {}
+          const tabs = s.tabs.filter((t) => t.id !== id)
+          // Closing the active tab shows its right neighbour, or the left one at the end.
+          return id === s.activeTab ? { tabs, ...showTab(tabs[Math.min(i, tabs.length - 1)]) } : { tabs }
+        }),
+      selectTab: (id) =>
+        set((s) => {
+          const t = s.tabs.find((x) => x.id === id)
+          return t && id !== s.activeTab ? showTab(t) : {}
+        }),
       // Created on first start, when the language is still the default English.
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       names: {},
@@ -142,10 +199,10 @@ export const useStore = create<State>()(
       drawings: {},
       tool: 'cursor',
       selectedId: null,
-      setSymbol: (symbol) => set({ symbol, selectedId: null, tool: 'cursor' }),
-      setTimeframe: (timeframe) => set({ timeframe, range: null }),
+      setSymbol: (symbol) => set((s) => ({ ...syncTab(s, { symbol }), selectedId: null, tool: 'cursor' })),
+      setTimeframe: (timeframe) => set((s) => syncTab(s, { timeframe, range: null })),
       range: null,
-      setRange: (range) => set({ range, timeframe: rangeById(range).tf }),
+      setRange: (range) => set((s) => syncTab(s, { range, timeframe: rangeById(range).tf })),
       extendedHours: false,
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
       forecastView: { style: 'line', band50: true, band80: true, band90: true, backtest: true, hover: true },
@@ -216,13 +273,18 @@ export const useStore = create<State>()(
       // Indicators added in later versions are missing from older files; fill them with their defaults.
       merge: (persisted, current) => {
         const p = persisted as Partial<State>
-        return {
+        const s = {
           ...current,
           ...p,
           indicators: { ...current.indicators, ...p.indicators },
           forecastView: { ...current.forecastView, ...p.forecastView },
           agentsConfig: { ...current.agentsConfig, ...p.agentsConfig }
         }
+        // Files from before tabs hold a single chart; it becomes the first tab.
+        const tabs = p.tabs?.length
+          ? p.tabs.slice(0, MAX_TABS)
+          : [{ ...firstTab, symbol: s.symbol, timeframe: s.timeframe, range: s.range }]
+        return { ...s, tabs, ...showTab(tabs.find((t) => t.id === p.activeTab) ?? tabs[0]) }
       },
       storage: createJSONStorage(() => ({
         getItem: () => window.api.storeGet(),
@@ -232,6 +294,8 @@ export const useStore = create<State>()(
       partialize: ({
         symbol,
         timeframe,
+        tabs,
+        activeTab,
         range,
         extendedHours,
         forecastView,
@@ -252,6 +316,8 @@ export const useStore = create<State>()(
         names,
         symbol,
         timeframe,
+        tabs,
+        activeTab,
         folders,
         indicators,
         drawings
