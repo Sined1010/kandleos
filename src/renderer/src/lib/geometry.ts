@@ -1,4 +1,5 @@
 // Pure helpers for the drawing tools (pixel and price math), kept apart so they can be tested.
+import { t } from '../../../shared/i18n.ts'
 
 /** End point of a ray from (x1,y1) through (x2,y2), continued to the left or right edge of the plot. */
 export function rayEnd(x1: number, y1: number, x2: number, y2: number, width: number): [number, number] {
@@ -28,5 +29,5 @@ export function measureLabel(from: number, to: number, bars: number, fmt: (p: nu
   const diff = to - from
   const pct = from ? (diff / from) * 100 : 0
   const sign = diff >= 0 ? '+' : '−'
-  return `${sign}${fmt(Math.abs(diff))} (${sign}${Math.abs(pct).toFixed(2)} %) · ${Math.round(Math.abs(bars))} Kerzen`
+  return `${sign}${fmt(Math.abs(diff))} (${sign}${Math.abs(pct).toFixed(2)} %) · ${t('{n} Kerzen', { n: Math.round(Math.abs(bars)) })}`
 }

@@ -11,6 +11,8 @@ function listen<T>(channel: string, cb: (value: T) => void): () => void {
 
 const api = {
   storeGet: (): string | null => ipcRenderer.sendSync('store:get'),
+  /** Language for texts the main process produces (error messages, names). */
+  setLanguage: (lang: string): void => ipcRenderer.send('app:language', lang),
   storeSet: (data: string): Promise<void> => ipcRenderer.invoke('store:set', data),
   keyGet: (): string => ipcRenderer.sendSync('key:get'),
   keySet: (key: string): Promise<void> => ipcRenderer.invoke('key:set', key),

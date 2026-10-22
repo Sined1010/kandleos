@@ -20,6 +20,7 @@ import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
 import { backtest, backtestCutoffs, forecastCandles, Q } from '../../../shared/forecast'
 import type { Decision } from '../../../shared/agents'
+import { locale, t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
 import {
   FORECAST_MIN_BARS,
@@ -64,7 +65,7 @@ const ts = (s: number) => s as UTCTimestamp
 const toBar = (c: Candle) => ({ time: ts(c.time), open: c.open, high: c.high, low: c.low, close: c.close })
 const toVol = (c: Candle) => ({ time: ts(c.time), value: c.volume, color: (c.close >= c.open ? UP : DOWN) + '55' })
 const fmtTime = (time: Time, opts: Intl.DateTimeFormatOptions) =>
-  new Date((time as number) * 1000).toLocaleString('de-DE', opts)
+  new Date((time as number) * 1000).toLocaleString(locale(), opts)
 
 function tickMark(time: Time, type: TickMarkType): string {
   if (type === TickMarkType.Year) return fmtTime(time, { year: 'numeric' })
@@ -142,7 +143,7 @@ export default function ChartArea() {
     setData([])
     api.candles.setData([])
     api.volume.setData([])
-    setStatus(`Lade ${symbol} …`)
+    setStatus(t('Lade {symbol} …', { symbol }))
     setCurrency('')
     setExchangeZone(undefined)
 
@@ -159,7 +160,7 @@ export default function ChartArea() {
     loadCandles(symbol, timeframe, finnhubKey, extended)
       .then(({ candles: bars, currency, timezone }) => {
         if (!active) return
-        if (!bars.length) return setStatus(`Keine Daten für ${symbol}`)
+        if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
         const last = bars[bars.length - 1].close
         const precision = last < 1 ? 6 : last < 10 ? 4 : 2
         api.candles.applyOptions({ priceFormat: { type: 'price', precision, minMove: 10 ** -precision } })
@@ -433,9 +434,9 @@ export default function ChartArea() {
   useEffect(() => {
     if (!api || !agentLevels) return
     const levels: [number | null, string, string, LineStyle][] = [
-      [agentLevels.priceTarget, THEME.brandTo, 'KI-Ziel', LineStyle.Dashed],
-      [agentLevels.entry, THEME.drawing, 'Einstieg', LineStyle.Dotted],
-      [agentLevels.stopLoss, THEME.down, 'Stop', LineStyle.Dashed]
+      [agentLevels.priceTarget, THEME.brandTo, t('KI-Ziel'), LineStyle.Dashed],
+      [agentLevels.entry, THEME.drawing, t('Einstieg'), LineStyle.Dotted],
+      [agentLevels.stopLoss, THEME.down, t('Stop'), LineStyle.Dashed]
     ]
     const lines = levels.flatMap(([price, color, title, lineStyle]) =>
       price === null ? [] : [api.candles.createPriceLine({ price, color, title, lineStyle, lineWidth: 1, axisLabelVisible: true })]
@@ -490,7 +491,7 @@ export default function ChartArea() {
       },
       rightPriceScale: { borderColor: LINE },
       timeScale: { borderColor: LINE, rightOffset: 10, tickMarkFormatter: tickMark },
-      localization: { locale: 'de-DE' }
+      localization: { locale: locale() }
     })
     const candles = chart.addSeries(CandlestickSeries, {
       upColor: UP,
@@ -530,7 +531,7 @@ export default function ChartArea() {
             </span>
             <QuoteChip quote={quote} />
             {currency && (
-              <span className="rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200" title="Währung der Kurse">
+              <span className="rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200" title={t('Währung der Kurse')}>
                 {MINOR_UNITS[currency] ?? currency}
               </span>
             )}
@@ -552,12 +553,14 @@ export default function ChartArea() {
               disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
               title={
                 data.length && data.length < FORECAST_MIN_BARS
-                  ? `Zu wenige Kerzen für eine Prognose: ${data.length} von mindestens ${FORECAST_MIN_BARS}. ` +
-                    'Eine kürzere Kerzengröße wählen.'
-                  : `Statistische Prognose der nächsten ${forecastSteps(timeframe, data.length)} Kerzen mit Chronos-2, ` +
-                    'lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, ' +
-                    'dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.' +
-                    (fc.state === 'idle' ? ' Beim ersten Mal wird das Modell geladen (ca. 480 MB).' : '')
+                  ? t('Zu wenige Kerzen für eine Prognose: {n} von mindestens {min}. Eine kürzere Kerzengröße wählen.', {
+                      n: data.length,
+                      min: FORECAST_MIN_BARS
+                    })
+                  : t(
+                      'Statistische Prognose der nächsten {n} Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.',
+                      { n: forecastSteps(timeframe, data.length) }
+                    ) + (fc.state === 'idle' ? ' ' + t('Beim ersten Mal wird das Modell geladen (ca. 480 MB).') : '')
               }
               className={`inline-flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
                 fc.state === 'shown'
@@ -567,19 +570,19 @@ export default function ChartArea() {
             >
               {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
               {fc.state === 'shown'
-                ? 'Prognose aus'
+                ? t('Prognose aus')
                 : fc.state === 'loading'
                   ? fc.pct !== undefined && fc.pct < 100
-                    ? `Lade Modell ${fc.pct} %`
-                    : 'Rechne …'
-                  : 'KI-Prognose'}
+                    ? t('Lade Modell {pct} %', { pct: fc.pct })
+                    : t('Rechne …')
+                  : t('KI-Prognose')}
             </button>
             <button
               onClick={() => setFcMenu((o) => !o)}
               aria-expanded={fcMenu}
               aria-haspopup="dialog"
-              title="Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick – und die umfassende Analyse mit TradingAgents"
-              aria-label="Prognose-Anzeige einstellen"
+              title={t('Prognose-Anzeige: Linie oder Kerzen, Bereiche, Rückblick – und die umfassende Analyse mit TradingAgents')}
+              aria-label={t('Prognose-Anzeige einstellen')}
               className={`rounded-r-lg border-l border-white/20 px-2 transition ${
                 fc.state === 'shown'
                   ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
@@ -621,16 +624,16 @@ export default function ChartArea() {
       </div>
       {agentsSetup && <AgentsSetup onClose={() => setAgentsSetup(false)} />}
       <div className="flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
-        <div className="flex gap-0.5" role="group" aria-label="Zeitraum">
+        <div className="flex gap-0.5" role="group" aria-label={t('Zeitraum')}>
           {RANGES.map((r) => (
             <button
               key={r.id}
               onClick={() => setRange(r.id)}
-              title={`${r.title} (${tfLabel(r.tf)}-Kerzen)`}
+              title={t('{title} ({tf}-Kerzen)', { title: t(r.title), tf: tfLabel(r.tf) })}
               aria-pressed={range === r.id}
               className={`rounded-md px-2 py-0.5 text-xs ${range === r.id ? 'bg-brand text-white shadow-glow' : 'text-muted hover:bg-line hover:text-white'}`}
             >
-              {r.id}
+              {t(r.label)}
             </button>
           ))}
         </div>
@@ -640,8 +643,8 @@ export default function ChartArea() {
           aria-pressed={extendedHours}
           title={
             extendable
-              ? 'Vorbörse und Nachbörse (US-Aktien, 10:00–15:30 und 22:00–02:00 deutscher Zeit) als Kerzen zeigen, grau hinterlegt'
-              : 'Vor-/Nachbörse gibt es nur bei Aktien und Kerzen unter einem Tag'
+              ? t('Vorbörse und Nachbörse (US-Aktien, 10:00–15:30 und 22:00–02:00 deutscher Zeit) als Kerzen zeigen, grau hinterlegt')
+              : t('Vor-/Nachbörse gibt es nur bei Aktien und Kerzen unter einem Tag')
           }
           className={`ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 text-xs disabled:opacity-40 ${
             extended ? 'bg-brand text-white shadow-glow' : 'text-muted enabled:hover:bg-line enabled:hover:text-white'
@@ -649,7 +652,7 @@ export default function ChartArea() {
         >
           <Sunrise size={12} />
           <Moon size={11} />
-          Vor-/Nachbörse
+          {t('Vor-/Nachbörse')}
         </button>
       </div>
     </div>

@@ -19,6 +19,6 @@ test('channelOffset measures the third point against the line at its own bar', (
 
 test('measureLabel shows signed change, percent and bars', () => {
   const fmt = (p: number) => p.toFixed(2)
-  assert.equal(measureLabel(100, 110, 12.4, fmt), '+10.00 (+10.00 %) · 12 Kerzen')
-  assert.equal(measureLabel(200, 150, -5, fmt), '−50.00 (−25.00 %) · 5 Kerzen')
+  assert.equal(measureLabel(100, 110, 12.4, fmt), '+10.00 (+10.00 %) · 12 candles')
+  assert.equal(measureLabel(200, 150, -5, fmt), '−50.00 (−25.00 %) · 5 candles')
 })

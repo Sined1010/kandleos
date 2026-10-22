@@ -1,5 +1,6 @@
 import { Activity, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
+import { locale, msg, t } from '../../../shared/i18n'
 import { isCrypto, tfLabel, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
@@ -22,10 +23,10 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
         <SymbolSearch
           value={symbol}
           onPick={setSymbol}
-          placeholder="Symbol oder Name suchen"
+          placeholder={t('Symbol oder Name suchen')}
           inputClassName="w-44 bg-transparent font-medium uppercase text-white outline-none placeholder:normal-case placeholder:font-normal placeholder:text-muted/60"
         />
-        <span className="rounded bg-line px-1.5 text-[10px] uppercase text-muted">{isCrypto(symbol) ? 'Krypto' : 'Aktie'}</span>
+        <span className="rounded bg-line px-1.5 text-[10px] uppercase text-muted">{isCrypto(symbol) ? t('Krypto') : t('Aktie')}</span>
       </div>
 
       <AddToWatchlist symbol={symbol} />
@@ -38,7 +39,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
           aria-expanded={menuOpen}
           className="flex items-center gap-1.5 rounded px-2 py-1 text-muted hover:bg-line hover:text-white"
         >
-          <Activity size={15} /> Indikatoren
+          <Activity size={15} /> {t('Indikatoren')}
         </button>
         {menuOpen && <IndicatorMenu onClose={() => setMenuOpen(false)} />}
       </div>
@@ -47,16 +48,16 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
       <button
         onClick={onOpenSettings}
         className="rounded p-1.5 text-muted hover:bg-line hover:text-white"
-        title="Einstellungen"
-        aria-label="Einstellungen"
+        title={t('Einstellungen')}
+        aria-label={t('Einstellungen')}
       >
         <Settings size={16} />
       </button>
       <button
         onClick={onOpenAbout}
         className="rounded p-1.5 text-muted hover:bg-line hover:text-white"
-        title="Über KandleOS, Haftung, Datenschutz, Lizenzen"
-        aria-label="Über KandleOS"
+        title={t('Über KandleOS, Haftung, Datenschutz, Lizenzen')}
+        aria-label={t('Über KandleOS')}
       >
         <Info size={16} />
       </button>
@@ -67,10 +68,10 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
 // Shown as buttons; every candle size, these included, is in the dropdown next to them.
 const MAIN: Timeframe[] = ['15m', '1h', '4h', '1D', '1W', '1M']
 const GROUPS: [title: string, items: [Timeframe, string][]][] = [
-  ['Minuten', [['1m', '1 Minute'], ['5m', '5 Minuten'], ['15m', '15 Minuten'], ['30m', '30 Minuten']]],
-  ['Stunden', [['1h', '1 Stunde'], ['2h', '2 Stunden'], ['4h', '4 Stunden']]],
-  ['Tage', [['1D', '1 Tag'], ['1W', '1 Woche']]],
-  ['Monate', [['1M', '1 Monat'], ['3M', '1 Quartal'], ['6M', '1 Halbjahr'], ['12M', '1 Jahr']]]
+  [msg('Minuten'), [['1m', msg('1 Minute')], ['5m', msg('5 Minuten')], ['15m', msg('15 Minuten')], ['30m', msg('30 Minuten')]]],
+  [msg('Stunden'), [['1h', msg('1 Stunde')], ['2h', msg('2 Stunden')], ['4h', msg('4 Stunden')]]],
+  [msg('Tage'), [['1D', msg('1 Tag')], ['1W', msg('1 Woche')]]],
+  [msg('Monate'), [['1M', msg('1 Monat')], ['3M', msg('1 Quartal')], ['6M', msg('1 Halbjahr')], ['12M', msg('1 Jahr')]]]
 ]
 
 /** Main candle sizes as buttons, the rest in a dropdown; a size picked there shows on the dropdown button. */
@@ -85,7 +86,7 @@ function TimeframePicker() {
   const other = !MAIN.includes(timeframe)
   const btn = (active: boolean) => `rounded-md px-2 py-0.5 text-xs ${active ? 'bg-brand text-white shadow-glow' : 'text-muted hover:text-white'}`
   return (
-    <div className="relative flex rounded-lg bg-bg p-0.5 ring-1 ring-line" role="group" aria-label="Zeiteinheit">
+    <div className="relative flex rounded-lg bg-bg p-0.5 ring-1 ring-line" role="group" aria-label={t('Zeiteinheit')}>
       {MAIN.map((tf) => (
         <button key={tf} onClick={() => pick(tf)} aria-pressed={tf === timeframe} className={btn(tf === timeframe)}>
           {tfLabel(tf)}
@@ -95,7 +96,7 @@ function TimeframePicker() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title="Alle Kerzengrößen"
+        title={t('Alle Kerzengrößen')}
         className={`${btn(other)} flex items-center gap-0.5 ${other ? '' : 'px-1'}`}
       >
         {other && tfLabel(timeframe)}
@@ -107,7 +108,7 @@ function TimeframePicker() {
           <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
             {GROUPS.map(([title, items]) => (
               <div key={title}>
-                <p className="px-3 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wider text-muted">{title}</p>
+                <p className="px-3 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wider text-muted">{t(title)}</p>
                 {items.map(([tf, name]) => (
                   <button
                     key={tf}
@@ -116,7 +117,7 @@ function TimeframePicker() {
                     onClick={() => pick(tf)}
                     className={`flex w-full items-center px-3 py-1 text-left text-sm hover:bg-bg ${tf === timeframe ? 'text-accent' : 'text-white'}`}
                   >
-                    {name}
+                    {t(name)}
                     <span className="ml-auto text-xs text-muted/60">{tfLabel(tf)}</span>
                   </button>
                 ))}
@@ -130,11 +131,11 @@ function TimeframePicker() {
 }
 
 const FEED: Record<FeedStatus['state'], [dot: string, label: string, hint: string]> = {
-  off: ['bg-muted', 'Yahoo · verzögert', 'Kein Finnhub-Key: Aktienkurse alle 15 s über Yahoo. Klicken zum Eintragen.'],
-  checking: ['bg-yellow-400 animate-pulse', 'Finnhub · prüfe Key…', 'API-Key wird geprüft.'],
-  connecting: ['bg-yellow-400 animate-pulse', 'Finnhub · verbinde…', 'Key gültig, Echtzeit-Verbindung wird aufgebaut.'],
-  live: ['bg-up', 'Finnhub · live', 'Key gültig, Echtzeit-Verbindung aktiv.'],
-  error: ['bg-down', 'Finnhub · Fehler', 'Aktienkurse kommen ersatzweise über Yahoo.']
+  off: ['bg-muted', msg('Yahoo · verzögert'), msg('Kein Finnhub-Key: Aktienkurse alle 15 s über Yahoo. Klicken zum Eintragen.')],
+  checking: ['bg-yellow-400 animate-pulse', msg('Finnhub · prüfe Key…'), msg('API-Key wird geprüft.')],
+  connecting: ['bg-yellow-400 animate-pulse', msg('Finnhub · verbinde…'), msg('Key gültig, Echtzeit-Verbindung wird aufgebaut.')],
+  live: ['bg-up', msg('Finnhub · live'), msg('Key gültig, Echtzeit-Verbindung aktiv.')],
+  error: ['bg-down', msg('Finnhub · Fehler'), msg('Aktienkurse kommen ersatzweise über Yahoo.')]
 }
 
 /** Finnhub connection status; opens the settings on click. */
@@ -143,11 +144,11 @@ function FeedBadge({ onClick }: { onClick: () => void }) {
   const [dot, label, hint] = FEED[feed.state]
   const details = [
     feed.detail,
-    hint,
+    t(hint),
     feed.state === 'live' &&
       (feed.lastTrade
-        ? `Letzter Trade: ${new Date(feed.lastTrade * 1000).toLocaleTimeString('de-DE')}`
-        : 'Noch keine Trades empfangen (Börse evtl. geschlossen).')
+        ? t('Letzter Trade: {time}', { time: new Date(feed.lastTrade * 1000).toLocaleTimeString(locale()) })
+        : t('Noch keine Trades empfangen (Börse evtl. geschlossen).'))
   ]
   return (
     <button
@@ -156,7 +157,7 @@ function FeedBadge({ onClick }: { onClick: () => void }) {
       className="ml-auto flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted hover:bg-line hover:text-white"
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden />
-      {label}
+      {t(label)}
       {feed.state === 'error' && feed.detail && <span className="text-down">({feed.detail})</span>}
     </button>
   )
@@ -180,7 +181,7 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        title={`${symbol} zur Watchlist hinzufügen`}
+        title={t('{symbol} zur Watchlist hinzufügen', { symbol })}
         className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-accent ring-1 ring-accent/50 transition hover:bg-accent/15 hover:shadow-glow"
       >
         <Plus size={14} /> Watchlist
@@ -189,7 +190,7 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
-            <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted">{symbol} hinzufügen zu</p>
+            <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted">{t('{symbol} hinzufügen zu', { symbol })}</p>
             {folders.map((f) => (
               <button key={f.id} role="menuitem" onClick={() => put(f.id)} className={`${item} text-white`}>
                 <FolderIcon size={14} className="shrink-0 text-muted" />
@@ -198,8 +199,8 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
               </button>
             ))}
             <div className="my-1 h-px bg-line" />
-            <button role="menuitem" onClick={() => put(addFolder('Neuer Ordner'))} className={`${item} text-muted`}>
-              <FolderPlus size={14} className="shrink-0" /> Neuer Ordner
+            <button role="menuitem" onClick={() => put(addFolder(t('Neuer Ordner')))} className={`${item} text-muted`}>
+              <FolderPlus size={14} className="shrink-0" /> {t('Neuer Ordner')}
             </button>
           </div>
         </>
@@ -210,16 +211,16 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
 
 // [field, label, step]
 const ROWS: Record<keyof Indicators, { label: string; params: [string, string, number?][] }> = {
-  sma: { label: 'SMA', params: [['period', 'Periode']] },
-  ema: { label: 'EMA', params: [['period', 'Periode']] },
-  ema3: { label: '3-fach EMA', params: [['fast', 'Kurz'], ['mid', 'Mittel'], ['slow', 'Lang']] },
-  bb: { label: 'Bollinger Bands', params: [['period', 'Periode'], ['mult', 'StdAbw', 0.1]] },
+  sma: { label: 'SMA', params: [['period', msg('Periode')]] },
+  ema: { label: 'EMA', params: [['period', msg('Periode')]] },
+  ema3: { label: msg('3-fach EMA'), params: [['fast', msg('Kurz')], ['mid', msg('Mittel')], ['slow', msg('Lang')]] },
+  bb: { label: 'Bollinger Bands', params: [['period', msg('Periode')], ['mult', msg('StdAbw'), 0.1]] },
   vwap: { label: 'VWAP', params: [] },
-  supertrend: { label: 'Supertrend', params: [['period', 'ATR-Periode'], ['mult', 'Faktor', 0.1]] },
-  rsi: { label: 'RSI', params: [['period', 'Periode']] },
+  supertrend: { label: 'Supertrend', params: [['period', msg('ATR-Periode')], ['mult', msg('Faktor'), 0.1]] },
+  rsi: { label: 'RSI', params: [['period', msg('Periode')]] },
   macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']] },
-  stoch: { label: 'Stochastik', params: [['period', 'Periode'], ['smoothK', '%K'], ['smoothD', '%D']] },
-  atr: { label: 'ATR', params: [['period', 'Periode']] }
+  stoch: { label: msg('Stochastik'), params: [['period', msg('Periode')], ['smoothK', '%K'], ['smoothD', '%D']] },
+  atr: { label: 'ATR', params: [['period', msg('Periode')]] }
 }
 
 function IndicatorMenu({ onClose }: { onClose: () => void }) {
@@ -241,14 +242,14 @@ function IndicatorMenu({ onClose }: { onClose: () => void }) {
                   onChange={(e) => setIndicator(name, { on: e.target.checked })}
                   className="accent-accent"
                 />
-                <span className="text-white">{ROWS[name].label}</span>
+                <span className="text-white">{t(ROWS[name].label)}</span>
               </label>
               {ROWS[name].params.map(([field, label, step = 1]) => (
                 <input
                   key={field}
                   type="number"
-                  title={label}
-                  aria-label={`${ROWS[name].label} ${label}`}
+                  title={t(label)}
+                  aria-label={`${t(ROWS[name].label)} ${t(label)}`}
                   min={step}
                   max={500}
                   step={step}

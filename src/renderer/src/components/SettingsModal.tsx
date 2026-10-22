@@ -1,6 +1,8 @@
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { t } from '../../../shared/i18n'
 import { useStore } from '../store/useStore'
+import LanguageSwitch from './LanguageSwitch'
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
@@ -33,15 +35,21 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 id="settings-title" className="text-base font-semibold text-white">
-            Einstellungen
+            {t('Einstellungen')}
           </h2>
-          <button type="button" onClick={onClose} className="text-muted hover:text-white" aria-label="Schließen">
+          <button type="button" onClick={onClose} className="text-muted hover:text-white" aria-label={t('Schließen')}>
             <X size={18} />
           </button>
         </div>
 
+        {/* Applies at once: the window redraws in the new language. */}
+        <div className="mb-5 flex items-center justify-between">
+          <span className="text-xs text-muted">{t('Sprache')}</span>
+          <LanguageSwitch />
+        </div>
+
         <label className="mb-1 block text-xs text-muted" htmlFor="finnhub-key">
-          Finnhub API-Key
+          {t('Finnhub API-Key')}
         </label>
         <input
           id="finnhub-key"
@@ -53,22 +61,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           className={`w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
         />
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          Ohne Key kommen Aktienkurse über Yahoo Finance (alle 15 s aktualisiert). Mit Key gibt es Echtzeit-Trades über den
-          Finnhub-WebSocket. Kostenloser Key:{' '}
+          {t('Ohne Key kommen Aktienkurse über Yahoo Finance (alle 15 s aktualisiert). Mit Key gibt es Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:')}{' '}
           <a href="https://finnhub.io/register" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             finnhub.io/register
           </a>
-          . Der Key wird getrennt von kandleos-store.json gespeichert – verschlüsselt für dein Benutzerkonto, sofern das
-          System einen Schlüsselbund hat (Windows immer, Linux mit gnome-keyring/KWallet). Nach einem Gerätewechsel hier
-          einfach neu eintragen.
+          .{' '}
+          {t(
+            'Der Key wird getrennt von kandleos-store.json gespeichert – verschlüsselt für dein Benutzerkonto, sofern das System einen Schlüsselbund hat (Windows immer, Linux mit gnome-keyring/KWallet). Nach einem Gerätewechsel hier einfach neu eintragen.'
+          )}
         </p>
 
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
-            Abbrechen
+            {t('Abbrechen')}
           </button>
-          <button type="submit" disabled={!valid} className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-3 py-1.5 disabled:opacity-40 disabled:shadow-none">
-            Speichern
+          <button
+            type="submit"
+            disabled={!valid}
+            className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-3 py-1.5 disabled:opacity-40 disabled:shadow-none"
+          >
+            {t('Speichern')}
           </button>
         </div>
       </form>

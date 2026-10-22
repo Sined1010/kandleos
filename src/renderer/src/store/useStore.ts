@@ -4,6 +4,7 @@ import { isCrypto, type Quote, type Timeframe } from '../../../shared/types'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
+import type { Lang } from '../../../shared/i18n'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -80,6 +81,9 @@ interface State {
   setForecastView: (patch: Partial<ForecastView>) => void
   agentsConfig: AgentsConfig
   setAgentsConfig: (patch: Partial<AgentsConfig>) => void
+  /** Interface language; English unless chosen otherwise. */
+  language: Lang
+  setLanguage: (lang: Lang) => void
   /** An empty name removes it, so the automatic name is looked up again. */
   setName: (symbol: string, name: string) => void
   addFolder: (name: string) => string
@@ -117,7 +121,8 @@ export const useStore = create<State>()(
     (set) => ({
       symbol: 'BTCUSDT',
       timeframe: '1h',
-      folders: [folder('Krypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Aktien', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
+      // Created on first start, when the language is still the default English.
+      folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       names: {},
       disclaimerAccepted: false,
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
@@ -153,6 +158,8 @@ export const useStore = create<State>()(
         ollamaUrl: 'http://localhost:11434'
       },
       setAgentsConfig: (patch) => set((s) => ({ agentsConfig: { ...s.agentsConfig, ...patch } })),
+      language: 'en',
+      setLanguage: (language) => set({ language }),
       setName: (symbol, name) =>
         set((s) => {
           const { [symbol]: _, ...rest } = s.names
@@ -229,12 +236,14 @@ export const useStore = create<State>()(
         extendedHours,
         forecastView,
         agentsConfig,
+        language,
         folders,
         names,
         indicators,
         drawings,
         disclaimerAccepted
       }) => ({
+        language,
         agentsConfig,
         range,
         extendedHours,

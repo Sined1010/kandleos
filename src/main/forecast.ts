@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { InferenceSession } from 'onnxruntime-node'
+import { t } from '../shared/i18n'
 import { FORECAST_MIN_BARS } from '../shared/types'
 
 // Chronos-2 (amazon/chronos-2, Apache-2.0) as fp32 ONNX export by sktime: 2048 bars in, 64 steps x 21 quantiles out.
@@ -26,7 +27,7 @@ async function download(onProgress: (share: number) => void): Promise<void> {
   await mkdir(dirname(modelFile()), { recursive: true })
   const part = modelFile() + '.part'
   const res = await fetch(MODEL.url)
-  if (!res.ok || !res.body) throw new Error(`Modell-Download fehlgeschlagen (HTTP ${res.status})`)
+  if (!res.ok || !res.body) throw new Error(t('Modell-Download fehlgeschlagen (HTTP {status})', { status: res.status }))
   const hash = createHash('sha256')
   let done = 0
   const meter = new Transform({
@@ -40,7 +41,7 @@ async function download(onProgress: (share: number) => void): Promise<void> {
   try {
     await pipeline(Readable.fromWeb(res.body as never), meter, createWriteStream(part))
     // A truncated or tampered file must never be loaded.
-    if (hash.digest('hex') !== MODEL.sha256) throw new Error('Modell-Download beschädigt (Prüfsumme falsch)')
+    if (hash.digest('hex') !== MODEL.sha256) throw new Error(t('Modell-Download beschädigt (Prüfsumme falsch)'))
     await rename(part, modelFile())
   } catch (e) {
     await rm(part, { force: true })
@@ -76,17 +77,17 @@ export async function forecast(
   onProgress: (share: number) => void
 ): Promise<number[][][]> {
   if (!Array.isArray(seriesArg) || !seriesArg.length || seriesArg.length > MAX_SERIES)
-    throw new Error('Ungültige Prognose-Anfrage')
+    throw new Error(t('Ungültige Prognose-Anfrage'))
   const groups =
     groupsArg === undefined || groupsArg === null ? seriesArg.map((_, i) => i) : (groupsArg as unknown[])
   const validGroups =
     Array.isArray(groups) &&
     groups.length === seriesArg.length &&
     groups.every((g) => Number.isInteger(g) && (g as number) >= 0)
-  if (!validGroups) throw new Error('Ungültige Prognose-Gruppen')
+  if (!validGroups) throw new Error(t('Ungültige Prognose-Gruppen'))
   for (const closes of seriesArg)
     if (!Array.isArray(closes) || closes.length < FORECAST_MIN_BARS || !closes.every((v) => Number.isFinite(v)))
-      throw new Error(`Zu wenige Kursdaten für eine Prognose (mindestens ${FORECAST_MIN_BARS} Kerzen)`)
+      throw new Error(t('Zu wenige Kursdaten für eine Prognose (mindestens {min} Kerzen)', { min: FORECAST_MIN_BARS }))
   const series = (seriesArg as number[][]).map((c) => c.slice(-CONTEXT))
   const s = await getSession(onProgress)
   const ort = await import('onnxruntime-node')

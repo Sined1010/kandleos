@@ -1,6 +1,7 @@
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { futureTimes } from '../../../shared/calendar'
+import { locale, t } from '../../../shared/i18n'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
@@ -255,7 +256,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           <line x1={x} x2={x} y1={0} y2={height} stroke={stroke} strokeWidth={selected ? 2 : 1} />
           {hit('ew-resize') && <line x1={x} x2={x} y1={0} y2={height} {...hit('ew-resize')} />}
           <text x={x + 4} y={height - 6} fill={stroke} fontSize={11}>
-            {new Date(d.time * 1000).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: step < 86400 ? 'short' : undefined })}
+            {new Date(d.time * 1000).toLocaleString(locale(), { dateStyle: 'short', timeStyle: step < 86400 ? 'short' : undefined })}
           </text>
         </g>
       )
@@ -444,7 +445,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       {tool !== 'cursor' && CLICKS[tool] > 1 && (
         // Bottom centre: the top is taken by the legend row.
         <div className="pointer-events-none absolute bottom-12 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-panel/90 px-2.5 py-1 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur">
-          Punkt {draft.length + 1} von {CLICKS[tool]} · Esc bricht ab
+          {t('Punkt {n} von {total} · Esc bricht ab', { n: draft.length + 1, total: CLICKS[tool] })}
         </div>
       )}
     </>

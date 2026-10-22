@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { agentsTicker, ANALYSTS, keyEnvFor, PROVIDERS, type ProviderId } from '../shared/agents'
+import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
 
 // TradingAgents runs in its own Python, set up on first use inside the app's data folder: uv (a single
@@ -100,7 +101,7 @@ async function downloadUv(onProgress: (p: SetupProgress) => void): Promise<void>
   const archive = join(base(), b.file)
   await mkdir(join(base(), 'uv'), { recursive: true })
   const res = await fetch(url)
-  if (!res.ok || !res.body) throw new Error(`uv-Download fehlgeschlagen (HTTP ${res.status})`)
+  if (!res.ok || !res.body) throw new Error(t('uv-Download fehlgeschlagen (HTTP {status})', { status: res.status }))
   const total = Number(res.headers.get('content-length')) || 0
   const hash = createHash('sha256')
   let done = 0
@@ -108,7 +109,7 @@ async function downloadUv(onProgress: (p: SetupProgress) => void): Promise<void>
     transform(chunk: Buffer, _enc, cb) {
       hash.update(chunk)
       done += chunk.length
-      if (total) onProgress({ step: 'uv', message: 'Lade uv …', share: done / total })
+      if (total) onProgress({ step: 'uv', message: t('Lade uv …'), share: done / total })
       cb(null, chunk)
     }
   })
@@ -116,35 +117,35 @@ async function downloadUv(onProgress: (p: SetupProgress) => void): Promise<void>
   // A tampered or truncated program must never be run.
   if (hash.digest('hex') !== b.sha256) {
     await rm(archive, { force: true })
-    throw new Error('uv-Download beschädigt (Prüfsumme falsch)')
+    throw new Error(t('uv-Download beschädigt (Prüfsumme falsch)'))
   }
   // Windows 10+ ships bsdtar, which also unpacks zip archives.
   const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
   const args = process.platform === 'win32' ? ['-xf', archive, '-C', join(base(), 'uv')] : ['-xzf', archive, '-C', join(base(), 'uv'), '--strip-components=1']
   await run(tar, args, process.env)
   await rm(archive, { force: true })
-  if (!existsSync(uvExe())) throw new Error('uv nach dem Entpacken nicht gefunden')
+  if (!existsSync(uvExe())) throw new Error(t('uv nach dem Entpacken nicht gefunden'))
 }
 
 let installing: Promise<AgentsStatus> | null = null
 
 /** Sets up Python and TradingAgents (a few hundred MB, several minutes on first use). */
 export function installAgents(onProgress: (p: SetupProgress) => void): Promise<AgentsStatus> {
-  if (!build()) return Promise.reject(new Error('Die umfassende Analyse gibt es nur für Windows und Linux (x64)'))
+  if (!build()) return Promise.reject(new Error(t('Die umfassende Analyse gibt es nur für Windows und Linux (x64).')))
   installing ??= (async () => {
     await rm(markerFile(), { force: true })
     if (!existsSync(uvExe())) await downloadUv(onProgress)
-    onProgress({ step: 'python', message: `Lade Python ${PYTHON_VERSION} …` })
+    onProgress({ step: 'python', message: t('Lade Python {version} …', { version: PYTHON_VERSION }) })
     await run(uvExe(), ['venv', join(base(), 'venv'), '--python', PYTHON_VERSION, '--clear'], uvEnv(), (line) =>
       onProgress({ step: 'python', message: line })
     )
-    onProgress({ step: 'packages', message: `Installiere TradingAgents ${TRADINGAGENTS.version} …` })
+    onProgress({ step: 'packages', message: t('Installiere TradingAgents {version} …', { version: TRADINGAGENTS.version }) })
     const source = `https://github.com/TauricResearch/TradingAgents/archive/${TRADINGAGENTS.commit}.zip`
     await run(uvExe(), ['pip', 'install', '--python', venvPython(), source], uvEnv(), (line) =>
       onProgress({ step: 'packages', message: line })
     )
     await writeFile(markerFile(), JSON.stringify({ commit: TRADINGAGENTS.commit, uv: UV_VERSION, python: PYTHON_VERSION }))
-    onProgress({ step: 'done', message: 'Fertig' })
+    onProgress({ step: 'done', message: t('Fertig') })
     return agentsStatus()
   })().finally(() => (installing = null))
   return installing
@@ -179,8 +180,8 @@ export function keyStatus(): Record<string, boolean> {
 }
 
 export async function setKey(name: unknown, value: unknown): Promise<Record<string, boolean>> {
-  if (typeof name !== 'string' || !keyEnvFor(name)) throw new Error('Unbekannter Schlüssel')
-  if (typeof value !== 'string' || !/^[\x21-\x7e]{0,300}$/.test(value)) throw new Error('Ungültiger Schlüssel')
+  if (typeof name !== 'string' || !keyEnvFor(name)) throw new Error(t('Unbekannter Schlüssel'))
+  if (typeof value !== 'string' || !/^[\x21-\x7e]{0,300}$/.test(value)) throw new Error(t('Ungültiger Schlüssel'))
   const keys = readKeys()
   if (value) keys[name] = value
   else delete keys[name]
@@ -247,7 +248,7 @@ function checkRequest(req: unknown): AgentsRequest {
     r.debateRounds >= 1 &&
     r.debateRounds <= 3 &&
     (r.ollamaUrl === undefined || /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl))
-  if (!ok) throw new Error('Ungültige Anfrage für die Analyse')
+  if (!ok) throw new Error(t('Ungültige Anfrage für die Analyse'))
   return r
 }
 
@@ -257,11 +258,14 @@ let current: ChildProcess | null = null
 /** Runs TradingAgents for a symbol as of today; progress goes to `onEvent`, the saved result is returned. */
 export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => void): Promise<SavedAnalysis> {
   const req = checkRequest(reqArg)
-  if (!agentsStatus().installed) throw new Error('Die umfassende Analyse ist noch nicht eingerichtet')
-  if (current) throw new Error('Es läuft bereits eine Analyse')
+  if (!agentsStatus().installed) throw new Error(t('Die umfassende Analyse ist noch nicht eingerichtet'))
+  if (current) throw new Error(t('Es läuft bereits eine Analyse'))
   const keys = readKeys()
   const keyEnv = keyEnvFor(req.provider)
-  if (keyEnv && !keys[req.provider]) throw new Error(`Kein API-Key für ${PROVIDERS.find((p) => p.id === req.provider)?.label} hinterlegt`)
+  if (keyEnv && !keys[req.provider]) {
+    const provider = t(PROVIDERS.find((p) => p.id === req.provider)?.label ?? req.provider)
+    throw new Error(t('Kein API-Key für {provider} hinterlegt', { provider }))
+  }
   const { ticker, assetType } = agentsTicker(req.symbol)
   // The analysis date is today in local time; TradingAgents fetches data up to it.
   const date = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -305,8 +309,8 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
       child.on('close', (code, signal) => {
         current = null
         if (done) resolve(done)
-        else if (signal || child.killed) reject(new Error('Abgebrochen'))
-        else reject(new Error(error || stderr.slice(-8).join('\n') || `Analyse beendet mit Code ${code}`))
+        else if (signal || child.killed) reject(new Error(t('Abgebrochen')))
+        else reject(new Error(error || stderr.slice(-8).join('\n') || t('Analyse beendet mit Code {code}', { code: String(code) })))
       })
       child.stdin.end(
         JSON.stringify({
@@ -318,7 +322,8 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
           quickModel: req.quickModel,
           analysts: req.analysts,
           debateRounds: req.debateRounds,
-          language: 'German',
+          // TradingAgents writes its reports in the interface language.
+          language: getLang() === 'de' ? 'German' : 'English',
           workDir: workDir.replace(/\\/g, '/')
         })
       )

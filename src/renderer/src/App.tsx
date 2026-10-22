@@ -15,6 +15,7 @@ export default function App() {
   const symbol = useStore((s) => s.symbol)
   const folders = useStore((s) => s.folders)
   const finnhubKey = useStore((s) => s.finnhubKey)
+  const language = useStore((s) => s.language)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
   // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
   // keeps the Finnhub and Binance connections open instead of reconnecting.
@@ -23,7 +24,8 @@ export default function App() {
   useEffect(() => watchQuotes(feed.split(','), finnhubKey, setQuote, setFeedStatus), [feed, finnhubKey])
 
   return (
-    <div className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
+    // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.
+    <div key={language} className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
       <div className="flex min-h-0 flex-1">
         <DrawingToolbar />

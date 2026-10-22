@@ -1,3 +1,5 @@
+import { msg, t } from './i18n.ts'
+
 // Long legal forms from exchange listings, shortened to what people actually say.
 const LEGAL_FORMS: [RegExp, string][] = [
   [/\bAktiengesellschaft\b/i, 'AG'],
@@ -27,16 +29,16 @@ export function cleanName(raw: string, crypto: boolean): string {
  */
 export const ALIASES: { symbol: string; name: string; terms: string[] }[] = [
   { symbol: 'GC=F', name: 'Gold', terms: ['gold'] },
-  { symbol: 'SI=F', name: 'Silber', terms: ['silber', 'silver'] },
-  { symbol: 'PL=F', name: 'Platin', terms: ['platin', 'platinum'] },
+  { symbol: 'SI=F', name: msg('Silber'), terms: ['silber', 'silver'] },
+  { symbol: 'PL=F', name: msg('Platin'), terms: ['platin', 'platinum'] },
   { symbol: 'PA=F', name: 'Palladium', terms: ['palladium'] },
-  { symbol: 'HG=F', name: 'Kupfer', terms: ['kupfer', 'copper'] },
-  { symbol: 'CL=F', name: 'Rohöl WTI', terms: ['rohoel', 'oel', 'wti', 'crudeoil'] },
-  { symbol: 'BZ=F', name: 'Rohöl Brent', terms: ['rohoel', 'oel', 'brent'] },
-  { symbol: 'NG=F', name: 'Erdgas', terms: ['erdgas', 'gas', 'naturalgas'] },
-  { symbol: 'UX=F', name: 'Uran (U3O8)', terms: ['uran', 'uranium'] },
-  { symbol: 'ZW=F', name: 'Weizen', terms: ['weizen', 'wheat'] },
-  { symbol: 'ZC=F', name: 'Mais', terms: ['mais', 'corn'] },
+  { symbol: 'HG=F', name: msg('Kupfer'), terms: ['kupfer', 'copper'] },
+  { symbol: 'CL=F', name: msg('Rohöl WTI'), terms: ['rohoel', 'oel', 'wti', 'crudeoil'] },
+  { symbol: 'BZ=F', name: msg('Rohöl Brent'), terms: ['rohoel', 'oel', 'brent'] },
+  { symbol: 'NG=F', name: msg('Erdgas'), terms: ['erdgas', 'gas', 'naturalgas'] },
+  { symbol: 'UX=F', name: msg('Uran (U3O8)'), terms: ['uran', 'uranium'] },
+  { symbol: 'ZW=F', name: msg('Weizen'), terms: ['weizen', 'wheat'] },
+  { symbol: 'ZC=F', name: msg('Mais'), terms: ['mais', 'corn'] },
   { symbol: '^GDAXI', name: 'DAX', terms: ['dax'] },
   { symbol: '^MDAXI', name: 'MDAX', terms: ['mdax'] },
   { symbol: '^TECDAX', name: 'TecDAX', terms: ['tecdax'] },
@@ -48,7 +50,7 @@ export const ALIASES: { symbol: string; name: string; terms: string[] }[] = [
   { symbol: '^IXIC', name: 'Nasdaq Composite', terms: ['nasdaqcomposite'] },
   { symbol: '^DJI', name: 'Dow Jones', terms: ['dowjones'] },
   { symbol: '^N225', name: 'Nikkei 225', terms: ['nikkei'] },
-  { symbol: '^VIX', name: 'VIX (Volatilität)', terms: ['vix', 'volatilitaet'] }
+  { symbol: '^VIX', name: msg('VIX (Volatilität)'), terms: ['vix', 'volatilitaet'] }
 ]
 
 /** Lowercase, umlauts spelled out, only letters and digits: "Rohöl" -> "rohoel", "S&P 500" -> "sp500". */
@@ -61,11 +63,15 @@ export const normalize = (s: string): string =>
     .replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]/g, '')
 
-/** Aliases whose search term, name or symbol starts with the query. */
+/** Aliases whose search term, name (German or translated) or symbol starts with the query. */
 export function findAliases(query: string): typeof ALIASES {
   const q = normalize(query)
   if (q.length < 2) return []
-  return ALIASES.filter((a) => [...a.terms, a.name, a.symbol].some((t) => normalize(t).startsWith(q)))
+  return ALIASES.filter((a) => [...a.terms, a.name, t(a.name), a.symbol].some((t) => normalize(t).startsWith(q)))
 }
 
-export const aliasName = (symbol: string): string | undefined => ALIASES.find((a) => a.symbol === symbol)?.name
+/** Display name of an alias in the current language. */
+export function aliasName(symbol: string): string | undefined {
+  const name = ALIASES.find((a) => a.symbol === symbol)?.name
+  return name && t(name)
+}

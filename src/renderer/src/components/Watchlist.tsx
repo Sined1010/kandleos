@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { t } from '../../../shared/i18n'
 import { formatChange, formatPrice } from '../lib/format'
 import { useQuotes, useStore, type Folder } from '../store/useStore'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
@@ -40,10 +41,10 @@ export default function Watchlist() {
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted">Watchlist</span>
         <button
-          onClick={() => setEditing(addFolder('Neuer Ordner'))}
+          onClick={() => setEditing(addFolder(t('Neuer Ordner')))}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
         >
-          <FolderPlus size={15} /> Ordner
+          <FolderPlus size={15} /> {t('Ordner')}
         </button>
       </div>
 
@@ -59,7 +60,7 @@ export default function Watchlist() {
             drag={drag}
           />
         ))}
-        {!folders.length && <p className="p-4 text-xs text-muted">Noch keine Ordner – oben „Ordner“ klicken.</p>}
+        {!folders.length && <p className="p-4 text-xs text-muted">{t('Noch keine Ordner – oben „Ordner“ klicken.')}</p>}
       </div>
     </aside>
   )
@@ -122,7 +123,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
       <div className="group/head flex items-center gap-1 px-2 pb-1 pt-3">
         <button
           onClick={() => toggle(f.id)}
-          aria-label={f.collapsed ? `${f.name} aufklappen` : `${f.name} zuklappen`}
+          aria-label={f.collapsed ? t('{name} aufklappen', { name: f.name }) : t('{name} zuklappen', { name: f.name })}
           aria-expanded={!f.collapsed}
           className="text-muted hover:text-white"
         >
@@ -133,7 +134,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
             autoFocus
             defaultValue={f.name}
             maxLength={40}
-            aria-label="Ordnername"
+            aria-label={t('Ordnername')}
             onFocus={(e) => e.target.select()}
             onBlur={(e) => {
               rename(f.id, e.target.value.trim() || f.name)
@@ -150,7 +151,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
           <span
             onClick={() => toggle(f.id)}
             onDoubleClick={onEdit}
-            title="Doppelklick zum Umbenennen"
+            title={t('Doppelklick zum Umbenennen')}
             className="min-w-0 flex-1 cursor-pointer truncate text-[11px] font-semibold uppercase tracking-wider text-muted"
           >
             {f.name} <span className="font-normal text-muted/50">{f.symbols.length}</span>
@@ -163,22 +164,22 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
               if (f.collapsed) toggle(f.id)
             }}
             className={iconBtn}
-            title="Symbol hinzufügen"
-            aria-label={`Symbol zu ${f.name} hinzufügen`}
+            title={t('Symbol hinzufügen')}
+            aria-label={t('Symbol zu {name} hinzufügen', { name: f.name })}
           >
             <Plus size={14} />
           </button>
-          <button onClick={onEdit} className={iconBtn} title="Umbenennen" aria-label={`${f.name} umbenennen`}>
+          <button onClick={onEdit} className={iconBtn} title={t('Umbenennen')} aria-label={t('{name} umbenennen', { name: f.name })}>
             <Pencil size={13} />
           </button>
           <button
             onClick={() =>
-              (!f.symbols.length || confirm(`Ordner „${f.name}“ mit ${f.symbols.length} Symbolen löschen?`)) &&
+              (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
               removeFolder(f.id)
             }
             className={`${iconBtn} hover:text-down`}
-            title="Ordner löschen"
-            aria-label={`${f.name} löschen`}
+            title={t('Ordner löschen')}
+            aria-label={t('{name} löschen', { name: f.name })}
           >
             <Trash2 size={13} />
           </button>
@@ -192,14 +193,14 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
             autoFocus
             onPick={(s) => addToFolder(f.id, s)}
             onClose={() => setAdding(false)}
-            placeholder="Name oder Symbol"
+            placeholder={t('Name oder Symbol')}
             inputClassName="w-full rounded bg-bg px-2 py-1 text-xs uppercase outline-none ring-1 ring-accent placeholder:normal-case placeholder:text-muted/60"
           />
         </div>
       )}
 
       {!f.collapsed && !f.symbols.length && !adding && (
-        <p className="px-8 py-1 text-xs text-muted/60">Leer – „+“ oder Symbol hierher ziehen</p>
+        <p className="px-8 py-1 text-xs text-muted/60">{t('Leer – „+“ oder Symbol hierher ziehen')}</p>
       )}
 
       {!f.collapsed &&
@@ -210,7 +211,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
             <div
               key={s}
               draggable={renaming !== s}
-              title="Ziehen zum Sortieren oder in einen anderen Ordner"
+              title={t('Ziehen zum Sortieren oder in einen anderen Ordner')}
               onDragStart={(e) => {
                 drag.current = { symbol: s, from: f.id }
                 e.dataTransfer.effectAllowed = 'move'
@@ -244,7 +245,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
                   autoFocus
                   defaultValue={names[s] ?? s}
                   maxLength={40}
-                  aria-label={`Anzeigename für ${s}`}
+                  aria-label={t('Anzeigename für {symbol}', { symbol: s })}
                   onClick={(e) => e.stopPropagation()}
                   onFocus={(e) => e.target.select()}
                   onBlur={(e) => {
@@ -263,7 +264,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
               ) : (
                 <span
                   className="min-w-0"
-                  title={`${s} – Doppelklick zum Umbenennen`}
+                  title={t('{symbol} – Doppelklick zum Umbenennen', { symbol: s })}
                   onDoubleClick={(e) => {
                     e.stopPropagation()
                     setRenaming(s)
@@ -304,7 +305,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
                     setRenaming(s)
                   }}
                   className="text-muted hover:text-white"
-                  aria-label={`${s} umbenennen`}
+                  aria-label={t('{symbol} umbenennen', { symbol: s })}
                 >
                   <Pencil size={13} />
                 </button>
@@ -314,7 +315,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
                     removeFromFolder(f.id, s)
                   }}
                   className="text-muted hover:text-down"
-                  aria-label={`${s} aus ${f.name} entfernen`}
+                  aria-label={t('{symbol} aus {name} entfernen', { symbol: s, name: f.name })}
                 >
                   <X size={14} />
                 </button>

@@ -13,6 +13,7 @@ import {
   runAgents,
   setKey
 } from './agents'
+import { setLang } from '../shared/i18n'
 import { forecast } from './forecast'
 import { finnhubCheck, searchSymbols, stockCandles, stockQuotes, symbolName } from './stocks'
 
@@ -23,6 +24,7 @@ if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(ap
 const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.json')
 let writeQueue = Promise.resolve()
 
+ipcMain.on('app:language', (_e, lang) => setLang(lang))
 ipcMain.on('store:get', (e) => {
   try {
     e.returnValue = readFileSync(storeFile(), 'utf8')

@@ -1,3 +1,4 @@
+import { msg } from '../../../shared/i18n.ts'
 import type { Timeframe } from '../../../shared/types'
 
 /**
@@ -5,16 +6,17 @@ import type { Timeframe } from '../../../shared/types'
  * and stays within what the data sources deliver (Binance: 1000 bars, Yahoo: per-interval ranges).
  */
 export const RANGES = [
-  { id: '1T', title: '1 Tag', tf: '5m', days: 1 },
-  { id: '5T', title: '5 Tage', tf: '15m', days: 5 },
-  { id: '1M', title: '1 Monat', tf: '1h', days: 30 },
-  { id: '3M', title: '3 Monate', tf: '4h', days: 91 },
-  { id: '6M', title: '6 Monate', tf: '1D', days: 182 },
-  { id: 'YTD', title: 'Seit Jahresbeginn', tf: '1D', days: 'ytd' },
-  { id: '1J', title: '12 Monate', tf: '1D', days: 365 },
-  { id: '5J', title: '5 Jahre', tf: '1W', days: 1826 },
-  { id: 'Max', title: 'Gesamte Historie', tf: '1M', days: 'max' }
-] as const satisfies readonly { id: string; title: string; tf: Timeframe; days: number | 'ytd' | 'max' }[]
+  // The button label is a German abbreviation, shown through t() (e.g. "1J" reads "1Y" in English).
+  { id: '1T', label: msg('1T'), title: msg('1 Tag'), tf: '5m', days: 1 },
+  { id: '5T', label: msg('5T'), title: msg('5 Tage'), tf: '15m', days: 5 },
+  { id: '1M', label: msg('1M'), title: msg('1 Monat'), tf: '1h', days: 30 },
+  { id: '3M', label: msg('3M'), title: msg('3 Monate'), tf: '4h', days: 91 },
+  { id: '6M', label: msg('6M'), title: msg('6 Monate'), tf: '1D', days: 182 },
+  { id: 'YTD', label: msg('YTD'), title: msg('Seit Jahresbeginn'), tf: '1D', days: 'ytd' },
+  { id: '1J', label: msg('1J'), title: msg('12 Monate'), tf: '1D', days: 365 },
+  { id: '5J', label: msg('5J'), title: msg('5 Jahre'), tf: '1W', days: 1826 },
+  { id: 'Max', label: msg('Max'), title: msg('Gesamte Historie'), tf: '1M', days: 'max' }
+] as const satisfies readonly { id: string; label: string; title: string; tf: Timeframe; days: number | 'ytd' | 'max' }[]
 
 export type RangeId = (typeof RANGES)[number]['id']
 export const rangeById = (id: RangeId) => RANGES.find((r) => r.id === id)!

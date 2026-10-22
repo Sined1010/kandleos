@@ -1,5 +1,6 @@
 // TradingAgents (multi-agent LLM analysis) as seen from KandleOS: the providers a user can choose, how a run's
 // progress maps to stages, and how its final texts are read. The Python side is resources/agents/kandleos_agents.py.
+import { msg } from './i18n.ts'
 import { cryptoQuoteAsset, isCrypto } from './types.ts'
 
 export type ProviderId = 'anthropic' | 'openai' | 'google' | 'deepseek' | 'qwen' | 'ollama'
@@ -59,7 +60,7 @@ export const PROVIDERS: Provider[] = [
   },
   {
     id: 'ollama',
-    label: 'Lokal (Ollama)',
+    label: msg('Lokal (Ollama)'),
     keyEnv: null,
     quick: ['qwen3:latest', 'gpt-oss:latest', 'glm-4.7-flash:latest'],
     deep: ['glm-4.7-flash:latest', 'gpt-oss:latest', 'qwen3:latest']
@@ -79,21 +80,21 @@ export function keyEnvFor(name: string): string | null {
 }
 
 export const ANALYSTS = [
-  ['market', 'Markt & Technik'],
-  ['social', 'Stimmung'],
-  ['news', 'Nachrichten'],
-  ['fundamentals', 'Fundamentaldaten']
+  ['market', msg('Markt & Technik')],
+  ['social', msg('Stimmung')],
+  ['news', msg('Nachrichten')],
+  ['fundamentals', msg('Fundamentaldaten')]
 ] as const
 export type AnalystId = (typeof ANALYSTS)[number][0]
 
 /** A run's stages in order; `nodes` are the TradingAgents graph nodes that belong to it. */
 export const STAGES = [
-  { id: 'analysts', label: 'Analysten sammeln Daten', nodes: ['Market Analyst', 'Social Media Analyst', 'Sentiment Analyst', 'News Analyst', 'Fundamentals Analyst'] },
-  { id: 'debate', label: 'Bull- und Bear-Debatte', nodes: ['Bull Researcher', 'Bear Researcher'] },
-  { id: 'plan', label: 'Research-Manager entscheidet', nodes: ['Research Manager'] },
-  { id: 'trader', label: 'Trader plant den Trade', nodes: ['Trader'] },
-  { id: 'risk', label: 'Risiko-Debatte', nodes: ['Aggressive Analyst', 'Neutral Analyst', 'Conservative Analyst'] },
-  { id: 'portfolio', label: 'Portfolio-Manager urteilt', nodes: ['Portfolio Manager'] }
+  { id: 'analysts', label: msg('Analysten sammeln Daten'), nodes: ['Market Analyst', 'Social Media Analyst', 'Sentiment Analyst', 'News Analyst', 'Fundamentals Analyst'] },
+  { id: 'debate', label: msg('Bull- und Bear-Debatte'), nodes: ['Bull Researcher', 'Bear Researcher'] },
+  { id: 'plan', label: msg('Research-Manager entscheidet'), nodes: ['Research Manager'] },
+  { id: 'trader', label: msg('Trader plant den Trade'), nodes: ['Trader'] },
+  { id: 'risk', label: msg('Risiko-Debatte'), nodes: ['Aggressive Analyst', 'Neutral Analyst', 'Conservative Analyst'] },
+  { id: 'portfolio', label: msg('Portfolio-Manager urteilt'), nodes: ['Portfolio Manager'] }
 ] as const
 
 /** Stage index of a graph node; analyst names vary a little, so any "... Analyst" before the debate counts. */

@@ -1,4 +1,5 @@
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
+import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
 import { aggregate, aggregateMonths } from '../shared/candles'
 import { aliasName, cleanName, findAliases } from '../shared/names'
@@ -50,7 +51,7 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
 async function getJson(url: string): Promise<any> {
   // Yahoo rejects requests without a browser-like user agent.
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) })
-  if (res.status === 404) throw new Error(`Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben`)
+  if (res.status === 404) throw new Error(t('Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben'))
   if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`)
   return res.json()
 }
@@ -60,7 +61,7 @@ export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   // German names for futures and indices come first; Yahoo's search does not know them.
   const curated: SearchResult[] = findAliases(query).map((a) => ({
     symbol: a.symbol,
-    name: a.name,
+    name: t(a.name),
     exchange: a.symbol.endsWith('=F') ? 'Future' : 'Index'
   }))
   let found: SearchResult[] = []
@@ -85,7 +86,7 @@ export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
 }
 
 function checkArgs(symbol: unknown, key: unknown): [string, string] {
-  if (typeof symbol !== 'string' || !SYMBOL_RE.test(symbol)) throw new Error(`Ungültiges Symbol: ${String(symbol)}`)
+  if (typeof symbol !== 'string' || !SYMBOL_RE.test(symbol)) throw new Error(t('Ungültiges Symbol: {symbol}', { symbol: String(symbol) }))
   return [symbol, typeof key === 'string' && /^[A-Za-z0-9]{1,64}$/.test(key) ? key : '']
 }
 
@@ -126,7 +127,7 @@ async function yahooCandles(symbol: string, tf: Timeframe, extended = false): Pr
       (extended ? '&includePrePost=true' : '')
   )
   const r = d.chart?.result?.[0]
-  if (!r?.timestamp) throw new Error(`Keine Kursdaten für ${symbol}`)
+  if (!r?.timestamp) throw new Error(t('Keine Kursdaten für {symbol}', { symbol }))
   const q = r.indicators.quote[0]
   const out: Candle[] = []
   r.timestamp.forEach((t: number, i: number) => {
@@ -156,7 +157,7 @@ export async function stockCandles(
   extendedArg?: unknown
 ): Promise<CandleData> {
   const [symbol, key] = checkArgs(symbolArg, keyArg)
-  if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(`Ungültiger Timeframe: ${String(tfArg)}`)
+  if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(t('Ungültiger Timeframe: {tf}', { tf: String(tfArg) }))
   const tf = tfArg as Timeframe
   // Pre-market and after-hours candles exist for intraday bars only, and only Yahoo serves them.
   const extended = extendedArg === true && TF_SECONDS[tf] < 86400
@@ -182,22 +183,22 @@ export async function stockCandles(
 /** Validates the key with one cheap request. Returns null if it works, otherwise a user-facing reason. */
 export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
   const [, key] = checkArgs('AAPL', keyArg)
-  if (!key) return 'Ungültiges Key-Format'
+  if (!key) return t('Ungültiges Key-Format')
   try {
     const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`, {
       signal: AbortSignal.timeout(10_000)
     })
-    if (res.status === 401 || res.status === 403) return 'API-Key ungültig'
+    if (res.status === 401 || res.status === 403) return t('API-Key ungültig')
     if (res.status === 429) return 'Rate-Limit erreicht (max. 60 Anfragen/Minute)'
     return res.ok ? null : `Finnhub HTTP ${res.status}`
   } catch {
-    return 'Finnhub nicht erreichbar'
+    return t('Finnhub nicht erreichbar')
   }
 }
 
 async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
   const d = await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`)
-  if (!d.c) throw new Error(`Finnhub: kein Kurs für ${symbol}`)
+  if (!d.c) throw new Error(t('Finnhub: kein Kurs für {symbol}', { symbol }))
   return { price: d.c, changePct: d.dp ?? 0, time: d.t, prevClose: d.pc }
 }
 
@@ -206,7 +207,7 @@ async function yahooMeta(symbol: string): Promise<any> {
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`
   )
   const m = d.chart?.result?.[0]?.meta
-  if (!m?.regularMarketPrice) throw new Error(`Yahoo: kein Kurs für ${symbol}`)
+  if (!m?.regularMarketPrice) throw new Error(t('Yahoo: kein Kurs für {symbol}', { symbol }))
   return m
 }
 
@@ -233,7 +234,7 @@ async function yahooQuote(symbol: string): Promise<Quote> {
   )
   const r = d.chart?.result?.[0]
   const m = r?.meta
-  if (!m?.regularMarketPrice) throw new Error(`Yahoo: kein Kurs für ${symbol}`)
+  if (!m?.regularMarketPrice) throw new Error(t('Yahoo: kein Kurs für {symbol}', { symbol }))
   const price: number = m.regularMarketPrice
   const prev = m.chartPreviousClose ?? m.previousClose ?? price
   const timezone = validTimeZone(m.exchangeTimezoneName)

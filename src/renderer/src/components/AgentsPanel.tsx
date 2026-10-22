@@ -1,6 +1,7 @@
 import { BrainCircuit, Check, Circle, Loader2, Settings2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { parseDecision, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
+import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
 import { renderMarkdown } from '../lib/markdown'
 import { useStore } from '../store/useStore'
@@ -10,42 +11,42 @@ type Saved = Awaited<ReturnType<typeof window.api.agents.run>>
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
 
 const RATING: Record<Rating, [label: string, style: string]> = {
-  Buy: ['Kaufen', 'bg-up text-white'],
-  Overweight: ['Übergewichten', 'bg-up/25 text-up ring-1 ring-up/60'],
-  Hold: ['Halten', 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/60'],
-  Underweight: ['Untergewichten', 'bg-down/25 text-down ring-1 ring-down/60'],
-  Sell: ['Verkaufen', 'bg-down text-white']
+  Buy: [msg('Kaufen'), 'bg-up text-white'],
+  Overweight: [msg('Übergewichten'), 'bg-up/25 text-up ring-1 ring-up/60'],
+  Hold: [msg('Halten'), 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/60'],
+  Underweight: [msg('Untergewichten'), 'bg-down/25 text-down ring-1 ring-down/60'],
+  Sell: [msg('Verkaufen'), 'bg-down text-white']
 }
-const ACTION = { Buy: 'Kaufen', Hold: 'Halten', Sell: 'Verkaufen' } as const
+const ACTION = { Buy: msg('Kaufen'), Hold: msg('Halten'), Sell: msg('Verkaufen') } as const
 
 const TABS = [
-  ['decision', 'Entscheidung'],
-  ['market', 'Markt'],
-  ['sentiment', 'Stimmung'],
-  ['news', 'Nachrichten'],
-  ['fundamentals', 'Fundamental'],
-  ['debate', 'Debatte'],
+  ['decision', msg('Entscheidung')],
+  ['market', msg('Markt')],
+  ['sentiment', msg('Stimmung')],
+  ['news', msg('Nachrichten')],
+  ['fundamentals', msg('Fundamental')],
+  ['debate', msg('Debatte')],
   ['trader', 'Trader'],
-  ['risk', 'Risiko']
+  ['risk', msg('Risiko')]
 ] as const
 
 // The common failures in plain words; the technical message follows for details.
 const HINTS: [RegExp, string][] = [
-  [/authentication|401|invalid.*(api.?key|x-api-key)|incorrect api key/i, 'Der API-Key wurde vom Anbieter abgelehnt. Bitte in „Einrichten“ prüfen.'],
-  [/402|insufficient|credit|billing|quota/i, 'Beim Anbieter fehlt Guthaben oder das Kontingent ist aufgebraucht.'],
-  [/429|rate.?limit|overloaded/i, 'Der Anbieter ist ausgelastet oder das Anfragelimit ist erreicht. Später erneut versuchen.'],
-  [/connect(ion)? ?(error|refused)|11434|ECONNREFUSED/i, 'Der KI-Dienst ist nicht erreichbar (bei Ollama: läuft es?).'],
-  [/model.*(not.?found|does not exist)|404/i, 'Das gewählte Modell gibt es beim Anbieter nicht. Bitte in „Einrichten“ ändern.']
+  [/authentication|401|invalid.*(api.?key|x-api-key)|incorrect api key/i, msg('Der API-Key wurde vom Anbieter abgelehnt. Bitte in „Einrichten“ prüfen.')],
+  [/402|insufficient|credit|billing|quota/i, msg('Beim Anbieter fehlt Guthaben oder das Kontingent ist aufgebraucht.')],
+  [/429|rate.?limit|overloaded/i, msg('Der Anbieter ist ausgelastet oder das Anfragelimit ist erreicht. Später erneut versuchen.')],
+  [/connect(ion)? ?(error|refused)|11434|ECONNREFUSED/i, msg('Der KI-Dienst ist nicht erreichbar (bei Ollama: läuft es?).')],
+  [/model.*(not.?found|does not exist)|404/i, msg('Das gewählte Modell gibt es beim Anbieter nicht. Bitte in „Einrichten“ ändern.')]
 ]
 const errorText = (e: unknown) => {
   const message = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
   const hint = HINTS.find(([re]) => re.test(message))?.[1]
-  return hint ? `${hint}
+  return hint ? `${t(hint)}
 
 ${message}` : message
 }
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
-const thousands = (n: number) => n.toLocaleString('de-DE')
+const thousands = (n: number) => n.toLocaleString(locale())
 
 interface Running {
   symbol: string
@@ -165,16 +166,16 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
         open ? 'flex' : 'hidden'
       }`}
       onMouseDown={(e) => e.stopPropagation()}
-      aria-label="Umfassende Analyse"
+      aria-label={t('Umfassende Analyse')}
     >
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <BrainCircuit size={16} className="text-accent" />
-        <span className="font-semibold text-white">Umfassende Analyse</span>
-        <span className="text-muted">mit TradingAgents · {symbol}</span>
-        <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title="Einrichten" aria-label="Umfassende Analyse einrichten">
+        <span className="font-semibold text-white">{t('Umfassende Analyse')}</span>
+        <span className="text-muted">{t('mit TradingAgents · {symbol}', { symbol })}</span>
+        <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title={t('Einrichten')} aria-label={t('Umfassende Analyse einrichten')}>
           <Settings2 size={15} />
         </button>
-        <button onClick={onClose} className="rounded p-1 text-muted hover:bg-line hover:text-white" aria-label="Schließen">
+        <button onClick={onClose} className="rounded p-1 text-muted hover:bg-line hover:text-white" aria-label={t('Schließen')}>
           <X size={15} />
         </button>
       </div>
@@ -183,8 +184,10 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
         {running ? (
           <div className="p-3">
             <p className="mb-2 text-slate-200">
-              Analyse von <span className="font-semibold text-white">{running.symbol}</span> läuft ·{' '}
-              {clock(Math.round((Date.now() - running.started) / 1000))}
+              {t('Analyse von {symbol} läuft · {time}', {
+                symbol: running.symbol,
+                time: clock(Math.round((Date.now() - running.started) / 1000))
+              })}
             </p>
             <ol className="space-y-1.5">
               {STAGES.map((s, i) => (
@@ -196,52 +199,57 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                   ) : (
                     <Circle size={10} className="mx-0.5" />
                   )}
-                  {s.label}
+                  {t(s.label)}
                 </li>
               ))}
             </ol>
             <p className="mt-3 truncate text-muted" title={running.tool}>
-              {running.node || 'Starte …'}
+              {running.node || t('Starte …')}
               {running.tool && ` · ${running.tool}`}
             </p>
             <p className="mt-1 text-muted">
-              {running.calls} Modellaufrufe · {thousands(running.tokensIn)} Tokens rein · {thousands(running.tokensOut)} raus
+              {t('{calls} Modellaufrufe · {in} Tokens rein · {out} raus', {
+                calls: running.calls,
+                in: thousands(running.tokensIn),
+                out: thousands(running.tokensOut)
+              })}
             </p>
             <button
               onClick={() => window.api.agents.cancel()}
               className="mt-3 rounded-lg px-3 py-1.5 text-muted ring-1 ring-line hover:text-down"
             >
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         ) : (
           <div className="p-3">
             {!status ? (
-              <p className="text-muted">Prüfe …</p>
+              <p className="text-muted">{t('Prüfe …')}</p>
             ) : !status.installed ? (
               <Intro symbol={symbol} supported={status.supported} onSetup={onSetup} />
             ) : !ready ? (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
-                <p className="text-slate-200">Für {provider.label} ist noch kein API-Key hinterlegt.</p>
+                <p className="text-slate-200">{t('Für {provider} ist noch kein API-Key hinterlegt.', { provider: t(provider.label) })}</p>
                 <button onClick={onSetup} className="mt-2 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110">
-                  Einrichten
+                  {t('Einrichten')}
                 </button>
               </div>
             ) : (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
                 <p className="text-muted">
-                  {provider.label} · {models.deep} / {models.quick} · {config.analysts.length} Analysten ·{' '}
-                  {config.debateRounds} Debattenrunde{config.debateRounds > 1 ? 'n' : ''}
+                  {t(provider.label)} · {models.deep} / {models.quick} ·{' '}
+                  {t('{analysts} Analysten · {rounds} Debattenrunde(n)', { analysts: config.analysts.length, rounds: config.debateRounds })}
                 </p>
                 <button
                   onClick={start}
                   className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white shadow-glow hover:brightness-110"
                 >
-                  <BrainCircuit size={15} /> {symbol} analysieren
+                  <BrainCircuit size={15} /> {t('{symbol} analysieren', { symbol })}
                 </button>
                 <p className="mt-2 text-[11px] leading-snug text-muted">
-                  Dauert einige Minuten{provider.keyEnv ? ' und kostet beim Anbieter Guthaben' : ''}. Daten bis heute; keine
-                  Anlageberatung.
+                  {provider.keyEnv
+                    ? t('Dauert einige Minuten und kostet beim Anbieter Guthaben. Daten bis heute; keine Anlageberatung.')
+                    : t('Dauert einige Minuten. Daten bis heute; keine Anlageberatung.')}
                 </p>
               </div>
             )}
@@ -256,12 +264,12 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                 value={shown.id}
                 onChange={(e) => setShownId(e.target.value)}
                 className="min-w-0 flex-1 rounded-md bg-bg px-1.5 py-1 text-slate-200 outline-none ring-1 ring-line"
-                aria-label="Gespeicherte Analysen"
+                aria-label={t('Gespeicherte Analysen')}
               >
                 {saved.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {new Date(a.createdAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} ·{' '}
-                    {providerById(a.provider).label} · {RATING[a.rating as Rating]?.[0] ?? a.rating}
+                    {new Date(a.createdAt).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })} ·{' '}
+                    {t(providerById(a.provider).label)} · {RATING[a.rating as Rating] ? t(RATING[a.rating as Rating][0]) : a.rating}
                   </option>
                 ))}
               </select>
@@ -269,15 +277,15 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
             <div className="flex items-center gap-3 px-3 pt-3">
               {decision.rating ? (
                 <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${RATING[decision.rating][1]}`}>
-                  {RATING[decision.rating][0]}
+                  {t(RATING[decision.rating][0])}
                 </span>
               ) : (
-                <span className="rounded-lg px-3 py-1.5 text-sm text-muted ring-1 ring-line">Ohne klares Urteil</span>
+                <span className="rounded-lg px-3 py-1.5 text-sm text-muted ring-1 ring-line">{t('Ohne klares Urteil')}</span>
               )}
               <div className="leading-tight">
                 {target !== null && target !== undefined && (
                   <p className="text-slate-200">
-                    Kursziel <span className="font-semibold text-white">{formatPrice(target)}</span>
+                    {t('Kursziel')} <span className="font-semibold text-white">{formatPrice(target)}</span>
                     {price ? (
                       <span className={target >= price ? 'text-up' : 'text-down'}>
                         {' '}
@@ -287,7 +295,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                     ) : null}
                   </p>
                 )}
-                {decision.horizon && <p className="text-muted">Horizont: {decision.horizon}</p>}
+                {decision.horizon && <p className="text-muted">{t('Horizont: {horizon}', { horizon: decision.horizon })}</p>}
               </div>
             </div>
             {(decision.action || decision.entry || decision.stopLoss || decision.sizing) && (
@@ -295,12 +303,12 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                 {decision.action && (
                   <>
                     <dt className="text-muted">Trader</dt>
-                    <dd className="text-slate-200">{ACTION[decision.action]}</dd>
+                    <dd className="text-slate-200">{t(ACTION[decision.action])}</dd>
                   </>
                 )}
                 {decision.entry !== null && (
                   <>
-                    <dt className="text-muted">Einstieg</dt>
+                    <dt className="text-muted">{t('Einstieg')}</dt>
                     <dd className="text-slate-200">{formatPrice(decision.entry)}</dd>
                   </>
                 )}
@@ -312,29 +320,33 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                 )}
                 {decision.sizing && (
                   <>
-                    <dt className="text-muted">Position</dt>
+                    <dt className="text-muted">{t('Position')}</dt>
                     <dd className="text-slate-200">{decision.sizing}</dd>
                   </>
                 )}
               </dl>
             )}
             {chronos && (
-              <p className="mx-3 mt-2 text-muted" title="Statistische Prognose von Chronos-2 aus dem Kursverlauf, zum Vergleich">
-                Chronos-Prognose: Median nach {chronos.steps} Kerzen {formatPrice(chronos.value)}
+              <p className="mx-3 mt-2 text-muted" title={t('Statistische Prognose von Chronos-2 aus dem Kursverlauf, zum Vergleich')}>
+                {t('Chronos-Prognose: Median nach {steps} Kerzen {value}', { steps: chronos.steps, value: formatPrice(chronos.value) })}
                 {price ? ` (${chronos.value >= price ? '+' : ''}${((chronos.value / price - 1) * 100).toFixed(1)} %)` : ''}
               </p>
             )}
             <label className="mx-3 mt-2 flex w-fit cursor-pointer items-center gap-2 text-muted">
               <input type="checkbox" checked={showLevels} onChange={(e) => setShowLevels(e.target.checked)} className="accent-accent" />
-              Kursziel, Einstieg und Stop im Chart zeigen
+              {t('Kursziel, Einstieg und Stop im Chart zeigen')}
             </label>
             <p className="mx-3 mt-1 text-[11px] text-muted/80">
               {shown.durationSec ? `${clock(shown.durationSec)} min · ` : ''}
-              {shown.stats.calls} Modellaufrufe · {thousands(shown.stats.tokensIn + shown.stats.tokensOut)} Tokens ·{' '}
+              {t('{calls} Modellaufrufe · {tokens} Tokens', {
+                calls: shown.stats.calls,
+                tokens: thousands(shown.stats.tokensIn + shown.stats.tokensOut)
+              })}{' '}
+              ·{' '}
               {shown.deepModel}
             </p>
 
-            <p className={head}>Berichte</p>
+            <p className={head}>{t('Berichte')}</p>
             <div className="mx-3 flex flex-wrap gap-1">
               {TABS.filter(([id]) => shown.reports[id]).map(([id, label]) => (
                 <button
@@ -342,7 +354,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                   onClick={() => setTab(id)}
                   className={`rounded-md px-2 py-0.5 ${tab === id ? 'bg-brand text-white shadow-glow' : 'text-muted ring-1 ring-line hover:text-white'}`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -358,18 +370,18 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
 }
 
 const STEPS = [
-  ['Vier Analysten sammeln Daten', 'Chart und Indikatoren, Stimmung (Reddit, StockTwits), Nachrichten und Fundamentaldaten wie Bilanzen.'],
-  ['Bull und Bear debattieren', 'Ein Optimist und ein Skeptiker streiten über Chancen und Risiken.'],
-  ['Ein Trader macht einen Plan', 'Kaufen, halten oder verkaufen, mit Einstieg, Stop-Loss und Positionsgröße.'],
-  ['Drei Risiko-Prüfer hinterfragen ihn', 'Offensiv, neutral und vorsichtig.'],
-  ['Der Portfolio-Manager entscheidet', 'Einschätzung in fünf Stufen, Kursziel und Zeithorizont.']
+  [msg('Vier Analysten sammeln Daten'), msg('Chart und Indikatoren, Stimmung (Reddit, StockTwits), Nachrichten und Fundamentaldaten wie Bilanzen.')],
+  [msg('Bull und Bear debattieren'), msg('Ein Optimist und ein Skeptiker streiten über Chancen und Risiken.')],
+  [msg('Ein Trader macht einen Plan'), msg('Kaufen, halten oder verkaufen, mit Einstieg, Stop-Loss und Positionsgröße.')],
+  [msg('Drei Risiko-Prüfer hinterfragen ihn'), msg('Offensiv, neutral und vorsichtig.')],
+  [msg('Der Portfolio-Manager entscheidet'), msg('Einschätzung in fünf Stufen, Kursziel und Zeithorizont.')]
 ] as const
 
 const COMPARE: [string, string, string][] = [
-  ['Methode', 'Statistisches Modell (Chronos-2) aus dem Kursverlauf', 'Sprachmodelle lesen Daten, Nachrichten und Zahlen'],
-  ['Ergebnis', 'Kursverlauf mit Wahrscheinlichkeitsfächer', 'Einschätzung, Kursziel, Trade-Plan und Berichte'],
-  ['Dauer', 'Sekunden', 'Einige Minuten'],
-  ['Kosten', 'Kostenlos, läuft lokal', 'Eigener API-Key (kostet je Analyse) oder lokal mit Ollama']
+  [msg('Methode'), msg('Statistisches Modell (Chronos-2) aus dem Kursverlauf'), msg('Sprachmodelle lesen Daten, Nachrichten und Zahlen')],
+  [msg('Ergebnis'), msg('Kursverlauf mit Wahrscheinlichkeitsfächer'), msg('Einschätzung, Kursziel, Trade-Plan und Berichte')],
+  [msg('Dauer'), msg('Sekunden'), msg('Einige Minuten')],
+  [msg('Kosten'), msg('Kostenlos, läuft lokal'), msg('Eigener API-Key (kostet je Analyse) oder lokal mit Ollama')]
 ]
 
 /** What the optional comprehensive analysis is, before anything is downloaded. */
@@ -377,14 +389,12 @@ function Intro({ symbol, supported, onSetup }: { symbol: string; supported: bool
   const h = 'mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-wider text-muted'
   return (
     <div className="leading-relaxed">
-      <p className="text-sm font-semibold text-white">Ein Team aus KI-Agenten analysiert {symbol}</p>
+      <p className="text-sm font-semibold text-white">{t('Ein Team aus KI-Agenten analysiert {symbol}', { symbol })}</p>
       <p className="mt-1 text-slate-300">
-        Wie in einem Analystenhaus prüfen mehrere spezialisierte KI-Agenten die Aktie oder Kryptowährung, diskutieren das
-        Für und Wider und schreiben einen ausführlichen Bericht mit Einschätzung. Grundlage ist das Open-Source-Projekt
-        TradingAgents.
+        {t('Wie in einem Analystenhaus prüfen mehrere spezialisierte KI-Agenten die Aktie oder Kryptowährung, diskutieren das Für und Wider und schreiben einen ausführlichen Bericht mit Einschätzung. Grundlage ist das Open-Source-Projekt TradingAgents.')}
       </p>
 
-      <p className={h}>So läuft eine Analyse</p>
+      <p className={h}>{t('So läuft eine Analyse')}</p>
       <ol className="space-y-1.5">
         {STEPS.map(([title, text], i) => (
           <li key={title} className="flex gap-2">
@@ -392,64 +402,61 @@ function Intro({ symbol, supported, onSetup }: { symbol: string; supported: bool
               {i + 1}
             </span>
             <span>
-              <span className="text-slate-200">{title}.</span> <span className="text-muted">{text}</span>
+              <span className="text-slate-200">{t(title)}.</span> <span className="text-muted">{t(text)}</span>
             </span>
           </li>
         ))}
       </ol>
 
-      <p className={h}>Das bekommst du</p>
+      <p className={h}>{t('Das bekommst du')}</p>
       <div className="flex flex-wrap gap-1">
         {RATINGS.map((r) => (
           <span key={r} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${RATING[r][1]}`}>
-            {RATING[r][0]}
+            {t(RATING[r][0])}
           </span>
         ))}
       </div>
       <p className="mt-1.5 text-muted">
-        Dazu Kursziel und Zeithorizont, Einstieg und Stop-Loss als Linien im Chart sowie alle Einzelberichte zum Nachlesen.
-        Jede Analyse wird gespeichert.
+        {t('Dazu Kursziel und Zeithorizont, Einstieg und Stop-Loss als Linien im Chart sowie alle Einzelberichte zum Nachlesen. Jede Analyse wird gespeichert.')}
       </p>
 
-      <p className={h}>Unterschied zur KI-Prognose</p>
+      <p className={h}>{t('Unterschied zur KI-Prognose')}</p>
       <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-lg ring-1 ring-line">
         <thead>
           <tr className="bg-bg text-left text-[10px] uppercase tracking-wider text-muted">
             <th className="px-2 py-1 font-semibold" />
-            <th className="px-2 py-1 font-semibold">KI-Prognose</th>
-            <th className="px-2 py-1 font-semibold">Umfassende Analyse</th>
+            <th className="px-2 py-1 font-semibold">{t('KI-Prognose')}</th>
+            <th className="px-2 py-1 font-semibold">{t('Umfassende Analyse')}</th>
           </tr>
         </thead>
         <tbody>
           {COMPARE.map(([label, forecast, agents]) => (
             <tr key={label} className="align-top">
-              <td className="border-t border-line px-2 py-1 text-muted">{label}</td>
-              <td className="border-t border-line px-2 py-1 text-slate-300">{forecast}</td>
-              <td className="border-t border-line px-2 py-1 text-slate-300">{agents}</td>
+              <td className="border-t border-line px-2 py-1 text-muted">{t(label)}</td>
+              <td className="border-t border-line px-2 py-1 text-slate-300">{t(forecast)}</td>
+              <td className="border-t border-line px-2 py-1 text-slate-300">{t(agents)}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p className={h}>Was du brauchst</p>
+      <p className={h}>{t('Was du brauchst')}</p>
       <ul className="ml-4 list-disc space-y-1 text-muted">
         <li>
-          <span className="text-slate-300">Einen API-Key</span> von Anthropic (Claude), OpenAI, Google, DeepSeek oder Alibaba
-          (Qwen). Jede Analyse kostet dort Guthaben, weil viele Modellaufrufe nötig sind.
+          <span className="text-slate-300">{t('Einen API-Key')}</span>{' '}
+          {t('von Anthropic (Claude), OpenAI, Google, DeepSeek oder Alibaba (Qwen). Jede Analyse kostet dort Guthaben, weil viele Modellaufrufe nötig sind.')}
         </li>
         <li>
-          <span className="text-slate-300">Oder Ollama</span> für KI auf dem eigenen Rechner: kostenlos und offline, aber
-          langsamer und mit schwächeren Ergebnissen; braucht einen leistungsstarken PC.
+          <span className="text-slate-300">{t('Oder Ollama')}</span>{' '}
+          {t('für KI auf dem eigenen Rechner: kostenlos und offline, aber langsamer und mit schwächeren Ergebnissen; braucht einen leistungsstarken PC.')}
         </li>
         <li>
-          <span className="text-slate-300">Einmalig rund 350 MB</span> Download (Python und TradingAgents). Alles bleibt im
-          Datenordner von KandleOS und lässt sich jederzeit wieder entfernen.
+          <span className="text-slate-300">{t('Einmalig rund 350 MB')}</span>{' '}
+          {t('Download (Python und TradingAgents). Alles bleibt im Datenordner von KandleOS und lässt sich jederzeit wieder entfernen.')}
         </li>
       </ul>
       <p className="mt-3 rounded-lg bg-bg p-2 text-[11px] text-muted ring-1 ring-line">
-        Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich
-        irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research
-        (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.
+        {t('Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.')}
       </p>
 
       {supported ? (
@@ -457,10 +464,10 @@ function Intro({ symbol, supported, onSetup }: { symbol: string; supported: bool
           onClick={onSetup}
           className="mt-3 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110"
         >
-          Einrichten
+          {t('Einrichten')}
         </button>
       ) : (
-        <p className="mt-3 text-down">Die umfassende Analyse gibt es nur für Windows und Linux (x64).</p>
+        <p className="mt-3 text-down">{t('Die umfassende Analyse gibt es nur für Windows und Linux (x64).')}</p>
       )}
     </div>
   )

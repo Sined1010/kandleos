@@ -1,5 +1,6 @@
 import { timeZoneForSymbol } from '../../../shared/calendar'
 import { aggregateMonths } from '../../../shared/candles'
+import { t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
 import {
   cryptoQuoteAsset,
@@ -47,7 +48,7 @@ const kline = (k: (string | number)[]): Candle => ({
 
 async function klines(symbol: string, interval: string, limit: number): Promise<Candle[]> {
   const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`)
-  if (!res.ok) throw new Error(`Binance: ${symbol} nicht gefunden (HTTP ${res.status})`)
+  if (!res.ok) throw new Error(t('Binance: {symbol} nicht gefunden (HTTP {status})', { symbol, status: res.status }))
   return ((await res.json()) as (string | number)[][]).map(kline)
 }
 
@@ -190,7 +191,7 @@ export function watchQuotes(
         `wss://ws.finnhub.io?token=${encodeURIComponent(finnhubKey)}`,
         (msg) => {
           if (msg.type === 'error') {
-            error = msg.msg ?? 'Finnhub-Fehler'
+            error = msg.msg ?? t('Finnhub-Fehler')
             return report()
           }
           if (msg.type !== 'trade') return
@@ -229,7 +230,7 @@ export function watchQuotes(
   } else {
     window.api
       .finnhubCheck(finnhubKey)
-      .catch(() => 'Finnhub nicht erreichbar')
+      .catch(() => t('Finnhub nicht erreichbar'))
       .then((err) => {
         if (!active) return
         error = err
