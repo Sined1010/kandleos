@@ -90,7 +90,7 @@ export default function WelcomeModal({ onOpenAbout }: { onOpenAbout: () => void 
               <p>{t('Aktienkurse kommen von Alpaca.')}</p>
             ) : (
               <p>
-                {t('Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS ist nicht mit Yahoo verbunden. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).')}{' '}
+                {t('Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, alle 15 Sekunden abgefragt, je nach Börse in Echtzeit oder verzögert (meist um 15 Minuten). Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS steht in keiner Verbindung zu Yahoo. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).')}{' '}
                 <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
                   {t('Yahoos Nutzungsbedingungen')}
                 </a>

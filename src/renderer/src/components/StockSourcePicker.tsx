@@ -155,7 +155,7 @@ export default function StockSourcePicker({ form }: { form: Form }) {
         'yahoo',
         t('Yahoo Finance (inoffiziell)'),
         null,
-        t('Aktien weltweit, Indizes und Rohstoffe, ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.'),
+        t('Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. KandleOS fragt die Kurse alle 15 Sekunden ab; Yahoo liefert sie je nach Börse in Echtzeit oder verzögert, meist um 15 Minuten. Yahoo bietet dafür keine offizielle Schnittstelle: Die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.'),
         <label className="flex cursor-pointer items-start gap-2">
           <input
             type="checkbox"
@@ -164,7 +164,7 @@ export default function StockSourcePicker({ form }: { form: Form }) {
             className="mt-0.5 accent-accent"
           />
           <span className="text-slate-200">
-            {t('Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS ist nicht mit Yahoo verbunden.')}{' '}
+            {t('Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS steht in keiner Verbindung zu Yahoo.')}{' '}
             <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
               {t('Yahoos Nutzungsbedingungen')}
             </a>

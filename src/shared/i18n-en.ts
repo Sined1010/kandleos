@@ -477,8 +477,8 @@ export const EN: Record<string, string> = {
     'Yahoo Finance – stock prices, symbol search and names, only if chosen as the data source (unofficial interface)',
   'Datenquelle für Aktien': 'Data source for stocks',
   'Finnhub API-Key (optional)': 'Finnhub API key (optional)',
-  'Mit Key kommen zusätzlich Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:':
-    'With a key, real-time trades also arrive via the Finnhub WebSocket. Free key:',
+  'Warum Finnhub? Ohne Key werden Aktienkurse nur in Abständen abgefragt (Alpaca alle 5 s, Yahoo alle 15 s). Mit Key erscheint jeder Trade einer US-Aktie sofort über den Finnhub-WebSocket, auch vor- und nachbörslich: Watchlist und Chart laufen live mit. Für andere Börsen, Indizes und Krypto ändert sich nichts; Verlauf und Suche kommen weiter von Alpaca oder Yahoo. Kostenloser Key:':
+    'Why Finnhub? Without a key, stock prices are only polled at intervals (Alpaca every 5 s, Yahoo every 15 s). With a key, every trade of a US stock appears instantly via the Finnhub WebSocket, including pre- and after-market: the watchlist and chart update live. Nothing changes for other exchanges, indices and crypto; history and search still come from Alpaca or Yahoo. Free key:',
   empfohlen: 'recommended',
   'US-Aktien und ETFs, Echtzeit von der Börse IEX. Offizielle Schnittstelle, kostenloser eigener API-Key nötig.':
     'US stocks and ETFs, real time from the IEX exchange. Official interface, requires your own free API key.',
@@ -490,9 +490,9 @@ export const EN: Record<string, string> = {
     'Sign up for free, then create a key pair under “API Keys” (a paper account is enough):',
   'Die Keys werden verschlüsselt auf diesem Rechner gespeichert.': 'The keys are stored encrypted on this computer.',
   'Yahoo Finance (inoffiziell)': 'Yahoo Finance (unofficial)',
-  'Aktien weltweit, Indizes und Rohstoffe, ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.':
-    'Stocks worldwide, indices and commodities, no sign-up, delayed by about 15 seconds. Yahoo offers no official interface for this; using it may breach Yahoo’s terms of service and can stop working at any time.',
-  'Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS ist nicht mit Yahoo verbunden.':
+  'Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. KandleOS fragt die Kurse alle 15 Sekunden ab; Yahoo liefert sie je nach Börse in Echtzeit oder verzögert, meist um 15 Minuten. Yahoo bietet dafür keine offizielle Schnittstelle: Die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.':
+    'Stocks worldwide as well as indices and commodities, no sign-up. KandleOS polls the prices every 15 seconds; depending on the exchange, Yahoo delivers them in real time or delayed, usually by 15 minutes. Yahoo offers no official interface for this: using it may breach Yahoo’s terms of service and can stop working at any time.',
+  'Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS steht in keiner Verbindung zu Yahoo.':
     'I use Yahoo Finance privately and at my own responsibility only. KandleOS is not affiliated with Yahoo.',
   'Yahoos Nutzungsbedingungen': 'Yahoo’s terms of service',
   'Nur Krypto': 'Crypto only',
@@ -513,8 +513,8 @@ export const EN: Record<string, string> = {
   'Kostenloser Key:': 'Free key:',
   'Der Key wird verschlüsselt auf diesem Rechner gespeichert.': 'The key is stored encrypted on this computer.',
   'Aktienkurse kommen von Alpaca.': 'Stock prices come from Alpaca.',
-  'Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS ist nicht mit Yahoo verbunden. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).':
-    'Without an Alpaca key, KandleOS automatically connects to Yahoo Finance for stock prices: no sign-up, delayed by about 15 seconds. Yahoo offers no official interface for this; it is meant for private use only, may breach Yahoo’s terms of service and can stop working at any time. KandleOS is not affiliated with Yahoo. You can switch Yahoo off in the settings at any time (“Crypto only”).',
+  'Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, alle 15 Sekunden abgefragt, je nach Börse in Echtzeit oder verzögert (meist um 15 Minuten). Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS steht in keiner Verbindung zu Yahoo. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).':
+    'Without an Alpaca key, KandleOS automatically connects to Yahoo Finance for stock prices: no sign-up, polled every 15 seconds, in real time or delayed depending on the exchange (usually by 15 minutes). Yahoo offers no official interface for this; it is meant for private use only, may breach Yahoo’s terms of service and can stop working at any time. KandleOS is not affiliated with Yahoo. You can switch Yahoo off in the settings at any time (“Crypto only”).',
   'Für Alpaca beide Felder ausfüllen oder beide leer lassen.': 'For Alpaca, fill in both fields or leave both empty.',
   'KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.':
     'KandleOS is a tool for chart analysis. Forecasts and analyses are not investment advice nor a recommendation to buy or sell. All prices without guarantee; use at your own risk.',

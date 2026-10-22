@@ -65,11 +65,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           className={`w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
         />
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t('Mit Key kommen zusätzlich Echtzeit-Trades über den Finnhub-WebSocket. Kostenloser Key:')}{' '}
+          {t('Warum Finnhub? Ohne Key werden Aktienkurse nur in Abständen abgefragt (Alpaca alle 5 s, Yahoo alle 15 s). Mit Key erscheint jeder Trade einer US-Aktie sofort über den Finnhub-WebSocket, auch vor- und nachbörslich: Watchlist und Chart laufen live mit. Für andere Börsen, Indizes und Krypto ändert sich nichts; Verlauf und Suche kommen weiter von Alpaca oder Yahoo. Kostenloser Key:')}{' '}
           <a href="https://finnhub.io/register" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             finnhub.io/register
           </a>
-          .{' '}
+          .
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-muted">
           {t(
             'Der Key wird getrennt von kandleos-store.json gespeichert – verschlüsselt für dein Benutzerkonto, sofern das System einen Schlüsselbund hat (Windows immer, Linux mit gnome-keyring/KWallet). Nach einem Gerätewechsel hier einfach neu eintragen.'
           )}
