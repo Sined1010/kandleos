@@ -35,10 +35,14 @@ const uvExe = (): string => join(base(), 'uv', build()?.exe ?? 'uv')
 const venvPython = (): string =>
   process.platform === 'win32' ? join(base(), 'venv', 'Scripts', 'python.exe') : join(base(), 'venv', 'bin', 'python')
 const markerFile = (): string => join(base(), 'installed.json')
-const runner = (): string =>
-  app.isPackaged
-    ? join(process.resourcesPath, 'agents', 'kandleos_agents.py')
-    : join(app.getAppPath(), 'resources', 'agents', 'kandleos_agents.py')
+const resource = (file: string): string =>
+  app.isPackaged ? join(process.resourcesPath, 'agents', file) : join(app.getAppPath(), 'resources', 'agents', file)
+const runner = (): string => resource('kandleos_agents.py')
+// TradingAgents and all its dependencies with their hashes: what gets installed is exactly what was locked.
+const lockFile = (): string => resource('requirements.lock')
+let lockHashCache: string | undefined
+/** Part of the install marker, so an updated lock file sets the environment up again. */
+const lockHash = (): string => (lockHashCache ??= createHash('sha256').update(readFileSync(lockFile())).digest('hex'))
 
 // uv keeps its cache and the Python it downloads next to the environment, so removing the folder removes all.
 const uvEnv = (): NodeJS.ProcessEnv => ({
@@ -59,7 +63,7 @@ export function agentsStatus(): AgentsStatus {
   if (!build()) return { supported: false, installed: false }
   try {
     const marker = JSON.parse(readFileSync(markerFile(), 'utf8'))
-    const installed = marker.commit === TRADINGAGENTS.commit && existsSync(venvPython())
+    const installed = marker.commit === TRADINGAGENTS.commit && marker.lock === lockHash() && existsSync(venvPython())
     return { supported: true, installed, version: installed ? TRADINGAGENTS.version : undefined }
   } catch {
     return { supported: true, installed: false }
@@ -140,11 +144,14 @@ export function installAgents(onProgress: (p: SetupProgress) => void): Promise<A
       onProgress({ step: 'python', message: line })
     )
     onProgress({ step: 'packages', message: t('Installiere TradingAgents {version} …', { version: TRADINGAGENTS.version }) })
-    const source = `https://github.com/TauricResearch/TradingAgents/archive/${TRADINGAGENTS.commit}.zip`
-    await run(uvExe(), ['pip', 'install', '--python', venvPython(), source], uvEnv(), (line) =>
+    // A package that does not match its locked hash, or one missing from the lock, fails the whole install.
+    await run(uvExe(), ['pip', 'install', '--python', venvPython(), '--require-hashes', '-r', lockFile()], uvEnv(), (line) =>
       onProgress({ step: 'packages', message: line })
     )
-    await writeFile(markerFile(), JSON.stringify({ commit: TRADINGAGENTS.commit, uv: UV_VERSION, python: PYTHON_VERSION }))
+    await writeFile(
+      markerFile(),
+      JSON.stringify({ commit: TRADINGAGENTS.commit, lock: lockHash(), uv: UV_VERSION, python: PYTHON_VERSION })
+    )
     onProgress({ step: 'done', message: t('Fertig') })
     return agentsStatus()
   })().finally(() => (installing = null))

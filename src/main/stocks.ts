@@ -59,9 +59,9 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
   '12M': ['M', 18250]
 }
 
-async function getJson(url: string): Promise<any> {
+async function getJson(url: string, headers: Record<string, string> = {}): Promise<any> {
   // Yahoo rejects requests without a browser-like user agent.
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) })
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, signal: AbortSignal.timeout(10_000) })
   if (res.status === 404) throw new Error(t('Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben'))
   if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`)
   return res.json()
@@ -126,11 +126,15 @@ function checkArgs(symbol: unknown, key: unknown): [string, string] {
   return [symbol, typeof key === 'string' && /^[A-Za-z0-9]{1,64}$/.test(key) ? key : '']
 }
 
+// The key goes in a header, not the URL, so it never shows up in proxy or server logs.
+const finnhubAuth = (key: string) => ({ 'X-Finnhub-Token': key })
+
 async function finnhubCandles(symbol: string, tf: Timeframe, key: string): Promise<Candle[]> {
   const [res, days] = FINNHUB[tf]
   const to = Math.floor(Date.now() / 1000)
   const d = await getJson(
-    `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${res}&from=${to - days * 86400}&to=${to}&token=${key}`
+    `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${res}&from=${to - days * 86400}&to=${to}`,
+    finnhubAuth(key)
   )
   if (d.s !== 'ok') throw new Error(`Finnhub: ${d.s ?? d.error}`)
   return d.t.map((t: number, i: number) => ({
@@ -223,7 +227,8 @@ export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
   const [, key] = checkArgs('AAPL', keyArg)
   if (!key) return t('Ungültiges Key-Format')
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`, {
+    const res = await fetch('https://finnhub.io/api/v1/quote?symbol=AAPL', {
+      headers: finnhubAuth(key),
       signal: AbortSignal.timeout(10_000)
     })
     if (res.status === 401 || res.status === 403) return t('API-Key ungültig')
@@ -235,7 +240,7 @@ export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
 }
 
 async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
-  const d = await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`)
+  const d = await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, finnhubAuth(key))
   if (!d.c) throw new Error(t('Finnhub: kein Kurs für {symbol}', { symbol }))
   return { price: d.c, changePct: d.dp ?? 0, time: d.t, prevClose: d.pc }
 }

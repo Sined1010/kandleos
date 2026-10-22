@@ -72,7 +72,8 @@ export interface SearchResult {
   exchange: string
 }
 
-export const SYMBOL_RE = /^[A-Z0-9.\-^=]{1,20}$/
+// Starts with a letter, digit or ^ (indices): the symbol also names a results folder, so ".." must never pass.
+export const SYMBOL_RE = /^[A-Z0-9^][A-Z0-9.\-^=]{0,19}$/
 
 export interface CandleData {
   candles: Candle[]

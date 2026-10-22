@@ -40,7 +40,8 @@ if [ "$(stat -c '%u %a' "$HELPER")" != "0 4755" ]; then
     echo "Sandbox eingerichtet."
   else
     FLAG=" --no-sandbox"
-    echo "Hinweis: KandleOS startet ohne Sandbox. Nachholen mit: bash $DEST/install.sh"
+    echo "WARNUNG: KandleOS startet ohne Sandbox. Eine Lücke im Chromium-Teil (etwa über Kursdaten oder KI-Berichte)"
+    echo "         hätte dann vollen Zugriff auf deine Dateien. Nachholen mit: bash $DEST/install.sh"
   fi
 fi
 

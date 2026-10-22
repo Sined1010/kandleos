@@ -54,7 +54,7 @@ node_modules/.bin/electron-vite build >/dev/null || fail "Build fehlgeschlagen."
 SANDBOX=()
 HELPER=node_modules/electron/dist/chrome-sandbox
 if [ "$(stat -c '%u %a' "$HELPER" 2>/dev/null)" != "0 4755" ]; then
-  echo "Hinweis: Electron-Sandbox nicht eingerichtet, starte mit --no-sandbox. Einmalig einrichten mit:"
+  echo "WARNUNG: Electron-Sandbox nicht eingerichtet, starte mit --no-sandbox (Chromium ohne Schutz vor Lücken). Einmalig einrichten mit:"
   echo "  sudo chown root:root '$DIR/$HELPER' && sudo chmod 4755 '$DIR/$HELPER'"
   SANDBOX=(--no-sandbox)
 fi
