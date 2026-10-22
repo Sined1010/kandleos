@@ -40,6 +40,7 @@ import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
+import FullscreenButton from './FullscreenButton'
 import { ForecastCheck, ForecastSettings, ForecastTip, type ForecastResult } from './ForecastInfo'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
@@ -654,6 +655,7 @@ export default function ChartArea() {
           <Moon size={11} />
           {t('Vor-/Nachbörse')}
         </button>
+        <FullscreenButton />
       </div>
     </div>
   )

@@ -263,6 +263,8 @@ export const EN: Record<string, string> = {
   'Alle Zeichnungen für {symbol} löschen': 'Delete all drawings for {symbol}',
   'Alle Zeichnungen löschen': 'Delete all drawings',
   '{n} Kerzen': '{n} candles',
+  'Vollbild (Umschalt+F)': 'Fullscreen (Shift+F)',
+  'Vollbild beenden (Esc)': 'Exit fullscreen (Esc)',
 
   // Forecast tooltip and settings
   Median: 'Median',

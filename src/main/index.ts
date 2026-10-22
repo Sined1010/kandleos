@@ -146,7 +146,8 @@ else {
   })
   app.whenReady().then(() => {
     // KandleOS needs no camera, microphone, location, notifications etc.; refuse every such request.
-    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+    // The one exception is fullscreen, for the chart's fullscreen mode.
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'fullscreen'))
     session.defaultSession.setPermissionCheckHandler(() => false)
     createWindow()
     app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())

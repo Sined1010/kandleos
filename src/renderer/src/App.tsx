@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import AboutModal from './components/AboutModal'
 import ChartArea from './components/ChartArea'
 import DrawingToolbar from './components/DrawingToolbar'
+import { FULLSCREEN_ID } from './components/FullscreenButton'
 import SettingsModal from './components/SettingsModal'
 import TopBar from './components/TopBar'
 import Watchlist from './components/Watchlist'
@@ -28,10 +29,13 @@ export default function App() {
     <div key={language} className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
       <div className="flex min-h-0 flex-1">
-        <DrawingToolbar />
-        <main className="relative min-w-0 flex-1">
-          <ChartArea />
-        </main>
+        {/* The chart and its drawing tools; this is what the fullscreen mode shows. */}
+        <div id={FULLSCREEN_ID} className="flex min-w-0 flex-1 bg-bg">
+          <DrawingToolbar />
+          <main className="relative min-w-0 flex-1">
+            <ChartArea />
+          </main>
+        </div>
         <Watchlist />
       </div>
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
