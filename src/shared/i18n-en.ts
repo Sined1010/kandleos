@@ -505,8 +505,17 @@ export const EN: Record<string, string> = {
     'Stock prices every 15 s via Yahoo Finance (unofficial). Click for the settings.',
   'Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.': 'No data source for stocks chosen. Click for the settings.',
   'Aktienkurse kommen ersatzweise über die gewählte Datenquelle.': 'Stock prices come from the chosen data source instead.',
-  'Kryptokurse kommen immer von Binance. Für Aktien eine Quelle wählen; das lässt sich später in den Einstellungen ändern.':
-    'Crypto prices always come from Binance. Choose a source for stocks; you can change it later in the settings.',
+  'Aktienkurse (optional)': 'Stock prices (optional)',
+  'Kryptokurse kommen immer von Binance. Für Aktien kannst du eigene kostenlose API-Keys eintragen, auch später in den Einstellungen.':
+    'Crypto prices always come from Binance. For stocks you can enter your own free API keys, now or later in the settings.',
+  'Zusätzlich Echtzeit-Trades für US-Aktien über den Finnhub-WebSocket. Verlauf und Suche kommen weiter von Alpaca oder Yahoo.':
+    'Adds real-time trades for US stocks via the Finnhub WebSocket. History and search still come from Alpaca or Yahoo.',
+  'Kostenloser Key:': 'Free key:',
+  'Der Key wird verschlüsselt auf diesem Rechner gespeichert.': 'The key is stored encrypted on this computer.',
+  'Aktienkurse kommen von Alpaca.': 'Stock prices come from Alpaca.',
+  'Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, etwa 15 Sekunden verzögert. Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS ist nicht mit Yahoo verbunden. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).':
+    'Without an Alpaca key, KandleOS automatically connects to Yahoo Finance for stock prices: no sign-up, delayed by about 15 seconds. Yahoo offers no official interface for this; it is meant for private use only, may breach Yahoo’s terms of service and can stop working at any time. KandleOS is not affiliated with Yahoo. You can switch Yahoo off in the settings at any time (“Crypto only”).',
+  'Für Alpaca beide Felder ausfüllen oder beide leer lassen.': 'For Alpaca, fill in both fields or leave both empty.',
   'KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.':
     'KandleOS is a tool for chart analysis. Forecasts and analyses are not investment advice nor a recommendation to buy or sell. All prices without guarantee; use at your own risk.',
   'Mehr zu Haftung, Datenschutz und Lizenzen': 'More on disclaimer, privacy and licenses',
