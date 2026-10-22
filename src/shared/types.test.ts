@@ -9,3 +9,8 @@ test('forecastSteps: full 64 steps with enough history, shorter for little histo
   assert.equal(forecastSteps('3M', 180), 20)
   assert.equal(forecastSteps('12M', 46), 5)
 })
+
+test('forecastSteps: a chosen length shortens the forecast, but never beyond what the history allows', () => {
+  assert.equal(forecastSteps('1h', 1000, 16), 16)
+  assert.equal(forecastSteps('1D', 100, 32), 25)
+})

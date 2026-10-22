@@ -18,8 +18,8 @@ const MODEL = {
 const CONTEXT = 2048
 // The quantile levels behind each step's 21 values are listed in shared/forecast.ts (QUANTILES).
 const LEVELS = 21
-// Live close and wick series plus up to three backtests; more series in one run gain nothing.
-const MAX_SERIES = 8
+// Live close and wick series plus up to ten backtests (the "Rückblick-Tiefe" setting), with a little room.
+const MAX_SERIES = 16
 
 const modelFile = (): string => join(app.getPath('userData'), 'models', 'chronos2-ctx2048-h64.onnx')
 

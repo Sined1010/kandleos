@@ -29,10 +29,21 @@ export interface ForecastView {
   band50: boolean
   band80: boolean
   band90: boolean
-  /** Accuracy check: the summary line and the latest backtest drawn over the real bars. */
-  backtest: boolean
   /** Value box for the forecast step under the mouse. */
   hover: boolean
+}
+
+/** How a forecast is computed; changing it recomputes a shown forecast. */
+export interface ForecastRun {
+  /** Longest forecast in candles; 'auto' allows Chronos-2's full 64 steps where the history allows. */
+  horizon: 'auto' | 8 | 16 | 32
+  /**
+   * Number of earlier forecasts compared with what really happened (accuracy line and the latest one drawn
+   * grey over the real bars); 0 switches the backtest off and saves computing it.
+   */
+  backtestRuns: 0 | 3 | 5 | 10
+  /** Recompute a shown forecast whenever a new candle begins. */
+  autoUpdate: boolean
 }
 
 /** Choices for the analysis with TradingAgents; the API keys themselves live encrypted in the main process. */
@@ -95,6 +106,8 @@ interface State {
   toggleExtendedHours: () => void
   forecastView: ForecastView
   setForecastView: (patch: Partial<ForecastView>) => void
+  forecastRun: ForecastRun
+  setForecastRun: (patch: Partial<ForecastRun>) => void
   agentsConfig: AgentsConfig
   setAgentsConfig: (patch: Partial<AgentsConfig>) => void
   /** Interface language; English unless chosen otherwise. */
@@ -205,8 +218,10 @@ export const useStore = create<State>()(
       setRange: (range) => set((s) => syncTab(s, { range, timeframe: rangeById(range).tf })),
       extendedHours: false,
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
-      forecastView: { style: 'line', band50: true, band80: true, band90: true, backtest: true, hover: true },
+      forecastView: { style: 'line', band50: true, band80: true, band90: true, hover: true },
       setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
+      forecastRun: { horizon: 'auto', backtestRuns: 3, autoUpdate: false },
+      setForecastRun: (patch) => set((s) => ({ forecastRun: { ...s.forecastRun, ...patch } })),
       agentsConfig: {
         provider: 'anthropic',
         models: {},
@@ -273,11 +288,14 @@ export const useStore = create<State>()(
       // Indicators added in later versions are missing from older files; fill them with their defaults.
       merge: (persisted, current) => {
         const p = persisted as Partial<State>
+        const { backtest, ...view } = (p.forecastView ?? {}) as Partial<ForecastView> & { backtest?: boolean }
         const s = {
           ...current,
           ...p,
           indicators: { ...current.indicators, ...p.indicators },
-          forecastView: { ...current.forecastView, ...p.forecastView },
+          forecastView: { ...current.forecastView, ...view },
+          // The backtest used to be a display switch of its own; switched off, it now means depth 0.
+          forecastRun: { ...current.forecastRun, ...(backtest === false && { backtestRuns: 0 as const }), ...p.forecastRun },
           agentsConfig: { ...current.agentsConfig, ...p.agentsConfig }
         }
         // Files from before tabs hold a single chart; it becomes the first tab.
@@ -299,6 +317,7 @@ export const useStore = create<State>()(
         range,
         extendedHours,
         forecastView,
+        forecastRun,
         agentsConfig,
         language,
         folders,
@@ -312,6 +331,7 @@ export const useStore = create<State>()(
         range,
         extendedHours,
         forecastView,
+        forecastRun,
         disclaimerAccepted,
         names,
         symbol,

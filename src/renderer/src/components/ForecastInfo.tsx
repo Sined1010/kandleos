@@ -128,10 +128,38 @@ const BANDS: [keyof ForecastView, string, string][] = [
   ['band90', msg('90 %-Bereich'), msg('auch seltene Ausschläge')]
 ]
 
-/** What a forecast shows; changes apply to a shown forecast at once, without recomputing. */
+/** Row of buttons choosing one value. */
+function Segments<V extends string | number>({
+  value,
+  options,
+  onChange
+}: {
+  value: V
+  options: [V, string][]
+  onChange: (v: V) => void
+}) {
+  return (
+    <div className="flex gap-1 rounded-lg bg-bg p-0.5 ring-1 ring-line">
+      {options.map(([v, label]) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          aria-pressed={value === v}
+          className={`flex-1 rounded-md px-2 py-1 ${value === v ? 'bg-brand text-white shadow-glow' : 'text-muted hover:text-white'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** What a forecast shows and how it is computed; display changes only redraw, the others recompute. */
 export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => void; onOpenAnalysis: () => void }) {
   const view = useStore((s) => s.forecastView)
   const set = useStore((s) => s.setForecastView)
+  const run = useStore((s) => s.forecastRun)
+  const setRun = useStore((s) => s.setForecastRun)
   const check = (key: keyof ForecastView, label: string, hint?: string) => (
     <label key={key} className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-bg">
       <input
@@ -163,7 +191,7 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         role="dialog"
         aria-label={t('Prognose-Anzeige')}
         onMouseDown={(e) => e.stopPropagation()}
-        className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-line bg-panel/95 p-2 text-xs shadow-2xl shadow-black/50 backdrop-blur"
+        className="absolute right-0 top-full z-30 mt-2 max-h-[calc(100vh-9rem)] w-64 overflow-y-auto rounded-xl border border-line bg-panel/95 p-2 text-xs shadow-2xl shadow-black/50 backdrop-blur"
       >
         {/* What the forecast is, before its display options. */}
         <div className="flex items-start gap-2 px-1 pb-1 pt-1">
@@ -189,8 +217,48 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         <p className={heading}>{t('Unsicherheitsbereiche')}</p>
         {BANDS.map(([key, label, hint]) => check(key, label, hint))}
         <p className={heading}>{t('Zusätzlich')}</p>
-        {check('backtest', msg('Rückblick'), msg('Treffsicherheit und frühere Prognose (grau)'))}
         {check('hover', msg('Werte beim Überfahren'))}
+        <p className={heading}>{t('Berechnung')}</p>
+        <p className="px-1 pb-1 text-slate-200">{t('Prognose-Länge')}</p>
+        <Segments
+          value={run.horizon}
+          options={[
+            ['auto', t('Auto')],
+            [8, '8'],
+            [16, '16'],
+            [32, '32']
+          ]}
+          onChange={(horizon) => setRun({ horizon })}
+        />
+        <p className="px-1 pb-1.5 pt-1 text-[11px] leading-snug text-muted">
+          {t('Kerzen in die Zukunft; Auto: bis 64, je nach vorhandener Historie')}
+        </p>
+        <p className="px-1 pb-1 text-slate-200">{t('Rückblick')}</p>
+        <Segments
+          value={run.backtestRuns}
+          options={[
+            [0, t('Aus')],
+            [3, '3'],
+            [5, '5'],
+            [10, '10']
+          ]}
+          onChange={(backtestRuns) => setRun({ backtestRuns })}
+        />
+        <p className="px-1 pb-1 pt-1 text-[11px] leading-snug text-muted">
+          {t('Treffsicherheit früherer Prognosen (die jüngste grau im Chart): mehr ist aussagekräftiger, rechnet aber länger')}
+        </p>
+        <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-bg">
+          <input
+            type="checkbox"
+            checked={run.autoUpdate}
+            onChange={(e) => setRun({ autoUpdate: e.target.checked })}
+            className="mt-0.5 accent-accent"
+          />
+          <span>
+            <span className="text-slate-200">{t('Automatisch aktualisieren')}</span>
+            <span className="block text-[11px] text-muted">{t('Neu berechnen, sobald eine neue Kerze beginnt')}</span>
+          </span>
+        </label>
         {/* Separates the Chronos-2 settings above from the TradingAgents analysis below. */}
         <div className="mx-1 mt-2 h-px bg-line" />
         <p className={heading}>{t('Erweitert · optional')}</p>

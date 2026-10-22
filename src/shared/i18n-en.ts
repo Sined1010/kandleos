@@ -310,8 +310,17 @@ export const EN: Record<string, string> = {
   Unsicherheitsbereiche: 'Uncertainty ranges',
   Zusätzlich: 'Extras',
   Rückblick: 'Backtest',
-  'Treffsicherheit und frühere Prognose (grau)': 'Accuracy and earlier forecast (grey)',
   'Werte beim Überfahren': 'Values on hover',
+  Berechnung: 'Calculation',
+  'Prognose-Länge': 'Forecast length',
+  Auto: 'Auto',
+  'Kerzen in die Zukunft; Auto: bis 64, je nach vorhandener Historie':
+    'Candles into the future; Auto: up to 64, depending on the available history',
+  Aus: 'Off',
+  'Treffsicherheit früherer Prognosen (die jüngste grau im Chart): mehr ist aussagekräftiger, rechnet aber länger':
+    'Accuracy of earlier forecasts (the latest grey in the chart): more is more meaningful but takes longer',
+  'Automatisch aktualisieren': 'Update automatically',
+  'Neu berechnen, sobald eine neue Kerze beginnt': 'Recompute as soon as a new candle begins',
   'Erweitert · optional': 'Advanced · optional',
   'Umfassende Analyse mit TradingAgents': 'Comprehensive analysis with TradingAgents',
   'KI-Agenten werten Nachrichten, Zahlen und Stimmung aus und geben Einschätzung und Kursziel. Eigener API-Key oder Ollama nötig.':

@@ -29,12 +29,13 @@ export const tfLabel = (tf: Timeframe): string => (TF_MONTHS[tf] ? tf + 'o' : tf
 export const FORECAST_MIN_BARS = 32
 
 /**
- * How many of Chronos-2's 64 forecast steps are shown: at most a quarter of the history the model saw
- * (a short history says little about the far future) and at most five years ahead for month-based candles.
+ * How many of Chronos-2's 64 forecast steps are shown: at most `max` (the chosen forecast length), at most a
+ * quarter of the history the model saw (a short history says little about the far future) and at most five
+ * years ahead for month-based candles.
  */
-export function forecastSteps(tf: Timeframe, bars: number): number {
+export function forecastSteps(tf: Timeframe, bars: number, max = 64): number {
   const months = TF_MONTHS[tf]
-  return Math.min(64, Math.floor(bars / 4), months ? Math.floor(60 / months) : 64)
+  return Math.min(max, 64, Math.floor(bars / 4), months ? Math.floor(60 / months) : 64)
 }
 
 /** time = bar open in UTC seconds */

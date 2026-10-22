@@ -90,6 +90,8 @@ export default function ChartArea() {
   const extended = extendedHours && extendable
   const quote = useQuotes((s) => s.quotes[symbol])
   const forecastView = useStore((s) => s.forecastView)
+  const forecastRun = useStore((s) => s.forecastRun)
+  const maxSteps = forecastRun.horizon === 'auto' ? 64 : forecastRun.horizon
   const containerRef = useRef<HTMLDivElement>(null)
   const dataRef = useRef<Candle[]>([])
   const [api, setApi] = useState<ChartApi | null>(null)
@@ -312,21 +314,26 @@ export default function ChartArea() {
     }
   }, [api, symbol, timeframe])
 
-  const toggleForecast = async () => {
+  const toggleForecast = () => (fc.state === 'shown' ? setFc({ state: 'idle' }) : runForecast())
+
+  /** Computes the forecast; `quiet` keeps the shown one (and the view) until the new one is ready. */
+  const runForecast = async (quiet = false) => {
     if (!api) return
-    if (fc.state === 'shown') return setFc({ state: 'idle' })
     const bars = dataRef.current
     const run = ++fcRun.current
-    setFc({ state: 'loading' })
-    const stop = window.api.onForecastProgress((pct) => run === fcRun.current && setFc({ state: 'loading', pct }))
+    if (!quiet) setFc({ state: 'loading' })
+    const stop = quiet
+      ? () => {}
+      : window.api.onForecastProgress((pct) => run === fcRun.current && setFc({ state: 'loading', pct }))
     try {
       const closes = bars.map((c) => c.close)
       const times = bars.map((c) => c.time)
       // Wick lengths above and below each body, for the forecast candles.
       const upper = bars.map((c) => c.high - Math.max(c.open, c.close))
       const lower = bars.map((c) => Math.min(c.open, c.close) - c.low)
-      const n = forecastSteps(timeframe, bars.length)
-      const cutoffs = backtestCutoffs(bars.length, n)
+      const { horizon, backtestRuns } = useStore.getState().forecastRun
+      const n = forecastSteps(timeframe, bars.length, horizon === 'auto' ? 64 : horizon)
+      const cutoffs = backtestCutoffs(bars.length, n, backtestRuns)
       // One model call: the close on its own (grouping it with the wicks made it measurably worse in
       // backtests), the two wick series as a group of their own, and the close at each backtest cutoff.
       const [live, liveUpper, liveLower, ...past] = await window.api.forecast(
@@ -359,15 +366,29 @@ export default function ChartArea() {
       })
       // Widen the view so the whole forecast is visible; the left edge stays where the user put it.
       const view = api.chart.timeScale().getVisibleLogicalRange()
-      if (view && view.to < bars.length + n)
+      if (!quiet && view && view.to < bars.length + n)
         api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
     } catch (e) {
       const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-      if (run === fcRun.current) setFc({ state: 'error', error })
+      // A failed refresh keeps the forecast already shown.
+      if (run === fcRun.current && !quiet) setFc({ state: 'error', error })
     } finally {
       stop()
     }
   }
+
+  // Changed forecast length or backtest depth: recompute a shown forecast.
+  useEffect(() => {
+    if (fc.state === 'shown') void runForecast()
+  }, [forecastRun.horizon, forecastRun.backtestRuns])
+
+  // Automatic refresh: a new candle has begun, so the shown forecast is recomputed over the new history.
+  const barCount = useRef(0)
+  useEffect(() => {
+    const grew = barCount.current > 0 && data.length > barCount.current
+    barCount.current = data.length
+    if (grew && forecastRun.autoUpdate && fc.state === 'shown') void runForecast(true)
+  }, [data.length])
 
   // Draws a computed forecast the way the forecast settings say; a settings change only redraws.
   useEffect(() => {
@@ -427,7 +448,7 @@ export default function ChartArea() {
       const path = [{ time: r.baseTime, value: r.base }, ...medians.map((value, i) => ({ time: r.times[i], value }))]
       line(path, FORECAST, 2, LineStyle.Dashed)
     }
-    if (view.backtest && r.backtestPath) line(r.backtestPath, '#b0bec5aa', 1, LineStyle.Dotted)
+    if (r.backtestPath) line(r.backtestPath, '#b0bec5aa', 1, LineStyle.Dotted)
     return () => series.forEach((s) => chart.removeSeries(s))
   }, [api, fc.result, forecastView])
 
@@ -539,7 +560,7 @@ export default function ChartArea() {
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
-          {fc.result && forecastView.backtest && <ForecastCheck check={fc.result.check} />}
+          {fc.result && forecastRun.backtestRuns > 0 && <ForecastCheck check={fc.result.check} />}
         </div>
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
             with its display settings right next to it. */}
@@ -560,7 +581,7 @@ export default function ChartArea() {
                     })
                   : t(
                       'Statistische Prognose der nächsten {n} Kerzen mit Chronos-2, lokal berechnet: Median (gestrichelt) mit Fächer aus 50/80/90 %-Bereichen, Werte beim Überfahren, dazu ein Rückblick auf die Treffsicherheit. Keine Anlageberatung.',
-                      { n: forecastSteps(timeframe, data.length) }
+                      { n: forecastSteps(timeframe, data.length, maxSteps) }
                     ) + (fc.state === 'idle' ? ' ' + t('Beim ersten Mal wird das Modell geladen (ca. 480 MB).') : '')
               }
               className={`inline-flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-semibold transition disabled:opacity-40 ${
