@@ -1,4 +1,4 @@
-import { BrainCircuit, ChevronRight } from 'lucide-react'
+import { BrainCircuit, ChevronRight, Sparkles } from 'lucide-react'
 import { forecastCandles, probabilityAbove, Q, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
@@ -165,6 +165,17 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         onMouseDown={(e) => e.stopPropagation()}
         className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-line bg-panel/95 p-2 text-xs shadow-2xl shadow-black/50 backdrop-blur"
       >
+        {/* What the forecast is, before its display options. */}
+        <div className="flex items-start gap-2 px-1 pb-1 pt-1">
+          <Sparkles size={14} className="mt-0.5 shrink-0 text-amber-200" />
+          <span>
+            <span className="font-semibold text-slate-200">{t('KI-Prognose mit Chronos-2')}</span>
+            <span className="block text-[11px] leading-snug text-muted">
+              {t('Statistische Prognose aus dem Kursverlauf, lokal auf deinem Rechner berechnet. Keine Anlageberatung.')}
+            </span>
+          </span>
+        </div>
+        <div className="mx-1 mt-1 h-px bg-line" />
         <p className={heading}>{t('Darstellung')}</p>
         <div className="flex gap-1 rounded-lg bg-bg p-0.5 ring-1 ring-line">
           {style('line', msg('Linie (Median)'))}

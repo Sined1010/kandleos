@@ -295,6 +295,9 @@ export const EN: Record<string, string> = {
   'übliche Schwankung': 'typical swing',
   'auch seltene Ausschläge': 'including rare spikes',
   'Prognose-Anzeige': 'Forecast display',
+  'KI-Prognose mit Chronos-2': 'AI forecast with Chronos-2',
+  'Statistische Prognose aus dem Kursverlauf, lokal auf deinem Rechner berechnet. Keine Anlageberatung.':
+    'Statistical forecast from the price history, computed locally on your computer. Not investment advice.',
   Darstellung: 'Style',
   'Linie (Median)': 'Line (median)',
   Kerzen: 'Candles',
