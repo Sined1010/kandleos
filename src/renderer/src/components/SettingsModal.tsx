@@ -45,10 +45,21 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Applies at once: the window redraws in the new language. */}
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between">
           <span className="text-xs text-muted">{t('Sprache')}</span>
           <LanguageSwitch />
         </div>
+        {/* App.tsx shows the start window until the notice is confirmed again; the current choices stay filled in. */}
+        <button
+          type="button"
+          onClick={() => {
+            useStore.setState({ disclaimerAccepted: false })
+            onClose()
+          }}
+          className="mb-5 text-xs text-accent hover:underline"
+        >
+          {t('Startfenster erneut zeigen')}
+        </button>
 
         <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>
         <StockSourcePicker form={source} />

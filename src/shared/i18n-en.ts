@@ -499,6 +499,7 @@ export const EN: Record<string, string> = {
   'Mehr zu Haftung, Datenschutz und Lizenzen': 'More on disclaimer, privacy and licenses',
   'Prüfe Keys …': 'Checking keys …',
   'Verstanden, los geht’s': 'Got it, let’s go',
+  'Startfenster erneut zeigen': 'Show the start window again',
   'Aktien über Alpaca':
     'Stocks via Alpaca',
   'empfohlen für US-Werte':
