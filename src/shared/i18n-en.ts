@@ -489,11 +489,10 @@ export const EN: Record<string, string> = {
   'Kostenlos registrieren, dann unter „API Keys“ ein Schlüsselpaar erstellen (ein Paper-Konto genügt):':
     'Sign up for free, then create a key pair under “API Keys” (a paper account is enough):',
   'Die Keys werden verschlüsselt auf diesem Rechner gespeichert.': 'The keys are stored encrypted on this computer.',
-  'Yahoo Finance (inoffiziell)': 'Yahoo Finance (unofficial)',
-  'Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. KandleOS fragt die Kurse alle 15 Sekunden ab; Yahoo liefert sie je nach Börse in Echtzeit oder verzögert, meist um 15 Minuten. Yahoo bietet dafür keine offizielle Schnittstelle: Die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.':
-    'Stocks worldwide as well as indices and commodities, no sign-up. KandleOS polls the prices every 15 seconds; depending on the exchange, Yahoo delivers them in real time or delayed, usually by 15 minutes. Yahoo offers no official interface for this: using it may breach Yahoo’s terms of service and can stop working at any time.',
-  'Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS steht in keiner Verbindung zu Yahoo.':
-    'I use Yahoo Finance privately and at my own responsibility only. KandleOS is not affiliated with Yahoo.',
+  'Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. Bei Auswahl verbindet sich KandleOS automatisch mit Yahoo Finance und fragt die Kurse alle 15 Sekunden ab; je nach Börse kommen sie in Echtzeit oder verzögert, meist um 15 Minuten.':
+    'Stocks worldwide as well as indices and commodities, no sign-up. When chosen, KandleOS connects to Yahoo Finance automatically and polls prices every 15 seconds; depending on the exchange they arrive in real time or delayed, usually by 15 minutes.',
+  'Ich nutze Yahoo Finance nur für private Zwecke. Es gelten Yahoos Nutzungsbedingungen; KandleOS steht in keiner Verbindung zu Yahoo.':
+    'I use Yahoo Finance for private purposes only. Yahoo’s terms of service apply; KandleOS is not affiliated with Yahoo.',
   'Yahoos Nutzungsbedingungen': 'Yahoo’s terms of service',
   'Nur Krypto': 'Crypto only',
   'Kryptokurse von Binance, ohne Registrierung. Aktien lassen sich später in den Einstellungen hinzufügen.':
@@ -505,17 +504,25 @@ export const EN: Record<string, string> = {
     'Stock prices every 15 s via Yahoo Finance (unofficial). Click for the settings.',
   'Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.': 'No data source for stocks chosen. Click for the settings.',
   'Aktienkurse kommen ersatzweise über die gewählte Datenquelle.': 'Stock prices come from the chosen data source instead.',
-  'Aktienkurse (optional)': 'Stock prices (optional)',
-  'Kryptokurse kommen immer von Binance. Für Aktien kannst du eigene kostenlose API-Keys eintragen, auch später in den Einstellungen.':
-    'Crypto prices always come from Binance. For stocks you can enter your own free API keys, now or later in the settings.',
+  'Welche Kurse möchtest du sehen?': 'Which prices do you want to see?',
+  'Aktien + Krypto': 'Stocks + crypto',
+  'Zusätzlich Aktien, ETFs, Indizes und Rohstoffe.': 'Adds stocks, ETFs, indices and commodities.',
+  'Mit eigener API': 'With your own API',
+  'Alpaca: offizielle Schnittstelle, US-Aktien und ETFs in Echtzeit (Börse IEX). Kostenlose Registrierung bei Alpaca nötig.':
+    'Alpaca: official interface, US stocks and ETFs in real time (IEX exchange). Free sign-up at Alpaca required.',
+  'Ohne eigene API weiter': 'Continue without your own API',
+  'Yahoo Finance: sofort ohne Registrierung, Aktien, Indizes und Rohstoffe weltweit, je nach Börse verzögert.':
+    'Yahoo Finance: right away without sign-up, stocks, indices and commodities worldwide, delayed depending on the exchange.',
+  optional: 'optional',
   'Zusätzlich Echtzeit-Trades für US-Aktien über den Finnhub-WebSocket. Verlauf und Suche kommen weiter von Alpaca oder Yahoo.':
     'Adds real-time trades for US stocks via the Finnhub WebSocket. History and search still come from Alpaca or Yahoo.',
   'Kostenloser Key:': 'Free key:',
   'Der Key wird verschlüsselt auf diesem Rechner gespeichert.': 'The key is stored encrypted on this computer.',
-  'Aktienkurse kommen von Alpaca.': 'Stock prices come from Alpaca.',
-  'Ohne Alpaca-Key verbindet sich KandleOS für Aktienkurse automatisch mit Yahoo Finance: ohne Registrierung, alle 15 Sekunden abgefragt, je nach Börse in Echtzeit oder verzögert (meist um 15 Minuten). Yahoo bietet dafür keine offizielle Schnittstelle; die Nutzung ist nur privat gedacht, kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren. KandleOS steht in keiner Verbindung zu Yahoo. In den Einstellungen lässt sich Yahoo jederzeit abschalten („Nur Krypto“).':
-    'Without an Alpaca key, KandleOS automatically connects to Yahoo Finance for stock prices: no sign-up, polled every 15 seconds, in real time or delayed depending on the exchange (usually by 15 minutes). Yahoo offers no official interface for this; it is meant for private use only, may breach Yahoo’s terms of service and can stop working at any time. KandleOS is not affiliated with Yahoo. You can switch Yahoo off in the settings at any time (“Crypto only”).',
-  'Für Alpaca beide Felder ausfüllen oder beide leer lassen.': 'For Alpaca, fill in both fields or leave both empty.',
+  'Mit dieser Auswahl verbindet sich KandleOS automatisch mit Yahoo Finance. Die Kurse werden alle 15 Sekunden abgefragt, je nach Börse in Echtzeit oder verzögert (meist um 15 Minuten). Die Nutzung ist nur für private Zwecke gedacht; es gelten Yahoos Nutzungsbedingungen. KandleOS steht in keiner Verbindung zu Yahoo. Die Datenquelle lässt sich jederzeit in den Einstellungen wechseln.':
+    'With this choice, KandleOS connects to Yahoo Finance automatically. Prices are polled every 15 seconds, in real time or delayed depending on the exchange (usually by 15 minutes). Use is intended for private purposes only; Yahoo’s terms of service apply. KandleOS is not affiliated with Yahoo. You can change the data source in the settings at any time.',
+  'Beide Alpaca-Keys eintragen oder „Ohne eigene API weiter“ wählen.': 'Enter both Alpaca keys or choose “Continue without your own API”.',
+  'Bitte zuerst auswählen, welche Kurse du sehen möchtest.': 'Please choose first which prices you want to see.',
+  '„Mit eigener API“ oder „Ohne eigene API weiter“ wählen.': 'Choose “With your own API” or “Continue without your own API”.',
   'KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.':
     'KandleOS is a tool for chart analysis. Forecasts and analyses are not investment advice nor a recommendation to buy or sell. All prices without guarantee; use at your own risk.',
   'Mehr zu Haftung, Datenschutz und Lizenzen': 'More on disclaimer, privacy and licenses',

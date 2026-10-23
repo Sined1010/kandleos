@@ -117,7 +117,7 @@ export function AlpacaKeyFields({ form }: { form: Form }) {
   )
 }
 
-/** Settings: Alpaca (own free key), Yahoo Finance (unofficial, acknowledged) or crypto only. */
+/** Settings: Alpaca (own free key), Yahoo Finance (private use, acknowledged) or crypto only. */
 export default function StockSourcePicker({ form }: { form: Form }) {
   const option = (value: StockSource, title: string, badge: string | null, text: string, extra?: React.ReactNode) => {
     const on = form.source === value
@@ -153,9 +153,9 @@ export default function StockSourcePicker({ form }: { form: Form }) {
       )}
       {option(
         'yahoo',
-        t('Yahoo Finance (inoffiziell)'),
+        'Yahoo Finance',
         null,
-        t('Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. KandleOS fragt die Kurse alle 15 Sekunden ab; Yahoo liefert sie je nach Börse in Echtzeit oder verzögert, meist um 15 Minuten. Yahoo bietet dafür keine offizielle Schnittstelle: Die Nutzung kann gegen Yahoos Nutzungsbedingungen verstoßen und jederzeit aufhören zu funktionieren.'),
+        t('Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. Bei Auswahl verbindet sich KandleOS automatisch mit Yahoo Finance und fragt die Kurse alle 15 Sekunden ab; je nach Börse kommen sie in Echtzeit oder verzögert, meist um 15 Minuten.'),
         <label className="flex cursor-pointer items-start gap-2">
           <input
             type="checkbox"
@@ -164,7 +164,7 @@ export default function StockSourcePicker({ form }: { form: Form }) {
             className="mt-0.5 accent-accent"
           />
           <span className="text-slate-200">
-            {t('Ich nutze Yahoo Finance nur privat und auf eigene Verantwortung. KandleOS steht in keiner Verbindung zu Yahoo.')}{' '}
+            {t('Ich nutze Yahoo Finance nur für private Zwecke. Es gelten Yahoos Nutzungsbedingungen; KandleOS steht in keiner Verbindung zu Yahoo.')}{' '}
             <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
               {t('Yahoos Nutzungsbedingungen')}
             </a>
