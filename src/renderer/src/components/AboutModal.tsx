@@ -101,12 +101,6 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           {licenseError && <span className="ml-2 text-down">({licenseError})</span>}
         </p>
 
-        <p className="mt-4 border-t border-line pt-3">
-          {t('KandleOS ist kostenlos.')}{' '}
-          <a href="https://ko-fi.com/sined1010" target="_blank" rel="noreferrer" className={link}>
-            {t('KandleOS auf Ko-fi unterstützen')}
-          </a>
-        </p>
       </div>
     </div>
   )

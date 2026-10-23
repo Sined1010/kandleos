@@ -68,8 +68,6 @@ export const EN: Record<string, string> = {
     'KandleOS uses open-source software, including Electron, React and Lightweight Charts.',
   'Lizenzen von Drittanbietern anzeigen': 'Show third-party licenses',
   'Quellcode:': 'Source code:',
-  'KandleOS ist kostenlos.': 'KandleOS is free.',
-  'KandleOS auf Ko-fi unterstützen': 'Support KandleOS on Ko-fi',
 
   // Comprehensive analysis panel
   Kaufen: 'Buy',

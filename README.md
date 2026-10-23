@@ -105,11 +105,6 @@ Installers end up in `release/`.
 
 Please do not report security issues as public issues; see [SECURITY.md](SECURITY.md).
 
-## Support
-
-KandleOS is free. If you find it useful, you can support its development on
-[Ko-fi](https://ko-fi.com/sined1010).
-
 ## License
 
 KandleOS is free software under the [GNU General Public License v3.0 or later](LICENSE).
