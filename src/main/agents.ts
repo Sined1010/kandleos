@@ -174,7 +174,7 @@ export async function removeAgents(): Promise<AgentsStatus> {
 const keysFile = (): string => join(base(), 'keys.bin')
 const plainKeysFile = (): string => join(base(), 'keys.json')
 
-function readKeys(): Record<string, string> {
+export function readKeys(): Record<string, string> {
   try {
     return JSON.parse(safeStorage.decryptString(readFileSync(keysFile())))
   } catch {
@@ -197,15 +197,19 @@ export async function setKey(name: unknown, value: unknown): Promise<Record<stri
   const keys = readKeys()
   if (value) keys[name] = value
   else delete keys[name]
+  await writeKeys(keys)
+  return keyStatus()
+}
+
+/** Replaces all stored keys (names checked by the caller). */
+export async function writeKeys(keys: Record<string, string>): Promise<void> {
   await mkdir(base(), { recursive: true })
   await rm(keysFile(), { force: true })
   await rm(plainKeysFile(), { force: true })
-  if (Object.keys(keys).length) {
-    if (safeStorage.isEncryptionAvailable()) await writeFile(keysFile(), safeStorage.encryptString(JSON.stringify(keys)))
-    // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
-    else await writeFile(plainKeysFile(), JSON.stringify(keys), { mode: 0o600 })
-  }
-  return keyStatus()
+  if (!Object.keys(keys).length) return
+  if (safeStorage.isEncryptionAvailable()) await writeFile(keysFile(), safeStorage.encryptString(JSON.stringify(keys)))
+  // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
+  else await writeFile(plainKeysFile(), JSON.stringify(keys), { mode: 0o600 })
 }
 
 export interface AgentsRequest {
@@ -355,9 +359,31 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
     analysts: req.analysts,
     ...result
   }
-  await mkdir(resultsDir(req.symbol), { recursive: true })
-  await writeFile(join(resultsDir(req.symbol), `${saved.id}.json`), JSON.stringify(saved))
+  await saveAnalysis(saved)
   return saved
+}
+
+/** Writes one analysis to results/<symbol>/<id>.json; the caller has checked symbol and id. */
+export async function saveAnalysis(a: SavedAnalysis): Promise<void> {
+  await mkdir(resultsDir(a.symbol), { recursive: true })
+  await writeFile(join(resultsDir(a.symbol), `${a.id}.json`), JSON.stringify(a))
+}
+
+/** Every saved analysis of every symbol, for the backup file. Unreadable files are skipped. */
+export async function allAnalyses(): Promise<unknown[]> {
+  const root = join(base(), 'results')
+  const out: unknown[] = []
+  for (const dir of await readdir(root).catch(() => [])) {
+    for (const f of await readdir(join(root, dir)).catch(() => [])) {
+      if (!f.endsWith('.json')) continue
+      try {
+        out.push(JSON.parse(await readFile(join(root, dir, f), 'utf8')))
+      } catch {
+        // A damaged file is left out rather than failing the whole export.
+      }
+    }
+  }
+  return out
 }
 
 export function cancelAgents(): void {

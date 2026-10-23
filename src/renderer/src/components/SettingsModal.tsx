@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
 import { useStore } from '../store/useStore'
+import BackupSection from './BackupSection'
 import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 
@@ -83,8 +84,10 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           .
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Nach einem Gerätewechsel neu eintragen.')}
+          {t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Für einen anderen Rechner unten bei „Daten sichern“ mitexportieren oder dort neu eintragen.')}
         </p>
+
+        <BackupSection />
 
         <div className="mt-5 flex items-center justify-end gap-2">
           {/* Shown next to the disabled button, so it is clear what is still missing. */}

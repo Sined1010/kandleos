@@ -7,6 +7,7 @@ import { t } from '../shared/i18n'
 import { phaseAt } from '../shared/market'
 import { cleanName } from '../shared/names'
 import {
+  ALPACA_KEY_RE,
   alpacaKnows,
   TF_SECONDS,
   type Candle,
@@ -43,8 +44,21 @@ function keys(): Keys | null {
 }
 
 export const alpacaHasKeys = (): boolean => !!keys()
+/** For the backup file (backup.ts); never sent to the window. */
+export const alpacaKeys = (): Keys | null => keys()
 
-const KEY_RE = /^[A-Za-z0-9]{10,80}$/
+
+/** Stores (or with null removes) a key pair without checking it with Alpaca. */
+export async function saveAlpacaKeys(k: Keys | null): Promise<void> {
+  await rm(keyFile(), { force: true })
+  await rm(plainKeyFile(), { force: true })
+  cached = k
+  if (!k) return
+  const json = JSON.stringify(k)
+  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(json))
+  // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
+  else await writeFile(plainKeyFile(), json, { mode: 0o600 })
+}
 
 async function request(url: string, k: Keys | null = keys()): Promise<any> {
   if (!k) throw new Error(t('Kein Alpaca-Key hinterlegt. In den Einstellungen eintragen.'))
@@ -63,24 +77,16 @@ export async function setAlpacaKeys(idArg: unknown, secretArg: unknown): Promise
   const id = typeof idArg === 'string' ? idArg.trim() : ''
   const secret = typeof secretArg === 'string' ? secretArg.trim() : ''
   if (!id && !secret) {
-    await rm(keyFile(), { force: true })
-    await rm(plainKeyFile(), { force: true })
-    cached = null
+    await saveAlpacaKeys(null)
     return null
   }
-  if (!KEY_RE.test(id) || !KEY_RE.test(secret)) return t('Ungültiges Key-Format')
+  if (!ALPACA_KEY_RE.test(id) || !ALPACA_KEY_RE.test(secret)) return t('Ungültiges Key-Format')
   try {
     await request(`${DATA}/stocks/snapshots?symbols=AAPL&feed=iex`, { id, secret })
   } catch (e) {
     return (e as Error).name === 'TimeoutError' ? t('Alpaca nicht erreichbar') : (e as Error).message
   }
-  await rm(keyFile(), { force: true })
-  await rm(plainKeyFile(), { force: true })
-  const json = JSON.stringify({ id, secret })
-  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(json))
-  // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
-  else await writeFile(plainKeyFile(), json, { mode: 0o600 })
-  cached = { id, secret }
+  await saveAlpacaKeys({ id, secret })
   return null
 }
 

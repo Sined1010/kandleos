@@ -63,4 +63,6 @@ test('stageOf and keyEnvFor map graph nodes and stored keys', () => {
   assert.equal(keyEnvFor('fred'), 'FRED_API_KEY')
   assert.equal(keyEnvFor('ollama'), null)
   assert.equal(keyEnvFor('evil'), null)
+  assert.equal(keyEnvFor('constructor'), null)
+  assert.equal(keyEnvFor('toString'), null)
 })

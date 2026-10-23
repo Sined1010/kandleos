@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
 import { readFileSync } from 'node:fs'
-import { rename, rm, writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -15,9 +15,21 @@ import {
   setKey
 } from './agents'
 import { setLang } from '../shared/i18n'
+import { FINNHUB_KEY_RE } from '../shared/types'
+import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
-import { companyInfo, finnhubCheck, searchSymbols, setStockSource, stockCandles, stockQuotes, symbolName } from './stocks'
+import {
+  companyInfo,
+  finnhubCheck,
+  finnhubKey,
+  saveFinnhubKey,
+  searchSymbols,
+  setStockSource,
+  stockCandles,
+  stockQuotes,
+  symbolName
+} from './stocks'
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
 // those would be two different folders. All data (store, key, single-instance lock) lives here.
@@ -31,15 +43,11 @@ ipcMain.on('app:stock-source', (_e, s, yahooExtra) => setStockSource(s, yahooExt
 // Alpaca keys only go in; the window learns whether they are set.
 ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
 ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))
-ipcMain.on('store:get', (e) => {
-  try {
-    e.returnValue = readFileSync(storeFile(), 'utf8')
-  } catch {
-    e.returnValue = null
-  }
-})
+ipcMain.on('store:get', (e) => (e.returnValue = readStore()))
+// After an import the old page would save its state back over the imported store; ignore it until the reload.
+let storeLocked = false
 ipcMain.handle('store:set', (_e, data: unknown) => {
-  if (typeof data !== 'string') return
+  if (typeof data !== 'string' || storeLocked) return
   // Serialize writes and swap atomically so a crash mid-write never truncates the store.
   writeQueue = writeQueue
     .then(async () => {
@@ -49,29 +57,35 @@ ipcMain.handle('store:set', (_e, data: unknown) => {
     .catch((err) => console.error('Speichern fehlgeschlagen:', err))
   return writeQueue
 })
-// The API key lives apart from the portable store file, encrypted for this OS user
-// (DPAPI on Windows, Secret Service/KWallet on Linux).
-const keyFile = (): string => join(app.getPath('userData'), 'finnhub-key.bin')
-const plainKeyFile = (): string => join(app.getPath('userData'), 'finnhub-key.txt')
-ipcMain.on('key:get', (e) => {
-  try {
-    e.returnValue = safeStorage.decryptString(readFileSync(keyFile()))
-  } catch {
-    try {
-      e.returnValue = readFileSync(plainKeyFile(), 'utf8')
-    } catch {
-      e.returnValue = ''
-    }
-  }
-})
+// The Finnhub key is stored apart from the store file (stocks.ts); the window needs it for the live stream.
+ipcMain.on('key:get', (e) => (e.returnValue = finnhubKey()))
 ipcMain.handle('key:set', async (_e, key: unknown) => {
-  if (typeof key !== 'string' || !/^[A-Za-z0-9]{0,64}$/.test(key)) return
-  await rm(keyFile(), { force: true })
-  await rm(plainKeyFile(), { force: true })
-  if (!key) return
-  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(key))
-  // shortcut: without an OS keyring (some Linux setups) the key is plain text readable only by this user; install gnome-keyring/KWallet to get encryption.
-  else await writeFile(plainKeyFile(), key, { mode: 0o600 })
+  if (typeof key === 'string' && FINNHUB_KEY_RE.test(key)) await saveFinnhubKey(key)
+})
+// Backup file (backup.ts): main shows the dialogs and handles the keys; the window gets a summary only.
+const readStore = (): string | null => {
+  try {
+    return readFileSync(storeFile(), 'utf8')
+  } catch {
+    return null
+  }
+}
+ipcMain.handle('backup:export', async (e, opts) => {
+  await writeQueue
+  return exportBackup(e.sender, readStore(), opts)
+})
+ipcMain.handle('backup:pick', (e) => pickBackup(e.sender))
+ipcMain.handle('backup:apply', async (e, password) => {
+  const store = await applyBackup(password)
+  storeLocked = true
+  await writeQueue
+  if (store) {
+    await writeFile(storeFile() + '.tmp', store, 'utf8')
+    await rename(storeFile() + '.tmp', storeFile())
+  }
+  // The new page reads the imported store (and keys) on start.
+  e.sender.once('did-finish-load', () => (storeLocked = false))
+  e.sender.reload()
 })
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended) => stockCandles(symbol, tf, key, extended))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))

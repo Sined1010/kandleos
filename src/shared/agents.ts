@@ -75,7 +75,8 @@ export type KeyName = ProviderId | keyof typeof EXTRA_KEYS
 
 /** Environment variable for a stored key name, or null when there is none (e.g. local models). */
 export function keyEnvFor(name: string): string | null {
-  if (name in EXTRA_KEYS) return EXTRA_KEYS[name as keyof typeof EXTRA_KEYS]
+  // Own keys only: `in` would also accept inherited names like "constructor".
+  if (Object.hasOwn(EXTRA_KEYS, name)) return EXTRA_KEYS[name as keyof typeof EXTRA_KEYS]
   return PROVIDERS.find((p) => p.id === name)?.keyEnv ?? null
 }
 

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
+import type { BackupSummary } from '../main/backup'
 import type { CandleData, CompanyInfo, Quote, SearchResult, Timeframe } from '../shared/types'
 
 /** Subscribes to a main-process event channel; returns the unsubscribe function. */
@@ -34,6 +35,16 @@ const api = {
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
   /** Profile of a stock for the info button: Finnhub with a key, otherwise Yahoo if switched on. */
   companyInfo: (symbol: string, key: string): Promise<CompanyInfo> => ipcRenderer.invoke('stocks:info', symbol, key),
+  /** Backup file: main shows the file dialogs; keys go into the file only encrypted with the password. */
+  backup: {
+    /** Resolves to the saved path, or null if the dialog was cancelled. */
+    export: (withKeys: boolean, password: string): Promise<string | null> =>
+      ipcRenderer.invoke('backup:export', { withKeys, password }),
+    /** Picks and checks a file; null if cancelled. */
+    pick: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:pick'),
+    /** Imports the picked file (keys only with the right password; empty skips them), then the window reloads. */
+    apply: (password: string): Promise<void> => ipcRenderer.invoke('backup:apply', password)
+  },
   /** Opens the third-party license file; resolves to an error message, or '' on success. */
   openLicenses: (): Promise<string> => ipcRenderer.invoke('app:licenses'),
   /**

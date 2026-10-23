@@ -109,6 +109,9 @@ export interface CompanyInfo {
 
 // Starts with a letter, digit or ^ (indices): the symbol also names a results folder, so ".." must never pass.
 export const SYMBOL_RE = /^[A-Z0-9^][A-Z0-9.\-^=]{0,19}$/
+/** Formats of the stored API keys (empty Finnhub key = none). */
+export const FINNHUB_KEY_RE = /^[A-Za-z0-9]{0,64}$/
+export const ALPACA_KEY_RE = /^[A-Za-z0-9]{10,80}$/
 
 export interface CandleData {
   candles: Candle[]

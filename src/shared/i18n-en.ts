@@ -531,8 +531,8 @@ export const EN: Record<string, string> = {
     'Please confirm that you use Yahoo Finance for private purposes only.',
   'Mit Key laufen US-Aktien in Echtzeit mit, auch vor- und nachbörslich. Ohne Key werden die Kurse alle 5 s (Alpaca) oder 15 s (Yahoo) abgefragt. Für andere Börsen, Indizes und Krypto ändert sich nichts. Kostenloser Key:':
     'With a key, US stocks update in real time, including pre- and after-market. Without a key, prices are polled every 5 s (Alpaca) or 15 s (Yahoo). Nothing changes for other exchanges, indices and crypto. Free key:',
-  'Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Nach einem Gerätewechsel neu eintragen.':
-    'The key is stored encrypted on this computer (on Linux only with gnome-keyring or KWallet). Enter it again after switching devices.',
+  'Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Für einen anderen Rechner unten bei „Daten sichern“ mitexportieren oder dort neu eintragen.':
+    'The key is stored encrypted on this computer (on Linux only with gnome-keyring or KWallet). For another computer, include it under “Back up data” below or enter it there again.',
   'Der Finnhub-Key darf nur Buchstaben und Ziffern enthalten.':
     'The Finnhub key may only contain letters and digits.',
   'Die Keys werden verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet).':
@@ -582,5 +582,47 @@ export const EN: Record<string, string> = {
   'Quelle: {source}':
     'Source: {source}',
   'nur für private Zwecke':
-    'for private use only'
+    'for private use only',
+  'Das Passwort muss mindestens {n} Zeichen haben.':
+    'The password must have at least {n} characters.',
+  'Falsches Passwort':
+    'Wrong password',
+  'Keine gültige KandleOS-Sicherung':
+    'Not a valid KandleOS backup',
+  'Daten exportieren':
+    'Export data',
+  'Daten importieren':
+    'Import data',
+  'Keine Sicherung ausgewählt':
+    'No backup selected',
+  'Daten sichern':
+    'Back up data',
+  'Watchlist, Zeichnungen, Indikatoren, Chart-Tabs, Einstellungen und gespeicherte Analysen als Datei sichern, z. B. für einen neuen Rechner.':
+    'Save the watchlist, drawings, indicators, chart tabs, settings and saved analyses to a file, e.g. for a new computer.',
+  'API-Keys mitexportieren (mit Passwort verschlüsselt)':
+    'Include API keys (encrypted with a password)',
+  'Passwort (mind. 8 Zeichen)':
+    'Password (at least 8 characters)',
+  'Passwort wiederholen':
+    'Repeat password',
+  'Die Passwörter stimmen nicht überein.':
+    'The passwords do not match.',
+  'Exportieren …':
+    'Export …',
+  'Importieren …':
+    'Import …',
+  'Importieren':
+    'Import',
+  'Gespeichert: {path}':
+    'Saved: {path}',
+  'Die Sicherung stammt von einer neueren KandleOS-Version.':
+    'The backup comes from a newer version of KandleOS.',
+  'Sicherung vom {date} (KandleOS {version}): {symbols} Werte in der Watchlist, {analyses} gespeicherte Analysen.':
+    'Backup from {date} (KandleOS {version}): {symbols} symbols in the watchlist, {analyses} saved analyses.',
+  'Enthält verschlüsselte API-Keys. Passwort eingeben, um sie zu übernehmen, oder leer lassen.':
+    'Contains encrypted API keys. Enter the password to import them, or leave it empty.',
+  'Passwort für die API-Keys':
+    'Password for the API keys',
+  'Ersetzt Watchlist, Zeichnungen und Einstellungen auf diesem Rechner. KandleOS lädt danach neu.':
+    'Replaces the watchlist, drawings and settings on this computer. KandleOS then reloads.'
 }

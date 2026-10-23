@@ -1,3 +1,7 @@
+import { app, safeStorage } from 'electron'
+import { readFileSync } from 'node:fs'
+import { rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { alpacaCandles, alpacaName, alpacaQuotes, alpacaSearch } from './alpaca'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
@@ -20,6 +24,33 @@ import {
   type StockSource,
   type Timeframe
 } from '../shared/types'
+
+// The Finnhub key lives apart from the portable store file, encrypted for this OS user
+// (DPAPI on Windows, Secret Service/KWallet on Linux).
+const keyFile = (): string => join(app.getPath('userData'), 'finnhub-key.bin')
+const plainKeyFile = (): string => join(app.getPath('userData'), 'finnhub-key.txt')
+
+export function finnhubKey(): string {
+  try {
+    return safeStorage.decryptString(readFileSync(keyFile()))
+  } catch {
+    try {
+      return readFileSync(plainKeyFile(), 'utf8')
+    } catch {
+      return ''
+    }
+  }
+}
+
+/** Stores the key (empty removes it); the caller has checked it against FINNHUB_KEY_RE. */
+export async function saveFinnhubKey(key: string): Promise<void> {
+  await rm(keyFile(), { force: true })
+  await rm(plainKeyFile(), { force: true })
+  if (!key) return
+  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(key))
+  // shortcut: without an OS keyring (some Linux setups) the key is plain text readable only by this user; install gnome-keyring/KWallet to get encryption.
+  else await writeFile(plainKeyFile(), key, { mode: 0o600 })
+}
 
 // Chosen by the user on first start or in the settings; the window tells main (see index.ts).
 let source: StockSource | null = null
