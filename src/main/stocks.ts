@@ -5,6 +5,7 @@ import { marketStatus, phaseAt } from '../shared/market'
 import { aggregate, aggregateMonths } from '../shared/candles'
 import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
 import {
+  alpacaKnows,
   cryptoQuoteAsset,
   isCrypto,
   stockRoute,
@@ -13,6 +14,7 @@ import {
   TF_SECONDS,
   type Candle,
   type CandleData,
+  type CompanyInfo,
   type Quote,
   type SearchResult,
   type StockSource,
@@ -340,4 +342,117 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Re
     })
   ])
   return out
+}
+
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+const raw = (v: any): number | undefined => num(v?.raw)
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+// The window opens https links only (see index.ts).
+const https = (v: unknown): string | undefined => str(v)?.replace(/^http:\/\//, 'https://').match(/^https:\/\/\S+$/)?.[0]
+
+/** Company profile for the info button: Finnhub with a key, otherwise (and for what Finnhub lacks) Yahoo if switched on. */
+export async function companyInfo(symbolArg: unknown, keyArg: unknown): Promise<CompanyInfo> {
+  const [symbol, key] = checkArgs(symbolArg, keyArg)
+  if (isCrypto(symbol)) throw new Error(t('Infos gibt es nur für Aktien.'))
+  // Finnhub's free plan covers US listings only; indices, commodities and other exchanges fall through to Yahoo.
+  const finnhub = key && alpacaKnows(symbol) ? await finnhubInfo(symbol, key).catch(() => null) : null
+  if (finnhub) return finnhub
+  if (!yahooOn()) {
+    throw new Error(
+      key
+        ? t('Finnhub hat keine Infos zu {symbol}.', { symbol })
+        : t('Für Infos einen Finnhub-Key eintragen oder Yahoo Finance einschalten (Einstellungen).')
+    )
+  }
+  return yahooInfo(symbol)
+}
+
+async function finnhubInfo(symbol: string, key: string): Promise<CompanyInfo | null> {
+  const [p, m] = await Promise.all([
+    getJson(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`, finnhubAuth(key)),
+    getJson(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all`, finnhubAuth(key)).catch(() => null)
+  ])
+  if (!str(p?.name)) return null
+  const k = m?.metric ?? {}
+  const cap = num(p.marketCapitalization)
+  return {
+    source: 'Finnhub',
+    name: str(p.name),
+    sector: str(p.finnhubIndustry),
+    country: str(p.country),
+    exchange: str(p.exchange),
+    currency: str(p.currency),
+    // Finnhub reports millions.
+    marketCap: cap && cap * 1e6,
+    website: https(p.weburl),
+    ipo: str(p.ipo),
+    pe: num(k.peTTM ?? k.peBasicExclExtraTTM),
+    dividendYield: num(k.dividendYieldIndicatedAnnual),
+    beta: num(k.beta),
+    high52: num(k['52WeekHigh']),
+    low52: num(k['52WeekLow'])
+  }
+}
+
+// quoteSummary wants a session cookie and its crumb; both are fetched once and renewed when Yahoo rejects them.
+let yahooSession: Promise<{ cookie: string; crumb: string }> | null = null
+const cookiesOf = (res: Response | null) => res?.headers.getSetCookie().map((c) => c.split(';')[0]) ?? []
+function yahooAuth(): Promise<{ cookie: string; crumb: string }> {
+  yahooSession ??= (async () => {
+    const opts = { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) }
+    // fc.yahoo.com answers 404 but sets the session cookie; failing here is fine, the crumb request sets one too.
+    const jar = cookiesOf(await fetch('https://fc.yahoo.com', { ...opts, redirect: 'manual' }).catch(() => null))
+    const res = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      ...opts,
+      headers: { ...opts.headers, Cookie: jar.join('; ') }
+    })
+    const crumb = (await res.text()).trim()
+    if (!res.ok || !/^\S{1,64}$/.test(crumb)) throw new Error(`Yahoo HTTP ${res.status}`)
+    return { cookie: [...jar, ...cookiesOf(res)].join('; '), crumb }
+  })().catch((e) => {
+    yahooSession = null
+    throw e
+  })
+  return yahooSession
+}
+
+async function yahooInfo(symbol: string, retry = true): Promise<CompanyInfo> {
+  const { cookie, crumb } = await yahooAuth()
+  let d: any
+  try {
+    d = await getJson(
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}` +
+        `?modules=assetProfile,price,summaryDetail&crumb=${encodeURIComponent(crumb)}`,
+      { Cookie: cookie }
+    )
+  } catch (e) {
+    // An expired crumb answers 401; get a new session once.
+    if (!retry || !/HTTP 401/.test((e as Error).message)) throw e
+    yahooSession = null
+    return yahooInfo(symbol, false)
+  }
+  const r = d.quoteSummary?.result?.[0]
+  if (!r) throw new Error(t('Yahoo hat keine Infos zu {symbol}.', { symbol }))
+  const p = r.assetProfile ?? {}
+  const pr = r.price ?? {}
+  const sd = r.summaryDetail ?? {}
+  const dy = raw(sd.dividendYield)
+  return {
+    source: 'Yahoo Finance',
+    name: str(pr.longName) ?? str(pr.shortName),
+    description: str(p.longBusinessSummary),
+    sector: str(p.sectorDisp) ?? str(p.sector),
+    industry: str(p.industryDisp) ?? str(p.industry),
+    country: str(p.country),
+    exchange: str(pr.exchangeName),
+    currency: str(pr.currency),
+    marketCap: raw(pr.marketCap) ?? raw(sd.marketCap),
+    employees: num(p.fullTimeEmployees),
+    website: https(p.website),
+    pe: raw(sd.trailingPE),
+    dividendYield: dy && dy * 100,
+    beta: raw(sd.beta),
+    high52: raw(sd.fiftyTwoWeekHigh),
+    low52: raw(sd.fiftyTwoWeekLow)
+  }
 }

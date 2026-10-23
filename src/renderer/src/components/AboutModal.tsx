@@ -53,8 +53,8 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
         <ul className="ml-4 mt-1 list-disc">
           <li>{t('Binance – Kryptokurse')}</li>
           <li>{t('Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key')}</li>
-          <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
-          <li>{t('Finnhub – Echtzeit-Aktienkurse, nur wenn ein eigener API-Key eingetragen ist')}</li>
+          <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
+          <li>{t('Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
         </ul>
         <p className="mt-2">

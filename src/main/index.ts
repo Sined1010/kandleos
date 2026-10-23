@@ -16,7 +16,7 @@ import {
 import { setLang } from '../shared/i18n'
 import { forecast } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
-import { finnhubCheck, searchSymbols, setStockSource, stockCandles, stockQuotes, symbolName } from './stocks'
+import { companyInfo, finnhubCheck, searchSymbols, setStockSource, stockCandles, stockQuotes, symbolName } from './stocks'
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
 // those would be two different folders. All data (store, key, single-instance lock) lives here.
@@ -77,6 +77,7 @@ ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
+ipcMain.handle('stocks:info', (_e, symbol, key) => companyInfo(symbol, key))
 ipcMain.handle('forecast:run', (e, series, groups) => {
   let last = -1
   return forecast(series, groups, (share) => {

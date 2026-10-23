@@ -4,6 +4,7 @@ import { locale, msg, t } from '../../../shared/i18n'
 import { isCrypto, tfLabel, type StockSource, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
+import CompanyInfoButton from './CompanyInfo'
 import Logo from './Logo'
 import SymbolSearch from './SymbolSearch'
 
@@ -30,6 +31,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
       </div>
 
       <AddToWatchlist symbol={symbol} />
+      {!isCrypto(symbol) && <CompanyInfoButton symbol={symbol} />}
 
       <TimeframePicker />
 

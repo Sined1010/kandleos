@@ -81,6 +81,32 @@ export interface SearchResult {
   exchange: string
 }
 
+/** What the info button shows about a stock; every field is optional because the sources differ. */
+export interface CompanyInfo {
+  source: 'Finnhub' | 'Yahoo Finance'
+  name?: string
+  /** What the company does; Yahoo only, in English. */
+  description?: string
+  sector?: string
+  industry?: string
+  country?: string
+  exchange?: string
+  currency?: string
+  /** In `currency` units. */
+  marketCap?: number
+  employees?: number
+  /** https only, so the window can open it. */
+  website?: string
+  /** Date of the IPO, YYYY-MM-DD (Finnhub only). */
+  ipo?: string
+  pe?: number
+  /** In percent. */
+  dividendYield?: number
+  beta?: number
+  high52?: number
+  low52?: number
+}
+
 // Starts with a letter, digit or ^ (indices): the symbol also names a results folder, so ".." must never pass.
 export const SYMBOL_RE = /^[A-Z0-9^][A-Z0-9.\-^=]{0,19}$/
 

@@ -50,8 +50,6 @@ export const EN: Record<string, string> = {
     'nor a recommendation to buy or sell. All prices without guarantee: data may be delayed, incomplete or wrong. Use at your own risk; investment decisions are yours alone.',
   Datenschutz: 'Privacy',
   'Binance – Kryptokurse': 'Binance – crypto prices',
-  'Finnhub – Echtzeit-Aktienkurse, nur wenn ein eigener API-Key eingetragen ist':
-    'Finnhub – real-time stock prices, only if you enter your own API key',
   'Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“':
     'Hugging Face – one-time download of the forecast model on the first click on “Forecast”',
   'Nur wenn du die': 'Only when you set up and start the',
@@ -473,8 +471,6 @@ export const EN: Record<string, string> = {
     'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; API keys are stored encrypted. To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
   'Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key':
     'Alpaca – stock prices, symbol search and names, only with your own API key',
-  'Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)':
-    'Yahoo Finance – stock prices, symbol search and names, only if chosen as the data source (for private use only)',
   'Datenquelle für Aktien': 'Data source for stocks',
   'Finnhub API-Key (optional)': 'Finnhub API key (optional)',
   'Keys gespeichert': 'Keys saved',
@@ -531,5 +527,49 @@ export const EN: Record<string, string> = {
   'Die Keys werden verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet).':
     'The keys are stored encrypted on this computer (on Linux only with gnome-keyring or KWallet).',
   'Kryptokurse von Binance, ohne Anmeldung. Aktien lassen sich jederzeit dazunehmen.':
-    'Crypto prices from Binance, no sign-up. Stocks can be added at any time.'
+    'Crypto prices from Binance, no sign-up. Stocks can be added at any time.',
+  'Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)':
+    'Yahoo Finance – stock prices, symbol search, names and company info, only if chosen as the data source (for private use only)',
+  'Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist':
+    'Finnhub – real-time stock prices and company info, only if you enter your own API key',
+  'Infos gibt es nur für Aktien.':
+    'Info is only available for stocks.',
+  'Finnhub hat keine Infos zu {symbol}.':
+    'Finnhub has no info on {symbol}.',
+  'Für Infos einen Finnhub-Key eintragen oder Yahoo Finance einschalten (Einstellungen).':
+    'For info, enter a Finnhub key or switch on Yahoo Finance (settings).',
+  'Yahoo hat keine Infos zu {symbol}.':
+    'Yahoo has no info on {symbol}.',
+  'Infos zum Unternehmen':
+    'Company info',
+  'Marktkapitalisierung':
+    'Market cap',
+  'Branche':
+    'Sector',
+  'Land':
+    'Country',
+  'Börse':
+    'Exchange',
+  'Mitarbeiter':
+    'Employees',
+  'KGV':
+    'P/E ratio',
+  'Dividendenrendite':
+    'Dividend yield',
+  'Beta':
+    'Beta',
+  '52-Wochen-Spanne':
+    '52-week range',
+  'Börsengang':
+    'IPO',
+  'Lade Infos …':
+    'Loading info …',
+  'Website':
+    'Website',
+  'Beschreibung (auf Englisch)':
+    'Description',
+  'Quelle: {source}':
+    'Source: {source}',
+  'nur für private Zwecke':
+    'for private use only'
 }

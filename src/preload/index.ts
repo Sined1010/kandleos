@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
-import type { CandleData, Quote, SearchResult, Timeframe } from '../shared/types'
+import type { CandleData, CompanyInfo, Quote, SearchResult, Timeframe } from '../shared/types'
 
 /** Subscribes to a main-process event channel; returns the unsubscribe function. */
 function listen<T>(channel: string, cb: (value: T) => void): () => void {
@@ -32,6 +32,8 @@ const api = {
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
+  /** Profile of a stock for the info button: Finnhub with a key, otherwise Yahoo if switched on. */
+  companyInfo: (symbol: string, key: string): Promise<CompanyInfo> => ipcRenderer.invoke('stocks:info', symbol, key),
   /** Opens the third-party license file; resolves to an error message, or '' on success. */
   openLicenses: (): Promise<string> => ipcRenderer.invoke('app:licenses'),
   /**
