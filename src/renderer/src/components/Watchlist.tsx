@@ -1,12 +1,16 @@
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { t } from '../../../shared/i18n'
+import { isCrypto } from '../../../shared/types'
 import { formatChange, formatPrice } from '../lib/format'
-import { useQuotes, useStore, type Folder } from '../store/useStore'
+import { MAX_TABS, useQuotes, useStore, type Folder } from '../store/useStore'
+import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
+/** A right-clicked watchlist row: which symbol in which folder, where the mouse was and the row's left edge. */
+type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number }
 
 export default function Watchlist() {
   const folders = useStore((s) => s.folders)
@@ -36,6 +40,19 @@ export default function Watchlist() {
     setName(s, '')
   }
 
+  const [menu, setMenu] = useState<RowAt | null>(null)
+  const [info, setInfo] = useState<RowAt | null>(null)
+  useEffect(() => {
+    if (!menu && !info) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setMenu(null)
+      setInfo(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menu, info])
+
   return (
     <aside className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
@@ -57,12 +74,87 @@ export default function Watchlist() {
             onEdit={() => setEditing(f.id)}
             onEditDone={() => setEditing(null)}
             onNameReset={resetName}
+            onMenu={setMenu}
             drag={drag}
           />
         ))}
         {!folders.length && <p className="p-4 text-xs text-muted">{t('Noch keine Ordner – oben „Ordner“ klicken.')}</p>}
       </div>
+      {menu && <RowMenu at={menu} onInfo={() => setInfo(menu)} onClose={() => setMenu(null)} />}
+      {info && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setInfo(null)} />
+          {/* Opens left of the watchlist (it sits at the window's right edge) so the list stays readable. */}
+          <div
+            className="fixed z-50"
+            style={{ left: Math.max(8, info.left - 392), top: Math.max(8, Math.min(info.y, window.innerHeight - 480)) }}
+          >
+            <InfoPanel symbol={info.symbol} />
+          </div>
+        </>
+      )}
     </aside>
+  )
+}
+
+/** Right-click menu of a watchlist row. Unavailable entries stay visible with the reason underneath. */
+function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClose: () => void }) {
+  const setSymbol = useStore((s) => s.setSymbol)
+  const addTab = useStore((s) => s.addTab)
+  const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
+  const removeFromFolder = useStore((s) => s.removeFromFolder)
+  const s = at.symbol
+  const items: { label: string; run?: () => void; reason?: string; danger?: boolean }[] = [
+    { label: t('Öffnen'), run: () => setSymbol(s) },
+    tabsFull
+      ? { label: t('In neuem Tab öffnen'), reason: t('Höchstens {max} Charts gleichzeitig', { max: MAX_TABS }) }
+      : {
+          label: t('In neuem Tab öffnen'),
+          // The new tab starts as a copy of the current chart, then shows this symbol.
+          run: () => {
+            addTab()
+            setSymbol(s)
+          }
+        },
+    isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
+    { label: t('Aus Watchlist löschen'), run: () => removeFromFolder(at.folderId, s), danger: true }
+  ]
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onClose()
+        }}
+      />
+      <div
+        role="menu"
+        aria-label={t('Aktionen für {symbol}', { symbol: s })}
+        className="fixed z-50 w-52 rounded-lg border border-line bg-panel/95 py-1 text-xs shadow-2xl shadow-black/50 backdrop-blur"
+        style={{ left: Math.min(at.x, window.innerWidth - 216), top: Math.min(at.y, window.innerHeight - 170) }}
+      >
+        {items.map((item, i) => (
+          <button
+            key={item.label}
+            role="menuitem"
+            autoFocus={i === 0}
+            disabled={!item.run}
+            onClick={() => {
+              item.run?.()
+              onClose()
+            }}
+            className={`block w-full px-3 py-1.5 text-left outline-none disabled:cursor-default disabled:text-muted ${
+              item.danger ? 'text-down hover:bg-down/10 focus:bg-down/10' : 'text-white hover:bg-line focus:bg-line'
+            } disabled:hover:bg-transparent`}
+          >
+            {item.label}
+            {item.reason && <span className="block text-[10px] text-muted/70">{item.reason}</span>}
+          </button>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -72,10 +164,11 @@ interface SectionProps {
   onEdit: () => void
   onEditDone: () => void
   onNameReset: (symbol: string) => void
+  onMenu: (row: RowAt) => void
   drag: Drag
 }
 
-function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, drag }: SectionProps) {
+function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, onMenu, drag }: SectionProps) {
   const active = useStore((s) => s.symbol)
   const setSymbol = useStore((s) => s.setSymbol)
   const toggle = useStore((s) => s.toggleFolder)
@@ -211,7 +304,11 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, dr
             <div
               key={s}
               draggable={renaming !== s}
-              title={t('Ziehen zum Sortieren oder in einen anderen Ordner')}
+              title={t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                onMenu({ symbol: s, folderId: f.id, x: e.clientX, y: e.clientY, left: e.currentTarget.getBoundingClientRect().left })
+              }}
               onDragStart={(e) => {
                 drag.current = { symbol: s, from: f.id }
                 e.dataTransfer.effectAllowed = 'move'

@@ -43,7 +43,8 @@ export default function CompanyInfoButton({ symbol }: { symbol: string }) {
   )
 }
 
-function InfoPanel({ symbol }: { symbol: string }) {
+/** The info panel itself; also opened from the watchlist's context menu. */
+export function InfoPanel({ symbol }: { symbol: string }) {
   const key = useStore((s) => s.finnhubKey)
   const [info, setInfo] = useState<CompanyInfo | null>(null)
   const [error, setError] = useState('')
