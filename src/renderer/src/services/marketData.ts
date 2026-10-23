@@ -3,6 +3,7 @@ import { aggregateMonths } from '../../../shared/candles'
 import { t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
 import {
+  alpacaKnows,
   cryptoQuoteAsset,
   isCrypto,
   TF_MONTHS,
@@ -174,10 +175,10 @@ export function watchQuotes(
 
   // Latest polled quote per stock: the previous close for live changes, the regular price for extended hours.
   const polled: Record<string, Quote> = {}
-  const poll = () =>
+  const poll = (list = stocks) =>
     window.api
       // A rejected key is not sent again, so quotes come straight from the chosen source.
-      .stockQuotes(stocks, error ? '' : finnhubKey)
+      .stockQuotes(list, error ? '' : finnhubKey)
       .then((quotes) => {
         if (!active) return
         for (const [s, q] of Object.entries(quotes)) {
@@ -186,8 +187,9 @@ export function watchQuotes(
         }
       })
       .catch((e) => console.warn('Aktienkurse:', e))
-  const startPolling = () => {
-    const id = setInterval(poll, source === 'alpaca' ? 5_000 : 15_000)
+  const startPolling = (list = stocks) => {
+    if (!list.length) return
+    const id = setInterval(() => poll(list), source === 'alpaca' ? 5_000 : 15_000)
     cleanups.push(() => clearInterval(id))
   }
   const openFinnhub = () =>
@@ -243,7 +245,11 @@ export function watchQuotes(
         if (!stocks.length) return
         // An invalid key would only make the socket reconnect forever; fall back to polling.
         if (err) startPolling()
-        else openFinnhub()
+        else {
+          openFinnhub()
+          // Finnhub's free stream has US listings only; other exchanges, indices and commodities keep being polled.
+          startPolling(stocks.filter((s) => !alpacaKnows(s)))
+        }
       })
   }
 

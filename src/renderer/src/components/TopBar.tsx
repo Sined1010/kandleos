@@ -130,7 +130,7 @@ function TimeframePicker() {
   )
 }
 
-/** Without Finnhub the badge names the stock source. */
+/** The badge always names the stock source; with a Finnhub key its connection follows. */
 const SOURCE: Record<StockSource, [dot: string, label: string, hint: string]> = {
   alpaca: ['bg-up', msg('Alpaca · IEX'), msg('Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.')],
   yahoo: ['bg-muted', msg('Yahoo · verzögert'), msg('Aktienkurse alle 15 s über Yahoo Finance (nur für private Zwecke). Klicken für die Einstellungen.')],
@@ -144,16 +144,18 @@ const FEED: Record<Exclude<FeedStatus['state'], 'off'>, [dot: string, label: str
   error: ['bg-down', msg('Finnhub · Fehler'), msg('Aktienkurse kommen ersatzweise über die gewählte Datenquelle.')]
 }
 
-/** Stock data source, or the Finnhub connection when a key is set; opens the settings on click. */
+/** Stock data source and, when a key is set, the Finnhub connection; opens the settings on click. */
 function FeedBadge({ onClick }: { onClick: () => void }) {
   const feed = useQuotes((s) => s.feed)
   const source = useStore((s) => s.stockSource) ?? 'none'
   const yahooExtra = useStore((s) => s.yahooExtra)
-  const [dot, label, hint] = feed.state === 'off' ? SOURCE[source] : FEED[feed.state]
+  const [dot, label, hint] = SOURCE[source]
+  const finnhub = feed.state === 'off' ? null : FEED[feed.state]
   const details = [
-    feed.detail,
     t(hint),
     yahooExtra && t('Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance (nur für private Zwecke).'),
+    finnhub && t(finnhub[2]),
+    feed.detail,
     feed.state === 'live' &&
       (feed.lastTrade
         ? t('Letzter Trade: {time}', { time: new Date(feed.lastTrade * 1000).toLocaleTimeString(locale()) })
@@ -167,6 +169,13 @@ function FeedBadge({ onClick }: { onClick: () => void }) {
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden />
       {t(label)}
+      {yahooExtra && ' + Yahoo'}
+      {finnhub && (
+        <>
+          <span className={`ml-2 h-2 w-2 rounded-full ${finnhub[0]}`} aria-hidden />
+          {t(finnhub[1])}
+        </>
+      )}
       {feed.state === 'error' && feed.detail && <span className="text-down">({feed.detail})</span>}
     </button>
   )

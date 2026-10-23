@@ -20,6 +20,7 @@ export default function App() {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const language = useStore((s) => s.language)
   const stockSource = useStore((s) => s.stockSource)
+  const yahooExtra = useStore((s) => s.yahooExtra)
   const activeTab = useStore((s) => s.activeTab)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
   // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
@@ -28,7 +29,8 @@ export default function App() {
 
   useEffect(
     () => watchQuotes(feed.split(','), finnhubKey, stockSource, setQuote, setFeedStatus),
-    [feed, finnhubKey, stockSource]
+    // yahooExtra: main routes by it, so the first poll after switching must see it.
+    [feed, finnhubKey, stockSource, yahooExtra]
   )
 
   return (
