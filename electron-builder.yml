@@ -7,6 +7,9 @@ files:
   - package.json
 # Shipped next to the app (resources/), opened from the "Über KandleOS" dialog.
 extraResources:
+  # KandleOS itself is GPL-3.0-or-later; the license text must travel with every copy.
+  - from: LICENSE
+    to: LICENSE.txt
   - from: resources/THIRD_PARTY_LICENSES.txt
     to: THIRD_PARTY_LICENSES.txt
   # Bridge to TradingAgents for the KI-Analyse; Python and TradingAgents themselves are installed on first use.

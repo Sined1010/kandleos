@@ -62,6 +62,8 @@ export const EN: Record<string, string> = {
   'Prognosemodell: Amazon Chronos-2 (Apache-2.0) als ONNX-Export von sktime. Umfassende Analyse: TradingAgents von Tauric Research (Apache-2.0), bei Bedarf installiert mit uv von Astral (MIT/Apache-2.0). Alle Marken gehören ihren jeweiligen Inhabern; KandleOS steht in keiner Verbindung zu diesen Unternehmen.':
     'Forecast model: Amazon Chronos-2 (Apache-2.0) as an ONNX export by sktime. Comprehensive analysis: TradingAgents by Tauric Research (Apache-2.0), installed on demand with uv by Astral (MIT/Apache-2.0). All trademarks belong to their respective owners; KandleOS is not affiliated with these companies.',
   Lizenzen: 'Licenses',
+  'KandleOS ist freie Software: Du darfst es unter den Bedingungen der GNU General Public License, Version 3 oder (nach deiner Wahl) jeder späteren Version, weitergeben und verändern. Es wird ohne jede Gewährleistung bereitgestellt. Der Lizenztext liegt als LICENSE.txt im Programmordner und unter':
+    'KandleOS is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes without any warranty. The license text is in LICENSE.txt in the program folder and at',
   'KandleOS nutzt Open-Source-Software, u. a. Electron, React und Lightweight Charts.':
     'KandleOS uses open-source software, including Electron, React and Lightweight Charts.',
   'Lizenzen von Drittanbietern anzeigen': 'Show third-party licenses',

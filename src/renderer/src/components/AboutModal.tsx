@@ -77,7 +77,18 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
         </p>
 
         <h3 className={h}>{t('Lizenzen')}</h3>
+        {/* GPL §5d: an interactive program shows its copyright, the missing warranty and where the license is. */}
         <p>
+          © 2026 Sined1010.{' '}
+          {t(
+            'KandleOS ist freie Software: Du darfst es unter den Bedingungen der GNU General Public License, Version 3 oder (nach deiner Wahl) jeder späteren Version, weitergeben und verändern. Es wird ohne jede Gewährleistung bereitgestellt. Der Lizenztext liegt als LICENSE.txt im Programmordner und unter'
+          )}{' '}
+          <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noreferrer" className={link}>
+            gnu.org/licenses/gpl-3.0
+          </a>
+          .
+        </p>
+        <p className="mt-2">
           {t('KandleOS nutzt Open-Source-Software, u. a. Electron, React und Lightweight Charts.')}{' '}
           <button onClick={async () => setLicenseError(await window.api.openLicenses())} className={link}>
             {t('Lizenzen von Drittanbietern anzeigen')}

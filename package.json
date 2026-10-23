@@ -5,6 +5,7 @@
   "private": true,
   "description": "Desktop-App für technische Chartanalyse",
   "author": "Sined1010 <343844815+Sined1010@users.noreply.github.com>",
+  "license": "GPL-3.0-or-later",
   "desktopName": "kandleos.desktop",
   "main": "./out/main/index.js",
   "scripts": {
