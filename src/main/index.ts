@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   agentsStatus,
   cancelAgents,
@@ -122,12 +123,21 @@ function createWindow(): void {
     return { action: 'deny' }
   })
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  else win.loadFile(join(__dirname, '../renderer/index.html'))
+  else win.loadFile(indexFile())
 }
 
+const indexFile = (): string => join(__dirname, '../renderer/index.html')
 // The window may only ever show KandleOS itself: no navigation to other pages, no embedded webviews.
-const isAppUrl = (url: string) =>
-  process.env.ELECTRON_RENDERER_URL ? url.startsWith(process.env.ELECTRON_RENDERER_URL) : url.startsWith('file://')
+// Only its own index.html, not any file:// page: a local HTML file would get window.api (keys, store).
+function isAppUrl(url: string): boolean {
+  if (process.env.ELECTRON_RENDERER_URL) return url.startsWith(process.env.ELECTRON_RENDERER_URL)
+  try {
+    return url.startsWith('file:') && resolve(fileURLToPath(url)) === resolve(indexFile())
+  } catch {
+    // An unparsable file URL (e.g. with a host) must block, not slip through a thrown handler.
+    return false
+  }
+}
 app.on('web-contents-created', (_e, contents) => {
   contents.on('will-navigate', (e, url) => !isAppUrl(url) && e.preventDefault())
   contents.on('will-attach-webview', (e) => e.preventDefault())
