@@ -4,7 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { StockSource } from '../../../shared/types'
 import { useStore } from '../store/useStore'
 
-/** State of the stock source choice, shared by the first-start window and the settings. */
+/** State of the stock source choice in the settings (the first-start window offers Yahoo or crypto only). */
 export function useSourceForm() {
   const current = useStore((s) => s.stockSource)
   const [source, setSource] = useState<StockSource | null>(current)
@@ -23,9 +23,7 @@ export function useSourceForm() {
   const newKeys = !!(id.trim() && secret.trim())
   /** Only one of the two Alpaca fields filled in. */
   const halfKeys = !newKeys && !!(id.trim() || secret.trim())
-  const readyFor = (s: StockSource | null, acknowledged = ack) =>
-    s === 'none' || (s === 'yahoo' && acknowledged) || (s === 'alpaca' && (saved || newKeys))
-  const ready = readyFor(source)
+  const ready = source === 'none' || (source === 'yahoo' && ack) || (source === 'alpaca' && (saved || newKeys))
   /** What is still missing before the choice can be saved; shown next to the disabled button. */
   const missing = ready
     ? null
@@ -37,14 +35,11 @@ export function useSourceForm() {
         ? t('Bitte bestätigen, dass du Yahoo Finance nur privat nutzt.')
         : t('Bitte zuerst auswählen, welche Kurse du sehen möchtest.')
 
-  /**
-   * Checks newly entered Alpaca keys, then stores the choice (by default the selected one; the first-start
-   * window passes its own). False if something is missing or the keys were rejected.
-   */
-  const apply = async (choice = source, acknowledged = ack): Promise<boolean> => {
-    if (!readyFor(choice, acknowledged) || !choice) return false
+  /** Checks newly entered Alpaca keys, then stores the choice. False if something is missing or the keys were rejected. */
+  const apply = async (): Promise<boolean> => {
+    if (!ready || !source) return false
     setError('')
-    if (choice === 'alpaca' && newKeys) {
+    if (source === 'alpaca' && newKeys) {
       setBusy(true)
       const err = await window.api.alpacaSetKeys(id, secret)
       setBusy(false)
@@ -56,7 +51,7 @@ export function useSourceForm() {
       setId('')
       setSecret('')
     }
-    useStore.getState().setStockSource(choice, extra)
+    useStore.getState().setStockSource(source, extra)
     return true
   }
   const removeKeys = async () => {
@@ -91,7 +86,7 @@ type Form = ReturnType<typeof useSourceForm>
 const input = 'w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ring-line focus:ring-accent'
 const link = 'text-accent hover:underline'
 
-/** Key ID and secret for Alpaca, with the sign-up link; used in the first-start window and the settings. */
+/** Key ID and secret for Alpaca, with the sign-up link. */
 export function AlpacaKeyFields({ form }: { form: Form }) {
   return (
     <div className="space-y-1.5">

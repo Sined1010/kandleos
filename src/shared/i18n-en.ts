@@ -495,12 +495,15 @@ export const EN: Record<string, string> = {
     'Stock prices every 15 s via Yahoo Finance (for private use only). Click for the settings.',
   'Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.': 'No data source for stocks chosen. Click for the settings.',
   'Aktienkurse kommen ersatzweise über die gewählte Datenquelle.': 'Stock prices come from the chosen data source instead.',
-  'Welche Kurse möchtest du sehen?': 'Which prices do you want to see?',
+  'Kurse': 'Prices',
+  'Aktien, Indizes und Rohstoffe weltweit kommen von Yahoo Finance (je nach Börse meist 15 Minuten verzögert), Kryptokurse live von Binance – ohne Anmeldung.': 'Stocks, indices and commodities worldwide come from Yahoo Finance (usually delayed by 15 minutes, depending on the exchange), crypto prices live from Binance – no sign-up needed.',
+  'Echtzeit-Kurse für US-Aktien: Alpaca (offizielle Schnittstelle) oder Finnhub kannst du jederzeit in den Einstellungen eintragen.': 'Real-time prices for US stocks: you can add Alpaca (official interface) or Finnhub in the settings at any time.',
+  'Ohne Aktien starten (nur Krypto)': 'Start without stocks (crypto only)',
+  'Deine Aktienquelle ist Alpaca. Ändern kannst du sie jederzeit in den Einstellungen.': 'Your stock source is Alpaca. You can change it in the settings at any time.',
   'Bitte zuerst auswählen, welche Kurse du sehen möchtest.': 'Please choose first which prices you want to see.',
   'KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.':
     'KandleOS is a tool for chart analysis. Forecasts and analyses are not investment advice nor a recommendation to buy or sell. All prices without guarantee; use at your own risk.',
   'Mehr zu Haftung, Datenschutz und Lizenzen': 'More on disclaimer, privacy and licenses',
-  'Prüfe Keys …': 'Checking keys …',
   'Verstanden, los geht’s': 'Got it, let’s go',
   'Startfenster erneut zeigen': 'Show the start window again',
   'Aktien über Alpaca':
