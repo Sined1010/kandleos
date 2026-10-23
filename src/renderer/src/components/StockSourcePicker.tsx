@@ -26,6 +26,16 @@ export function useSourceForm() {
   const readyFor = (s: StockSource | null, acknowledged = ack) =>
     s === 'none' || (s === 'yahoo' && acknowledged) || (s === 'alpaca' && (saved || newKeys))
   const ready = readyFor(source)
+  /** What is still missing before the choice can be saved; shown next to the disabled button. */
+  const missing = ready
+    ? null
+    : source === 'alpaca'
+      ? halfKeys
+        ? t('Bitte beide Alpaca-Keys eintragen.')
+        : t('Beide Alpaca-Keys eintragen oder eine andere Quelle wählen.')
+      : source === 'yahoo'
+        ? t('Bitte bestätigen, dass du Yahoo Finance nur privat nutzt.')
+        : t('Bitte zuerst auswählen, welche Kurse du sehen möchtest.')
 
   /**
    * Checks newly entered Alpaca keys, then stores the choice (by default the selected one; the first-start
@@ -71,6 +81,7 @@ export function useSourceForm() {
     error,
     busy,
     ready,
+    missing,
     apply
   }
 }
@@ -84,11 +95,27 @@ const link = 'text-accent hover:underline'
 export function AlpacaKeyFields({ form }: { form: Form }) {
   return (
     <div className="space-y-1.5">
+      {/* First, so users who also want markets outside the US see it before the key fields. Ticking it is the
+          private-use confirmation for Yahoo, as with Yahoo as the only source. */}
+      <label className="flex cursor-pointer items-start gap-2 pb-1">
+        <input
+          type="checkbox"
+          checked={form.extra}
+          onChange={(e) => form.setExtra(e.target.checked)}
+          className="mt-0.5 accent-accent"
+        />
+        <span className="text-slate-200">
+          {t('Auch Indizes, Rohstoffe und Aktien außerhalb der USA (z. B. DAX) über Yahoo Finance ergänzen. Ich nutze Yahoo Finance nur für private Zwecke; es gelten Yahoos Nutzungsbedingungen.')}{' '}
+          <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
+            {t('Yahoos Nutzungsbedingungen')}
+          </a>
+        </span>
+      </label>
       {form.saved && (
         <p className="flex items-center gap-1.5 text-up">
           <Check size={13} /> {t('Keys gespeichert')}
           <button type="button" onClick={form.removeKeys} className="ml-2 text-muted hover:text-down">
-            {t('Key entfernen')}
+            {t('Keys entfernen')}
           </button>
         </p>
       )}
@@ -110,27 +137,12 @@ export function AlpacaKeyFields({ form }: { form: Form }) {
         className={input}
       />
       <p className="text-muted">
-        {t('Kostenlos registrieren, dann unter „API Keys“ ein Schlüsselpaar erstellen (ein Paper-Konto genügt):')}{' '}
+        {t('Kostenlos registrieren und unter „API Keys“ ein Key-Paar erstellen; ein Testkonto (Paper Trading) ohne Geld genügt:')}{' '}
         <a href="https://app.alpaca.markets/signup" target="_blank" rel="noreferrer" className={link}>
           app.alpaca.markets
         </a>
-        . {t('Die Keys werden verschlüsselt auf diesem Rechner gespeichert.')}
+        . {t('Die Keys werden verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet).')}
       </p>
-      {/* Ticking it is the private-use confirmation for Yahoo, as with Yahoo as the only source. */}
-      <label className="flex cursor-pointer items-start gap-2 pt-1">
-        <input
-          type="checkbox"
-          checked={form.extra}
-          onChange={(e) => form.setExtra(e.target.checked)}
-          className="mt-0.5 accent-accent"
-        />
-        <span className="text-slate-200">
-          {t('Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance ergänzen. Ich nutze Yahoo Finance nur für private Zwecke; es gelten Yahoos Nutzungsbedingungen.')}{' '}
-          <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
-            {t('Yahoos Nutzungsbedingungen')}
-          </a>
-        </span>
-      </label>
     </div>
   )
 }
@@ -164,16 +176,16 @@ export default function StockSourcePicker({ form }: { form: Form }) {
     <div className="space-y-2 text-xs leading-relaxed">
       {option(
         'alpaca',
-        'Alpaca',
-        t('empfohlen'),
-        t('US-Aktien und ETFs, Echtzeit von der Börse IEX. Offizielle Schnittstelle, kostenloser eigener API-Key nötig.'),
+        t('Aktien über Alpaca'),
+        t('empfohlen für US-Werte'),
+        t('Nur US-Aktien und ETFs, in Echtzeit von der Börse IEX. Offizielle Schnittstelle; ein kostenloses Alpaca-Konto ist nötig.'),
         <AlpacaKeyFields form={form} />
       )}
       {option(
         'yahoo',
-        'Yahoo Finance',
+        t('Aktien über Yahoo Finance'),
         null,
-        t('Aktien weltweit sowie Indizes und Rohstoffe, ohne Registrierung. Bei Auswahl verbindet sich KandleOS automatisch mit Yahoo Finance und fragt die Kurse alle 15 Sekunden ab; je nach Börse kommen sie in Echtzeit oder verzögert, meist um 15 Minuten.'),
+        t('Aktien, Indizes und Rohstoffe weltweit, sofort ohne Anmeldung. KandleOS fragt die Kurse alle 15 Sekunden bei Yahoo ab; je nach Börse sind sie verzögert (meist 15 Minuten).'),
         <label className="flex cursor-pointer items-start gap-2">
           <input
             type="checkbox"
@@ -193,7 +205,7 @@ export default function StockSourcePicker({ form }: { form: Form }) {
         'none',
         t('Nur Krypto'),
         null,
-        t('Kryptokurse von Binance, ohne Registrierung. Aktien lassen sich später in den Einstellungen hinzufügen.')
+        t('Kryptokurse von Binance, ohne Anmeldung. Aktien lassen sich jederzeit dazunehmen.')
       )}
       {form.error && <p className="text-down">{form.error}</p>}
     </div>

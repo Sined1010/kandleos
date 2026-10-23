@@ -65,19 +65,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           className={`w-full rounded-lg bg-bg px-2 py-1.5 outline-none ring-1 ${valid ? 'ring-line focus:ring-accent' : 'ring-down'}`}
         />
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t('Warum Finnhub? Ohne Key werden Aktienkurse nur in Abständen abgefragt (Alpaca alle 5 s, Yahoo alle 15 s). Mit Key erscheint jeder Trade einer US-Aktie sofort über den Finnhub-WebSocket, auch vor- und nachbörslich: Watchlist und Chart laufen live mit. Für andere Börsen, Indizes und Krypto ändert sich nichts; Verlauf und Suche kommen weiter von Alpaca oder Yahoo. Kostenloser Key:')}{' '}
+          {t('Mit Key laufen US-Aktien in Echtzeit mit, auch vor- und nachbörslich. Ohne Key werden die Kurse alle 5 s (Alpaca) oder 15 s (Yahoo) abgefragt. Für andere Börsen, Indizes und Krypto ändert sich nichts. Kostenloser Key:')}{' '}
           <a href="https://finnhub.io/register" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             finnhub.io/register
           </a>
           .
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t(
-            'Der Key wird getrennt von kandleos-store.json gespeichert – verschlüsselt für dein Benutzerkonto, sofern das System einen Schlüsselbund hat (Windows immer, Linux mit gnome-keyring/KWallet). Nach einem Gerätewechsel hier einfach neu eintragen.'
-          )}
+          {t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Nach einem Gerätewechsel neu eintragen.')}
         </p>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex items-center justify-end gap-2">
+          {/* Shown next to the disabled button, so it is clear what is still missing. */}
+          {(!valid || source.missing) && (
+            <p className="mr-auto text-xs text-muted" role="status">
+              {valid ? source.missing : t('Der Finnhub-Key darf nur Buchstaben und Ziffern enthalten.')}
+            </p>
+          )}
           <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
             {t('Abbrechen')}
           </button>
