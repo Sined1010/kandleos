@@ -17,6 +17,8 @@ extraResources:
     to: agents/kandleos_agents.py
   - from: resources/agents/requirements.lock
     to: agents/requirements.lock
+  - from: resources/agents/build-constraints.txt
+    to: agents/build-constraints.txt
 # Hardening of the packaged Electron binary: no "run as plain Node", no Node debugging/option injection,
 # app code only from the (integrity-checked) app.asar, encrypted cookies.
 electronFuses:

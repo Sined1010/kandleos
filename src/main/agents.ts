@@ -40,6 +40,8 @@ const resource = (file: string): string =>
 const runner = (): string => resource('kandleos_agents.py')
 // TradingAgents and all its dependencies with their hashes: what gets installed is exactly what was locked.
 const lockFile = (): string => resource('requirements.lock')
+// TradingAgents is a source archive; the setuptools that builds it is pinned the same way.
+const buildConstraints = (): string => resource('build-constraints.txt')
 let lockHashCache: string | undefined
 /** Part of the install marker, so an updated lock file sets the environment up again. */
 const lockHash = (): string => (lockHashCache ??= createHash('sha256').update(readFileSync(lockFile())).digest('hex'))
@@ -144,9 +146,12 @@ export function installAgents(onProgress: (p: SetupProgress) => void): Promise<A
       onProgress({ step: 'python', message: line })
     )
     onProgress({ step: 'packages', message: t('Installiere TradingAgents {version} …', { version: TRADINGAGENTS.version }) })
-    // A package that does not match its locked hash, or one missing from the lock, fails the whole install.
-    await run(uvExe(), ['pip', 'install', '--python', venvPython(), '--require-hashes', '-r', lockFile()], uvEnv(), (line) =>
-      onProgress({ step: 'packages', message: line })
+    // A package or build backend that does not match its locked hash, or one missing from the lock, fails the whole install.
+    await run(
+      uvExe(),
+      ['pip', 'install', '--python', venvPython(), '--require-hashes', '--build-constraint', buildConstraints(), '-r', lockFile()],
+      uvEnv(),
+      (line) => onProgress({ step: 'packages', message: line })
     )
     await writeFile(
       markerFile(),
