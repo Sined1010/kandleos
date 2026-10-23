@@ -1,11 +1,11 @@
-# KandleOS
+<p align="center"><img src="resources/icon.png" alt="KandleOS logo" width="96"></p>
+
+<h1 align="center">KandleOS</h1>
 
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer.
 
-<!-- TODO screenshot: add docs/screenshot.png and uncomment
-![KandleOS](docs/screenshot.png)
--->
+![KandleOS with a Chronos-2 forecast for XRP (daily candles): forecast candles with 50 % and 80 % ranges](docs/screenshot.png)
 
 ## Features
 
