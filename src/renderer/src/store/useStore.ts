@@ -126,7 +126,9 @@ interface State {
   setFinnhubKey: (key: string) => void
   /** Where stock prices come from; null until chosen in the first-start window (Yahoo is never on by default). */
   stockSource: StockSource | null
-  setStockSource: (source: StockSource) => void
+  /** With Alpaca: indices, commodities and other exchanges come from Yahoo (confirmed for private use). */
+  yahooExtra: boolean
+  setStockSource: (source: StockSource, yahooExtra?: boolean) => void
   /** Whether the disclaimer shown on first start has been confirmed. */
   disclaimerAccepted: boolean
   acceptDisclaimer: () => void
@@ -198,7 +200,9 @@ export const useStore = create<State>()(
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       names: {},
       stockSource: null,
-      setStockSource: (stockSource) => set({ stockSource }),
+      yahooExtra: false,
+      setStockSource: (stockSource, yahooExtra = false) =>
+        set({ stockSource, yahooExtra: stockSource === 'alpaca' && yahooExtra }),
       disclaimerAccepted: false,
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
       finnhubKey: window.api.keyGet(),
@@ -330,9 +334,11 @@ export const useStore = create<State>()(
         indicators,
         drawings,
         stockSource,
+        yahooExtra,
         disclaimerAccepted
       }) => ({
         stockSource,
+        yahooExtra,
         language,
         agentsConfig,
         range,

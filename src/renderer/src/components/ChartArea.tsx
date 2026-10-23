@@ -80,6 +80,7 @@ export default function ChartArea() {
   const timeframe = useStore((s) => s.timeframe)
   const finnhubKey = useStore((s) => s.finnhubKey)
   const stockSource = useStore((s) => s.stockSource)
+  const yahooExtra = useStore((s) => s.yahooExtra)
   const indicators = useStore((s) => s.indicators)
   const select = useStore((s) => s.select)
   const range = useStore((s) => s.range)
@@ -196,7 +197,7 @@ export default function ChartArea() {
       active = false
       stop()
     }
-  }, [api, symbol, timeframe, finnhubKey, extended, stockSource])
+  }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])
 
   // Grey background behind pre-market and after-hours candles. Rebuilt when bars are added, not on every tick.
   useEffect(() => {

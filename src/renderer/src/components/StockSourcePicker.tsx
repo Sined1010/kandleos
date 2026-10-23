@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore'
 export function useSourceForm() {
   const current = useStore((s) => s.stockSource)
   const [source, setSource] = useState<StockSource | null>(current)
+  const [extra, setExtra] = useState(useStore.getState().yahooExtra)
   const [ack, setAck] = useState(current === 'yahoo')
   const [id, setId] = useState('')
   const [secret, setSecret] = useState('')
@@ -45,7 +46,7 @@ export function useSourceForm() {
       setId('')
       setSecret('')
     }
-    useStore.getState().setStockSource(choice)
+    useStore.getState().setStockSource(choice, extra)
     return true
   }
   const removeKeys = async () => {
@@ -55,6 +56,8 @@ export function useSourceForm() {
   return {
     source,
     setSource,
+    extra,
+    setExtra,
     ack,
     setAck,
     id,
@@ -113,6 +116,21 @@ export function AlpacaKeyFields({ form }: { form: Form }) {
         </a>
         . {t('Die Keys werden verschlüsselt auf diesem Rechner gespeichert.')}
       </p>
+      {/* Ticking it is the private-use confirmation for Yahoo, as with Yahoo as the only source. */}
+      <label className="flex cursor-pointer items-start gap-2 pt-1">
+        <input
+          type="checkbox"
+          checked={form.extra}
+          onChange={(e) => form.setExtra(e.target.checked)}
+          className="mt-0.5 accent-accent"
+        />
+        <span className="text-slate-200">
+          {t('Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance ergänzen. Ich nutze Yahoo Finance nur für private Zwecke; es gelten Yahoos Nutzungsbedingungen.')}{' '}
+          <a href="https://legal.yahoo.com/" target="_blank" rel="noreferrer" className={link}>
+            {t('Yahoos Nutzungsbedingungen')}
+          </a>
+        </span>
+      </label>
     </div>
   )
 }

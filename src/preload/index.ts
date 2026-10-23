@@ -13,8 +13,11 @@ const api = {
   storeGet: (): string | null => ipcRenderer.sendSync('store:get'),
   /** Language for texts the main process produces (error messages, names). */
   setLanguage: (lang: string): void => ipcRenderer.send('app:language', lang),
-  /** Where stock prices come from (StockSource); main routes candles, quotes, search and names by it. */
-  setStockSource: (source: string): void => ipcRenderer.send('app:stock-source', source),
+  /**
+   * Where stock prices come from (StockSource); main routes candles, quotes, search and names by it.
+   * `yahooExtra`: with Alpaca, what Alpaca does not have comes from Yahoo.
+   */
+  setStockSource: (source: string, yahooExtra = false): void => ipcRenderer.send('app:stock-source', source, yahooExtra),
   alpacaHasKeys: (): Promise<boolean> => ipcRenderer.invoke('alpaca:has-keys'),
   /** Checks the key pair with Alpaca and stores it encrypted; resolves to an error message or null. Empty removes it. */
   alpacaSetKeys: (id: string, secret: string): Promise<string | null> => ipcRenderer.invoke('alpaca:set-keys', id, secret),

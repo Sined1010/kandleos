@@ -7,6 +7,7 @@ import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
 import {
   cryptoQuoteAsset,
   isCrypto,
+  stockRoute,
   SYMBOL_RE,
   TF_MONTHS,
   TF_SECONDS,
@@ -20,9 +21,15 @@ import {
 
 // Chosen by the user on first start or in the settings; the window tells main (see index.ts).
 let source: StockSource | null = null
-export function setStockSource(s: unknown): void {
+// With Alpaca: whether Yahoo fills in what Alpaca does not have (indices, commodities, other exchanges).
+let yahooExtra = false
+export function setStockSource(s: unknown, extra?: unknown): void {
   if (s === 'alpaca' || s === 'yahoo' || s === 'none') source = s
+  yahooExtra = source === 'alpaca' && extra === true
 }
+
+const yahooOn = () => source === 'yahoo' || yahooExtra
+const viaAlpaca = (symbol: string) => stockRoute(source, yahooExtra, symbol) === 'alpaca'
 
 const sourceOff = () =>
   new Error(t('Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.'))
@@ -87,13 +94,20 @@ async function coinSearch(query: string): Promise<SearchResult[]> {
 
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   if (typeof query !== 'string' || !query.trim() || query.length > 40) return []
-  if (source !== 'yahoo') {
+  if (!yahooOn()) {
     const [coins, stocks] = await Promise.all([
       coinSearch(query),
       source === 'alpaca' ? alpacaSearch(query).catch(() => []) : []
     ])
     return [...stocks, ...coins]
   }
+  if (source === 'yahoo') return yahooSearch(query)
+  // Alpaca's US hits first, then Yahoo's for everything else (a US symbol from Yahoo is the same symbol).
+  const [stocks, found] = await Promise.all([alpacaSearch(query).catch(() => []), yahooSearch(query).catch(() => [])])
+  return [...stocks, ...found.filter((f) => !stocks.some((s) => s.symbol === f.symbol))]
+}
+
+async function yahooSearch(query: string): Promise<SearchResult[]> {
   // German names for futures and indices come first; Yahoo's search does not know them.
   const curated: SearchResult[] = findAliases(query).map((a) => ({
     symbol: a.symbol,
@@ -201,8 +215,8 @@ export async function stockCandles(
   const tf = tfArg as Timeframe
   // Pre-market and after-hours candles exist for intraday bars only.
   const extended = extendedArg === true && TF_SECONDS[tf] < 86400
-  if (source === 'alpaca') return alpacaCandles(symbol, tf, extended)
-  if (source !== 'yahoo') throw sourceOff()
+  if (viaAlpaca(symbol)) return alpacaCandles(symbol, tf, extended)
+  if (!yahooOn()) throw sourceOff()
   let data: CandleData | undefined
   if (key && !extended) {
     try {
@@ -260,7 +274,8 @@ export async function symbolName(symbolArg: unknown): Promise<string | null> {
   const crypto = isCrypto(symbol)
   if (source !== 'yahoo') {
     if (crypto) return COINS[symbol.slice(0, -cryptoQuoteAsset(symbol).length)] ?? null
-    return source === 'alpaca' ? alpacaName(symbol).catch(() => null) : null
+    if (viaAlpaca(symbol)) return alpacaName(symbol).catch(() => null)
+    if (!yahooOn()) return null
   }
   // Yahoo lists coins against USD (BTC-USD), not as exchange pairs (BTCUSDT).
   const lookup = crypto ? `${symbol.slice(0, -cryptoQuoteAsset(symbol).length)}-USD` : symbol
@@ -301,10 +316,18 @@ async function yahooQuote(symbol: string): Promise<Quote> {
 export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Record<string, Quote>> {
   const out: Record<string, Quote> = {}
   if (!Array.isArray(symbols)) return out
-  if (source === 'alpaca') return alpacaQuotes(symbols.filter((s) => typeof s === 'string' && SYMBOL_RE.test(s)))
-  if (source !== 'yahoo') return out
-  await Promise.all(
-    symbols.map(async (s) => {
+  const alpaca = symbols.filter((s) => typeof s === 'string' && SYMBOL_RE.test(s) && viaAlpaca(s))
+  // shortcut: with the Yahoo extra its symbols are polled at Alpaca's 5 s pace; throttle here if Yahoo starts refusing.
+  const yahoo = yahooOn() ? symbols.filter((s) => !alpaca.includes(s)) : []
+  if (!yahoo.length) return alpaca.length ? alpacaQuotes(alpaca) : out
+  await Promise.all([
+    // One failing source must not drop the other's prices.
+    alpaca.length &&
+      alpacaQuotes(alpaca).then(
+        (q) => Object.assign(out, q),
+        (e) => console.warn((e as Error).message)
+      ),
+    ...yahoo.map(async (s) => {
       try {
         const [symbol, key] = checkArgs(s, keyArg)
         // Outside the regular session Yahoo also has the pre-market and after-hours price; Finnhub's quote does not.
@@ -315,6 +338,6 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Re
         console.warn((e as Error).message)
       }
     })
-  )
+  ])
   return out
 }

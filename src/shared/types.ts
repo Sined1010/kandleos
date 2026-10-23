@@ -66,6 +66,15 @@ export interface Quote {
 export type StockSource = 'alpaca' | 'yahoo' | 'none'
 export const STOCK_SOURCES: StockSource[] = ['alpaca', 'yahoo', 'none']
 
+/** Indices, futures, currencies and foreign listings (^GSPC, GC=F, EURUSD=X, SAP.DE) are not on Alpaca. */
+export const alpacaKnows = (symbol: string): boolean => !/[\^=]/.test(symbol) && !/\.[A-Z]{2,}$/.test(symbol)
+
+/** Which source serves a stock symbol, null with stocks off. With Alpaca, the Yahoo extra takes what Alpaca lacks. */
+export function stockRoute(source: StockSource | null, yahooExtra: boolean, symbol: string): 'alpaca' | 'yahoo' | null {
+  if (source === 'alpaca') return yahooExtra && !alpacaKnows(symbol) ? 'yahoo' : 'alpaca'
+  return source === 'yahoo' ? 'yahoo' : null
+}
+
 export interface SearchResult {
   symbol: string
   name: string

@@ -26,7 +26,7 @@ const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.js
 let writeQueue = Promise.resolve()
 
 ipcMain.on('app:language', (_e, lang) => setLang(lang))
-ipcMain.on('app:stock-source', (_e, s) => setStockSource(s))
+ipcMain.on('app:stock-source', (_e, s, yahooExtra) => setStockSource(s, yahooExtra))
 // Alpaca keys only go in; the window learns whether they are set.
 ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
 ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))

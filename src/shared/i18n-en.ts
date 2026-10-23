@@ -465,8 +465,12 @@ export const EN: Record<string, string> = {
   'Alpaca: API-Key ungültig': 'Alpaca: invalid API key',
   'Alpaca: Anfragelimit erreicht, gleich erneut versuchen': 'Alpaca: rate limit reached, try again shortly',
   'Alpaca nicht erreichbar': 'Alpaca unreachable',
-  '{symbol} gibt es bei Alpaca nicht: Alpaca liefert nur US-Aktien und ETFs. Indizes, Rohstoffe und ausländische Börsen gibt es mit Yahoo Finance (Einstellungen).':
-    '{symbol} is not available on Alpaca: Alpaca only serves US stocks and ETFs. Indices, commodities and foreign exchanges are available with Yahoo Finance (settings).',
+  '{symbol} gibt es bei Alpaca nicht: Alpaca liefert nur US-Aktien und ETFs. Indizes, Rohstoffe und ausländische Börsen lassen sich in den Einstellungen über Yahoo Finance ergänzen.':
+    '{symbol} is not available on Alpaca: Alpaca only serves US stocks and ETFs. Indices, commodities and foreign exchanges can be added via Yahoo Finance in the settings.',
+  'Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance ergänzen. Ich nutze Yahoo Finance nur für private Zwecke; es gelten Yahoos Nutzungsbedingungen.':
+    'Add indices, commodities and exchanges outside the US via Yahoo Finance. I use Yahoo Finance for private purposes only; Yahoo’s terms of service apply.',
+  'Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance (nur für private Zwecke).':
+    'Indices, commodities and exchanges outside the US via Yahoo Finance (for private use only).',
   'Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.':
     'Stock prices are switched off. Choose a data source for stocks in the settings.',
   'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:':

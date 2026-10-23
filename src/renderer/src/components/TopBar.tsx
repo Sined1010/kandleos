@@ -148,10 +148,12 @@ const FEED: Record<Exclude<FeedStatus['state'], 'off'>, [dot: string, label: str
 function FeedBadge({ onClick }: { onClick: () => void }) {
   const feed = useQuotes((s) => s.feed)
   const source = useStore((s) => s.stockSource) ?? 'none'
+  const yahooExtra = useStore((s) => s.yahooExtra)
   const [dot, label, hint] = feed.state === 'off' ? SOURCE[source] : FEED[feed.state]
   const details = [
     feed.detail,
     t(hint),
+    yahooExtra && t('Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance (nur für private Zwecke).'),
     feed.state === 'live' &&
       (feed.lastTrade
         ? t('Letzter Trade: {time}', { time: new Date(feed.lastTrade * 1000).toLocaleTimeString(locale()) })

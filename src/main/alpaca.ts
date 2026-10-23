@@ -6,7 +6,15 @@ import { aggregate } from '../shared/candles'
 import { t } from '../shared/i18n'
 import { phaseAt } from '../shared/market'
 import { cleanName } from '../shared/names'
-import { TF_SECONDS, type Candle, type CandleData, type Quote, type SearchResult, type Timeframe } from '../shared/types'
+import {
+  alpacaKnows,
+  TF_SECONDS,
+  type Candle,
+  type CandleData,
+  type Quote,
+  type SearchResult,
+  type Timeframe
+} from '../shared/types'
 
 // Alpaca's market data API with the user's own free key: US stocks and ETFs. The free plan serves all US
 // exchanges (SIP) up to 15 minutes ago and real-time data from the IEX exchange only.
@@ -79,14 +87,10 @@ export async function setAlpacaKeys(idArg: unknown, secretArg: unknown): Promise
 /** Alpaca writes share classes with a dot (BRK.B), Yahoo with a dash (BRK-B). */
 const ticker = (symbol: string) => symbol.replace('-', '.')
 
-/** Indices, futures, currencies and foreign listings (^GSPC, GC=F, EURUSD=X, SAP.DE) are not on Alpaca. */
-export function alpacaKnows(symbol: string): boolean {
-  return !/[\^=]/.test(symbol) && !/\.[A-Z]{2,}$/.test(symbol)
-}
 
 function notListed(symbol: string): Error {
   return new Error(
-    t('{symbol} gibt es bei Alpaca nicht: Alpaca liefert nur US-Aktien und ETFs. Indizes, Rohstoffe und ausländische Börsen gibt es mit Yahoo Finance (Einstellungen).', { symbol })
+    t('{symbol} gibt es bei Alpaca nicht: Alpaca liefert nur US-Aktien und ETFs. Indizes, Rohstoffe und ausländische Börsen lassen sich in den Einstellungen über Yahoo Finance ergänzen.', { symbol })
   )
 }
 
