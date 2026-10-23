@@ -49,7 +49,7 @@ const FORECAST = '#ffd54f'
 // Width of the analysis panel (w-[400px] in AgentsPanel).
 const AGENTS_WIDTH = 400
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
-const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
+export const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
 interface ChartApi {
   chart: IChartApi

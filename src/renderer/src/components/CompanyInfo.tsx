@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { locale, t } from '../../../shared/i18n'
 import type { CompanyInfo } from '../../../shared/types'
 import { useStore } from '../store/useStore'
+import { MINOR_UNITS } from './ChartArea'
 
 const fmt = (v: number | undefined, o: Intl.NumberFormatOptions = {}) =>
   v == null ? undefined : new Intl.NumberFormat(locale(), o).format(v)
@@ -70,7 +71,10 @@ function InfoPanel({ symbol }: { symbol: string }) {
         [
           t('52-Wochen-Spanne'),
           info.low52 != null && info.high52 != null
-            ? `${money(info.low52, info.currency)} – ${money(info.high52, info.currency)}`
+            ? info.currency && MINOR_UNITS[info.currency]
+              ? // Prices in pence/cents like the chart; Intl would read GBp as GBP and show £.
+                `${fmt(info.low52, { maximumFractionDigits: 2 })} – ${fmt(info.high52, { maximumFractionDigits: 2 })} ${MINOR_UNITS[info.currency]}`
+              : `${money(info.low52, info.currency)} – ${money(info.high52, info.currency)}`
             : undefined
         ],
         // A plain date; read in UTC so it does not shift by a day.
