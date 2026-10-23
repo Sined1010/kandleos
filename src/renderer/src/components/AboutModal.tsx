@@ -86,6 +86,11 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noreferrer" className={link}>
             gnu.org/licenses/gpl-3.0
           </a>
+          .{' '}
+          {t('Quellcode:')}{' '}
+          <a href="https://github.com/Sined1010/kandleos" target="_blank" rel="noreferrer" className={link}>
+            github.com/Sined1010/kandleos
+          </a>
           .
         </p>
         <p className="mt-2">
@@ -96,6 +101,12 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           {licenseError && <span className="ml-2 text-down">({licenseError})</span>}
         </p>
 
+        <p className="mt-4 border-t border-line pt-3">
+          {t('KandleOS ist kostenlos.')}{' '}
+          <a href="https://ko-fi.com/sined1010" target="_blank" rel="noreferrer" className={link}>
+            {t('KandleOS auf Ko-fi unterstützen')}
+          </a>
+        </p>
       </div>
     </div>
   )
