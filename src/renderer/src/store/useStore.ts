@@ -161,7 +161,9 @@ const showTab = (t: ChartTab) => ({
   selectedId: null,
   tool: 'cursor' as const
 })
-const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [s.symbol]: list } })
+/** Drawings belong to a tab and its symbol, so two tabs on the same symbol are separate charts. */
+export const drawingsKey = (s: { activeTab: string; symbol: string }): string => `${s.activeTab}:${s.symbol}`
+const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [drawingsKey(s)]: list } })
 const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
 const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
   folders: s.folders.map((f) => (f.id === id ? fn(f) : f))
@@ -188,8 +190,12 @@ export const useStore = create<State>()(
           const i = s.tabs.findIndex((t) => t.id === id)
           if (s.tabs.length < 2 || i < 0) return {}
           const tabs = s.tabs.filter((t) => t.id !== id)
+          // A closed tab's drawings can never be shown again.
+          const drawings = Object.fromEntries(Object.entries(s.drawings).filter(([k]) => !k.startsWith(`${id}:`)))
           // Closing the active tab shows its right neighbour, or the left one at the end.
-          return id === s.activeTab ? { tabs, ...showTab(tabs[Math.min(i, tabs.length - 1)]) } : { tabs }
+          return id === s.activeTab
+            ? { tabs, drawings, ...showTab(tabs[Math.min(i, tabs.length - 1)]) }
+            : { tabs, drawings }
         }),
       selectTab: (id) =>
         set((s) => {
@@ -266,16 +272,19 @@ export const useStore = create<State>()(
         set((s) => ({ indicators: { ...s.indicators, [name]: { ...s.indicators[name], ...patch } } })),
       setTool: (tool) => set({ tool, selectedId: null }),
       select: (selectedId) => set({ selectedId }),
-      addDrawing: (d) => set((s) => withDrawings(s, [...(s.drawings[s.symbol] ?? []), d])),
+      addDrawing: (d) => set((s) => withDrawings(s, [...(s.drawings[drawingsKey(s)] ?? []), d])),
       updateDrawing: (d) =>
-        set((s) => withDrawings(s, (s.drawings[s.symbol] ?? []).map((x) => (x.id === d.id ? d : x)))),
+        set((s) => withDrawings(s, (s.drawings[drawingsKey(s)] ?? []).map((x) => (x.id === d.id ? d : x)))),
       removeDrawing: (id) =>
-        set((s) => ({ ...withDrawings(s, (s.drawings[s.symbol] ?? []).filter((d) => d.id !== id)), selectedId: null })),
+        set((s) => ({
+          ...withDrawings(s, (s.drawings[drawingsKey(s)] ?? []).filter((d) => d.id !== id)),
+          selectedId: null
+        })),
       clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null }))
     }),
     {
       name: 'kandleos',
-      version: 3,
+      version: 4,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -290,6 +299,18 @@ export const useStore = create<State>()(
           if (typeof p.finnhubKey === 'string' && p.finnhubKey) void window.api.keySet(p.finnhubKey)
           // An empty legacy key must not blank out one already in the key file.
           else delete p.finnhubKey
+        }
+        // v3 kept drawings per symbol, shared by all tabs; every existing tab gets its own copy.
+        if (version < 4 && p.drawings) {
+          if (!Array.isArray(p.tabs) || !p.tabs.length) {
+            const { symbol = firstTab.symbol, timeframe = firstTab.timeframe, range = null } = p as Partial<State>
+            p.tabs = [{ ...firstTab, symbol, timeframe, range }]
+            p.activeTab = firstTab.id
+          }
+          const old = p.drawings as Record<string, Drawing[]>
+          p.drawings = Object.fromEntries(
+            (p.tabs as ChartTab[]).flatMap((t) => Object.entries(old).map(([sym, list]) => [`${t.id}:${sym}`, list]))
+          )
         }
         return p as unknown as State
       },

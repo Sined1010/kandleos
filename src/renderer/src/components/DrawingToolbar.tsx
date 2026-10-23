@@ -15,7 +15,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import { msg, t } from '../../../shared/i18n'
-import { useStore, type Tool } from '../store/useStore'
+import { drawingsKey, useStore, type Tool } from '../store/useStore'
 
 const TOOLS: [Tool, LucideIcon, string][] = [
   ['cursor', MousePointer2, msg('Auswahl')],
@@ -35,7 +35,7 @@ export default function DrawingToolbar() {
   const tool = useStore((s) => s.tool)
   const setTool = useStore((s) => s.setTool)
   const selectedId = useStore((s) => s.selectedId)
-  const count = useStore((s) => s.drawings[s.symbol]?.length ?? 0)
+  const count = useStore((s) => s.drawings[drawingsKey(s)]?.length ?? 0)
   const symbol = useStore((s) => s.symbol)
   const removeDrawing = useStore((s) => s.removeDrawing)
   const clearDrawings = useStore((s) => s.clearDrawings)

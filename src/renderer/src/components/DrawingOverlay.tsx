@@ -6,7 +6,7 @@ import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
 import { THEME } from '../lib/theme'
-import { useStore, type Drawing, type Point, type Tool } from '../store/useStore'
+import { drawingsKey, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
@@ -64,7 +64,7 @@ interface Props {
 export default function DrawingOverlay({ chart, series, data, timeZone }: Props) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
-  const drawings = useStore((s) => s.drawings[s.symbol] ?? NO_DRAWINGS)
+  const drawings = useStore((s) => s.drawings[drawingsKey(s)] ?? NO_DRAWINGS)
   const tool = useStore((s) => s.tool)
   const setTool = useStore((s) => s.setTool)
   const selectedId = useStore((s) => s.selectedId)
