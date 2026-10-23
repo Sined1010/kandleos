@@ -133,7 +133,7 @@ function TimeframePicker() {
 /** Without Finnhub the badge names the stock source. */
 const SOURCE: Record<StockSource, [dot: string, label: string, hint: string]> = {
   alpaca: ['bg-up', msg('Alpaca · IEX'), msg('Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.')],
-  yahoo: ['bg-muted', msg('Yahoo · verzögert'), msg('Aktienkurse alle 15 s über Yahoo Finance (inoffiziell). Klicken für die Einstellungen.')],
+  yahoo: ['bg-muted', msg('Yahoo · verzögert'), msg('Aktienkurse alle 15 s über Yahoo Finance (nur für private Zwecke). Klicken für die Einstellungen.')],
   none: ['bg-muted', msg('Nur Krypto'), msg('Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.')]
 }
 

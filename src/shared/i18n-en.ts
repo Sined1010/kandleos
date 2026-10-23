@@ -473,8 +473,8 @@ export const EN: Record<string, string> = {
     'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; API keys are stored encrypted. To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
   'Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key':
     'Alpaca – stock prices, symbol search and names, only with your own API key',
-  'Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (inoffizielle Schnittstelle)':
-    'Yahoo Finance – stock prices, symbol search and names, only if chosen as the data source (unofficial interface)',
+  'Yahoo Finance – Aktienkurse, Symbolsuche und Namen, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)':
+    'Yahoo Finance – stock prices, symbol search and names, only if chosen as the data source (for private use only)',
   'Datenquelle für Aktien': 'Data source for stocks',
   'Finnhub API-Key (optional)': 'Finnhub API key (optional)',
   'Warum Finnhub? Ohne Key werden Aktienkurse nur in Abständen abgefragt (Alpaca alle 5 s, Yahoo alle 15 s). Mit Key erscheint jeder Trade einer US-Aktie sofort über den Finnhub-WebSocket, auch vor- und nachbörslich: Watchlist und Chart laufen live mit. Für andere Börsen, Indizes und Krypto ändert sich nichts; Verlauf und Suche kommen weiter von Alpaca oder Yahoo. Kostenloser Key:':
@@ -500,8 +500,8 @@ export const EN: Record<string, string> = {
   'Alpaca · IEX': 'Alpaca · IEX',
   'Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.':
     'Stock prices via Alpaca: real time from the IEX exchange, every 5 s. Click for the settings.',
-  'Aktienkurse alle 15 s über Yahoo Finance (inoffiziell). Klicken für die Einstellungen.':
-    'Stock prices every 15 s via Yahoo Finance (unofficial). Click for the settings.',
+  'Aktienkurse alle 15 s über Yahoo Finance (nur für private Zwecke). Klicken für die Einstellungen.':
+    'Stock prices every 15 s via Yahoo Finance (for private use only). Click for the settings.',
   'Keine Datenquelle für Aktien gewählt. Klicken für die Einstellungen.': 'No data source for stocks chosen. Click for the settings.',
   'Aktienkurse kommen ersatzweise über die gewählte Datenquelle.': 'Stock prices come from the chosen data source instead.',
   'Welche Kurse möchtest du sehen?': 'Which prices do you want to see?',
