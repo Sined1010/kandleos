@@ -9,8 +9,12 @@ import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
-/** A right-clicked watchlist row: which symbol in which folder, where the mouse was and the row's left edge. */
-type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number }
+/**
+ * A right-clicked watchlist row: which symbol in which folder, where the mouse was, the row's left edge and how
+ * to start renaming it (the row edits its own name).
+ */
+type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number; rename: () => void }
+type MenuItem = { label: string; run?: () => void; reason?: string; danger?: boolean }
 
 export default function Watchlist() {
   const folders = useStore((s) => s.folders)
@@ -104,7 +108,7 @@ function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClo
   const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
   const removeFromFolder = useStore((s) => s.removeFromFolder)
   const s = at.symbol
-  const items: { label: string; run?: () => void; reason?: string; danger?: boolean }[] = [
+  const items: MenuItem[] = [
     { label: t('Öffnen'), run: () => setSymbol(s) },
     tabsFull
       ? { label: t('In neuem Tab öffnen'), reason: t('Höchstens {max} Charts gleichzeitig', { max: MAX_TABS }) }
@@ -117,8 +121,19 @@ function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClo
           }
         },
     isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
+    { label: t('Umbenennen'), run: at.rename },
     { label: t('Aus Watchlist löschen'), run: () => removeFromFolder(at.folderId, s), danger: true }
   ]
+  return <ContextMenu x={at.x} y={at.y} label={t('Aktionen für {symbol}', { symbol: s })} items={items} onClose={onClose} />
+}
+
+/** Menu at the mouse position; unavailable entries stay visible with the reason underneath. */
+function ContextMenu({ x, y, label, items, onClose }: { x: number; y: number; label: string; items: MenuItem[]; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   return (
     <>
       <div
@@ -131,9 +146,9 @@ function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClo
       />
       <div
         role="menu"
-        aria-label={t('Aktionen für {symbol}', { symbol: s })}
+        aria-label={label}
         className="fixed z-50 w-52 rounded-lg border border-line bg-panel/95 py-1 text-xs shadow-2xl shadow-black/50 backdrop-blur"
-        style={{ left: Math.min(at.x, window.innerWidth - 216), top: Math.min(at.y, window.innerHeight - 170) }}
+        style={{ left: Math.min(x, window.innerWidth - 216), top: Math.min(y, window.innerHeight - 40 * items.length - 10) }}
       >
         {items.map((item, i) => (
           <button
@@ -182,6 +197,15 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
   const setName = useStore((s) => s.setName)
   const [adding, setAdding] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
+  // Right-click menu of the folder heading, at the mouse position.
+  const [headMenu, setHeadMenu] = useState<{ x: number; y: number } | null>(null)
+  const startAdding = () => {
+    setAdding(true)
+    if (f.collapsed) toggle(f.id)
+  }
+  const deleteFolder = () =>
+    (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
+    removeFolder(f.id)
   const [dropTarget, setDropTarget] = useState(false)
   // Where a dragged symbol would land: in front of this symbol, null = at the end, undefined = nowhere.
   const [insertBefore, setInsertBefore] = useState<string | null | undefined>(undefined)
@@ -213,7 +237,26 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
       // Another folder lights up as a whole; within the own folder only the insertion line shows.
       className={dropTarget && dragged?.from !== f.id ? 'bg-accent/10 ring-1 ring-inset ring-accent' : ''}
     >
-      <div className="group/head flex items-center gap-1 px-2 pb-1 pt-3">
+      {headMenu && (
+        <ContextMenu
+          x={headMenu.x}
+          y={headMenu.y}
+          label={t('Aktionen für {symbol}', { symbol: f.name })}
+          items={[
+            { label: t('Umbenennen'), run: onEdit },
+            { label: t('Symbol hinzufügen'), run: startAdding },
+            { label: t('Ordner löschen'), run: deleteFolder, danger: true }
+          ]}
+          onClose={() => setHeadMenu(null)}
+        />
+      )}
+      <div
+        className="group/head flex items-center gap-1 px-2 pb-1 pt-3"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          if (!editing) setHeadMenu({ x: e.clientX, y: e.clientY })
+        }}
+      >
         <button
           onClick={() => toggle(f.id)}
           aria-label={f.collapsed ? t('{name} aufklappen', { name: f.name }) : t('{name} zuklappen', { name: f.name })}
@@ -252,10 +295,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
         )}
         <div className="flex opacity-0 focus-within:opacity-100 group-hover/head:opacity-100">
           <button
-            onClick={() => {
-              setAdding(true)
-              if (f.collapsed) toggle(f.id)
-            }}
+            onClick={startAdding}
             className={iconBtn}
             title={t('Symbol hinzufügen')}
             aria-label={t('Symbol zu {name} hinzufügen', { name: f.name })}
@@ -266,10 +306,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
             <Pencil size={13} />
           </button>
           <button
-            onClick={() =>
-              (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
-              removeFolder(f.id)
-            }
+            onClick={deleteFolder}
             className={`${iconBtn} hover:text-down`}
             title={t('Ordner löschen')}
             aria-label={t('{name} löschen', { name: f.name })}
@@ -307,7 +344,14 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
               title={t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')}
               onContextMenu={(e) => {
                 e.preventDefault()
-                onMenu({ symbol: s, folderId: f.id, x: e.clientX, y: e.clientY, left: e.currentTarget.getBoundingClientRect().left })
+                onMenu({
+                  symbol: s,
+                  folderId: f.id,
+                  x: e.clientX,
+                  y: e.clientY,
+                  left: e.currentTarget.getBoundingClientRect().left,
+                  rename: () => setRenaming(s)
+                })
               }}
               onDragStart={(e) => {
                 drag.current = { symbol: s, from: f.id }
