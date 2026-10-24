@@ -656,5 +656,9 @@ export const EN: Record<string, string> = {
   'Alle Ordner aufklappen':
     'Expand all folders',
   'Alle Ordner zuklappen':
-    'Collapse all folders'
+    'Collapse all folders',
+  'Text (1 Klick, dann tippen · Doppelklick bearbeitet)':
+    'Text (1 click, then type · double-click edits)',
+  'Text eingeben':
+    'Enter text'
 }

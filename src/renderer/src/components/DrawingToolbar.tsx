@@ -18,6 +18,7 @@ import {
   Spline,
   Trash2,
   Triangle,
+  Type,
   X,
   type LucideIcon
 } from 'lucide-react'
@@ -42,7 +43,8 @@ const TOOLS: [Tool, LucideIcon, string][] = [
   ['wxy', Merge, msg('Elliott-Kombination 0-W-X-Y (4 Klicks)')],
   ['wxyxz', Shuffle, msg('Elliott-Dreifachkombination 0-W-X-Y-X-Z (6 Klicks)')],
   ['sine', AudioWaveform, msg('Sinuswelle (2 Klicks: Tief → nächstes Hoch oder umgekehrt)')],
-  ['measure', Ruler, msg('Messen – Preis, Prozent und Kerzen (2 Klicks)')]
+  ['measure', Ruler, msg('Messen – Preis, Prozent und Kerzen (2 Klicks)')],
+  ['text', Type, msg('Text (1 Klick, dann tippen · Doppelklick bearbeitet)')]
 ]
 // A thin divider before each group: Fibonacci, Elliott, the rest.
 const GROUP_STARTS = new Set<Tool>(['fib', 'elliott', 'sine'])

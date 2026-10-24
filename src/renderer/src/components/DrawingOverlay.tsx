@@ -54,7 +54,8 @@ const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
   triangle: 6,
   wxy: 4,
   wxyxz: 6,
-  sine: 2
+  sine: 2,
+  text: 1
 }
 
 /** 'move' drags the whole drawing, a number drags that point. */
@@ -74,6 +75,7 @@ function build(tool: Exclude<Tool, 'cursor'>, id: string, pts: Point[]): Drawing
   if (tool === 'hline') return { id, type: tool, price: pts[0].price }
   if (tool === 'vline') return { id, type: tool, time: pts[0].time }
   if (tool === 'trend' || tool === 'fib') return { id, type: tool, p1: pts[0], p2: pts[1] ?? pts[0] }
+  if (tool === 'text') return { id, type: tool, points: pts, text: '' }
   return { id, type: tool, points: pts }
 }
 
@@ -104,6 +106,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   // Edits are previewed locally and committed on mouseup, so the store file is written once per drag.
   const [drag, setDrag] = useState<DragState | null>(null)
   const dragRef = useRef<DragState | null>(null)
+  // Text drawing whose input field is open: right after placing it, or after a double-click.
+  const [editing, setEditing] = useState<string | null>(null)
   const [, redraw] = useState(0)
   const times = useMemo(() => data.map((c) => c.time), [data])
   const step = TF_SECONDS[timeframe]
@@ -238,7 +242,9 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (!p || tool === 'cursor') return
     const pts = [...draft, p]
     if (pts.length < CLICKS[tool]) return setDraft(pts)
-    addDrawing(build(tool, crypto.randomUUID(), pts))
+    const id = crypto.randomUUID()
+    addDrawing(build(tool, id, pts))
+    if (tool === 'text') setEditing(id)
     setTool('cursor')
   }
 
@@ -313,6 +319,27 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           onMouseDown={preview ? undefined : (e) => startDrag(e, d, i)}
         />
       ))
+    if (d.type === 'text') {
+      return (
+        <g key={d.id}>
+          {d.id !== editing && (
+            <text
+              x={xs[0]}
+              y={ys[0]}
+              fill={stroke}
+              fontSize={13}
+              fontWeight={600}
+              style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move', userSelect: 'none' }}
+              onMouseDown={preview ? undefined : (e) => startDrag(e, d, 'move')}
+              onDoubleClick={preview ? undefined : () => setEditing(d.id)}
+            >
+              {d.text}
+            </text>
+          )}
+        </g>
+      )
+    }
+
     const seg = (a: number, b: number) => ({ x1: xs[a], y1: ys[a], x2: xs[b], y2: ys[b] })
 
     if (d.type === 'trend' || (d.type === 'ray' && pts.length < 2)) {
@@ -569,6 +596,16 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     )
   }
 
+  const textEdit = drawings.find((d): d is Extract<Drawing, { type: 'text' }> => d.id === editing && d.type === 'text')
+  const editAt = textEdit && [toX(textEdit.points[0].time), toY(textEdit.points[0].price)]
+  // An emptied text is removed rather than kept as an invisible drawing.
+  const commitText = (d: Extract<Drawing, { type: 'text' }>, value: string) => {
+    setEditing(null)
+    const text = value.trim()
+    if (!text) removeDrawing(d.id)
+    else if (text !== d.text) updateDrawing({ ...d, text })
+  }
+
   const preview = tool !== 'cursor' && draft.length > 0 && hover ? build(tool, 'draft', [...draft, hover]) : null
   return (
     <>
@@ -588,6 +625,19 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
         {preview && render(preview, true)}
       </svg>
+      {textEdit && editAt && editAt[0] !== null && editAt[1] !== null && (
+        <input
+          key={textEdit.id}
+          autoFocus
+          defaultValue={textEdit.text}
+          placeholder={t('Text eingeben')}
+          aria-label={t('Text eingeben')}
+          onBlur={(e) => commitText(textEdit, e.currentTarget.value)}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
+          className="pointer-events-auto absolute z-20 w-48 rounded border border-accent/60 bg-panel px-1 text-[13px] font-semibold text-slate-100 outline-none"
+          style={{ left: editAt[0], top: editAt[1] - 17 }}
+        />
+      )}
       {tool !== 'cursor' && CLICKS[tool] > 1 && (
         // Bottom centre: the top is taken by the legend row.
         <div className="pointer-events-none absolute bottom-12 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-panel/90 px-2.5 py-1 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur">

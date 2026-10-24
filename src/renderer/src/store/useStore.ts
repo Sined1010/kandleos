@@ -18,6 +18,7 @@ export type Drawing =
       type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure' | 'fibext' | 'fibfan' | 'fibtime' | 'triangle' | 'wxy' | 'wxyxz' | 'sine'
       points: Point[]
     }
+  | { id: string; type: 'text'; points: Point[]; text: string }
 export type Tool = 'cursor' | Drawing['type']
 export interface Folder {
   id: string
