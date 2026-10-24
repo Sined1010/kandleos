@@ -5,6 +5,7 @@ directories:
 files:
   - out/**
   - package.json
+  - resources/icon.png # window icon, loaded by src/main/index.ts
 # Shipped next to the app (resources/), opened from the "Über KandleOS" dialog.
 extraResources:
   # KandleOS itself is GPL-3.0-or-later; the license text must travel with every copy.

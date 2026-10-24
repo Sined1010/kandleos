@@ -14,6 +14,7 @@ import {
   runAgents,
   setKey
 } from './agents'
+import icon from '../../resources/icon.png?asset'
 import { setLang } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { applyBackup, exportBackup, pickBackup } from './backup'
@@ -123,6 +124,8 @@ function createWindow(): void {
     backgroundColor: '#0b0e14',
     autoHideMenuBar: true,
     title: 'KandleOS',
+    // Without it, title bar and taskbar show Electron's icon on a dev start and in some Linux window managers.
+    icon,
     // Electron's secure defaults, spelled out so a later change cannot silently weaken them.
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
