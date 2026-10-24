@@ -4,7 +4,18 @@ import { futureTimes } from '../../../shared/calendar'
 import { locale, t } from '../../../shared/i18n'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
-import { channelOffset, isTrough, measureLabel, rayEnd } from '../lib/geometry'
+import {
+  channelOffset,
+  fanPrice,
+  FIB_EXT_LEVELS,
+  FIB_FAN_LEVELS,
+  FIB_TIME_ZONES,
+  fibExtPrice,
+  isTrough,
+  measureLabel,
+  rayEnd,
+  sinePrice
+} from '../lib/geometry'
 import { THEME } from '../lib/theme'
 import { drawingsKey, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
@@ -12,8 +23,15 @@ const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
 const COLOR = THEME.drawing
 const SELECTED = THEME.selected
-const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043' }
-const WAVE_LABELS = { elliott: ['0', '1', '2', '3', '4', '5'], abc: ['0', 'A', 'B', 'C'] }
+const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043', triangle: '#42a5f5', wxy: '#ec407a', wxyxz: '#ffca28' }
+const WAVE_LABELS = {
+  elliott: ['0', '1', '2', '3', '4', '5'],
+  abc: ['0', 'A', 'B', 'C'],
+  triangle: ['0', 'A', 'B', 'C', 'D', 'E'],
+  wxy: ['0', 'W', 'X', 'Y'],
+  wxyxz: ['0', 'W', 'X', 'Y', 'X', 'Z']
+}
+const isWave = (type: string): type is keyof typeof WAVE_LABELS => Object.hasOwn(WAVE_LABELS, type)
 const NO_DRAWINGS: Drawing[] = []
 // How far right of the last candle drawings follow the trading calendar; beyond that, even steps.
 const FUTURE_BARS = 500
@@ -29,7 +47,14 @@ const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
   channel: 3,
   elliott: 6,
   abc: 4,
-  measure: 2
+  measure: 2,
+  fibext: 3,
+  fibfan: 2,
+  fibtime: 2,
+  triangle: 6,
+  wxy: 4,
+  wxyxz: 6,
+  sine: 2
 }
 
 /** 'move' drags the whole drawing, a number drags that point. */
@@ -139,6 +164,13 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const logicalOf = (time: number) => timeToLogical(axis, time, step)
   const toX = (time: number) => (times.length ? chart.timeScale().logicalToCoordinate(logicalOf(time) as Logical) : null)
   const toY = (price: number) => series.priceToCoordinate(price)
+  // logicalToCoordinate gives 0 between bars, so fractional positions are interpolated between the two neighbours.
+  const xAt = (logical: number) => {
+    const base = Math.floor(logical)
+    const a = chart.timeScale().logicalToCoordinate(base as Logical)
+    const b = chart.timeScale().logicalToCoordinate((base + 1) as Logical)
+    return a === null || b === null ? null : a + (logical - base) * (b - a)
+  }
   const fmt = (price: number) => series.priceFormatter().format(price)
 
   const logicalAt = (e: { clientX: number; clientY: number }) => {
@@ -362,7 +394,121 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       )
     }
 
-    if (d.type === 'elliott' || d.type === 'abc') {
+    if (d.type === 'fibext') {
+      const path = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+      const guide = (
+        <>
+          <polyline points={path} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray="4 4" />
+          {hit() && <polyline points={path} {...hit()} />}
+        </>
+      )
+      if (pts.length < 3)
+        return (
+          <g key={d.id}>
+            {guide}
+            {handles}
+          </g>
+        )
+      // Targets start at the pullback C and reach as far right as the pattern A → C is wide.
+      const left = xs[2]
+      const right = xs[2] + Math.max(40, Math.abs(xs[2] - xs[0]))
+      return (
+        <g key={d.id}>
+          {FIB_EXT_LEVELS.map((lvl, i) => {
+            const price = fibExtPrice(pts[0].price, pts[1].price, pts[2].price, lvl)
+            const y = toY(price)
+            if (y === null) return null
+            const color = FIB_COLORS[i]
+            return (
+              <g key={lvl}>
+                <line x1={left} x2={right} y1={y} y2={y} stroke={color} strokeWidth={selected ? 2 : 1} />
+                {hit() && <line x1={left} x2={right} y1={y} y2={y} {...hit()} />}
+                <text x={right + 4} y={y + 3} fill={color} fontSize={10}>
+                  {lvl} ({fmt(price)})
+                </text>
+              </g>
+            )
+          })}
+          {guide}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'fibfan') {
+      return (
+        <g key={d.id}>
+          {FIB_FAN_LEVELS.map((ratio, i) => {
+            const through = toY(fanPrice(pts[0].price, pts[1].price, ratio))
+            if (through === null) return null
+            const [ex, ey] = rayEnd(xs[0], ys[0], xs[1], through, width)
+            const color = ratio ? FIB_COLORS[i + 1] : stroke
+            const ray = { x1: xs[0], y1: ys[0], x2: ex, y2: ey }
+            return (
+              <g key={ratio}>
+                <line {...ray} stroke={color} strokeWidth={selected ? 2 : 1} />
+                {hit() && <line {...ray} {...hit()} />}
+                {ratio > 0 && (
+                  <text x={xs[1] + 4} y={through - 3} fill={color} fontSize={10}>
+                    {ratio}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'fibtime') {
+      const start = logicalOf(pts[0].time)
+      const unit = logicalOf(pts[1].time) - start
+      return (
+        <g key={d.id}>
+          {unit !== 0 &&
+            FIB_TIME_ZONES.map((k) => {
+              const x = xAt(start + k * unit)
+              if (x === null || x < 0 || x > width) return null
+              return (
+                <g key={k}>
+                  <line x1={x} x2={x} y1={0} y2={height} stroke={stroke} strokeWidth={selected ? 2 : 1} strokeOpacity={k ? 0.7 : 1} />
+                  {hit() && <line x1={x} x2={x} y1={0} y2={height} {...hit()} />}
+                  <text x={x + 3} y={height - 6} fill={stroke} fontSize={10}>
+                    {k}
+                  </text>
+                </g>
+              )
+            })}
+          {handles}
+        </g>
+      )
+    }
+
+    if (d.type === 'sine') {
+      const l1 = logicalOf(pts[0].time)
+      const l2 = logicalOf(pts[1].time)
+      const half = Math.abs(l2 - l1)
+      // From the first click to the right edge of the view, about 32 points per half wave and at most 2000.
+      const end = Math.max(l1, l2, chart.timeScale().getVisibleLogicalRange()?.to ?? l2)
+      const stepL = half ? Math.max(half / 32, (end - l1) / 2000) : end - l1 || 1
+      const curve: string[] = []
+      for (let l = l1; l <= end; l += stepL) {
+        const x = xAt(l)
+        const y = toY(sinePrice(l1, pts[0].price, l2, pts[1].price, l))
+        if (x !== null && y !== null) curve.push(`${x},${y}`)
+      }
+      const path = curve.join(' ')
+      return (
+        <g key={d.id}>
+          <polyline points={path} fill="none" stroke={stroke} strokeWidth={lineWidth} />
+          {hit() && <polyline points={path} {...hit()} />}
+          {handles}
+        </g>
+      )
+    }
+
+    if (isWave(d.type)) {
       const color = selected ? SELECTED : WAVE_COLORS[d.type]
       const labels = WAVE_LABELS[d.type]
       const path =xs.map((x, i) => `${x},${ys[i]}`).join(' ')

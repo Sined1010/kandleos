@@ -13,7 +13,11 @@ export type Drawing =
   | { id: string; type: 'hline'; price: number }
   | { id: string; type: 'vline'; time: number }
   // Tools added later store their clicks as a point list; the older shapes above keep their saved format.
-  | { id: string; type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure'; points: Point[] }
+  | {
+      id: string
+      type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure' | 'fibext' | 'fibfan' | 'fibtime' | 'triangle' | 'wxy' | 'wxyxz' | 'sine'
+      points: Point[]
+    }
 export type Tool = 'cursor' | Drawing['type']
 export interface Folder {
   id: string

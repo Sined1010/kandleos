@@ -1,16 +1,23 @@
 import {
   Activity,
+  AudioWaveform,
+  ChartNoAxesColumnIncreasing,
   ChartNoAxesGantt,
   Columns2,
+  Columns4,
+  Fan,
+  Merge,
   Minus,
   MousePointer2,
   MoveUpRight,
   RectangleHorizontal,
   Ruler,
   SeparatorVertical,
+  Shuffle,
   Slash,
   Spline,
   Trash2,
+  Triangle,
   X,
   type LucideIcon
 } from 'lucide-react'
@@ -26,10 +33,19 @@ const TOOLS: [Tool, LucideIcon, string][] = [
   ['channel', Columns2, msg('Parallelkanal (3 Klicks: Linie, dann Abstand)')],
   ['rect', RectangleHorizontal, msg('Rechteck / Zone (2 Klicks)')],
   ['fib', ChartNoAxesGantt, msg('Fibonacci Retracement (2 Klicks: Hoch → Tief)')],
+  ['fibext', ChartNoAxesColumnIncreasing, msg('Fibonacci-Erweiterung (3 Klicks: Start, Ende der Bewegung, Rücksetzer)')],
+  ['fibfan', Fan, msg('Fibonacci-Fächer (2 Klicks: Start → Ende der Bewegung)')],
+  ['fibtime', Columns4, msg('Fibonacci-Zeitzonen (2 Klicks: Start und Länge einer Einheit)')],
   ['elliott', Activity, msg('Elliott-Impuls 0-1-2-3-4-5 (6 Klicks)')],
   ['abc', Spline, msg('Elliott-Korrektur 0-A-B-C (4 Klicks)')],
+  ['triangle', Triangle, msg('Elliott-Dreieck 0-A-B-C-D-E (6 Klicks)')],
+  ['wxy', Merge, msg('Elliott-Kombination 0-W-X-Y (4 Klicks)')],
+  ['wxyxz', Shuffle, msg('Elliott-Dreifachkombination 0-W-X-Y-X-Z (6 Klicks)')],
+  ['sine', AudioWaveform, msg('Sinuswelle (2 Klicks: Tief → nächstes Hoch oder umgekehrt)')],
   ['measure', Ruler, msg('Messen – Preis, Prozent und Kerzen (2 Klicks)')]
 ]
+// A thin divider before each group: Fibonacci, Elliott, the rest.
+const GROUP_STARTS = new Set<Tool>(['fib', 'elliott', 'sine'])
 
 export default function DrawingToolbar() {
   const tool = useStore((s) => s.tool)
@@ -42,18 +58,21 @@ export default function DrawingToolbar() {
 
   const btn = 'flex h-8 w-8 items-center justify-center rounded-lg transition'
   return (
-    <nav className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2">
+    // Scrolls in small windows rather than cutting off the lower tools.
+    <nav className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-line bg-panel py-2">
       {TOOLS.map(([id, Icon, label]) => (
-        <button
-          key={id}
-          onClick={() => setTool(id)}
-          title={t(label)}
-          aria-label={t(label)}
-          aria-pressed={tool === id}
-          className={`${btn} ${tool === id ? 'bg-brand text-white shadow-glow' : 'text-muted hover:bg-line hover:text-white'}`}
-        >
-          <Icon size={17} />
-        </button>
+        <div key={id} className="contents">
+          {GROUP_STARTS.has(id) && <div className="my-0.5 h-px w-6 shrink-0 bg-line" />}
+          <button
+            onClick={() => setTool(id)}
+            title={t(label)}
+            aria-label={t(label)}
+            aria-pressed={tool === id}
+            className={`${btn} shrink-0 ${tool === id ? 'bg-brand text-white shadow-glow' : 'text-muted hover:bg-line hover:text-white'}`}
+          >
+            <Icon size={17} />
+          </button>
+        </div>
       ))}
       <div className="my-1 h-px w-6 bg-line" />
       {selectedId && (

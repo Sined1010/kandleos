@@ -634,5 +634,19 @@ export const EN: Record<string, string> = {
   'Bänder ×{f} kalibriert':
     'ranges calibrated ×{f}',
   'Bänder kalibriert: Die Unsicherheitsbereiche sind um den Faktor {f} gestreckt (über 1) oder gestaucht (unter 1), damit im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Die Werte oben gelten für das unkalibrierte Modell.':
-    'Ranges calibrated: the uncertainty ranges are stretched (above 1) or shrunk (below 1) by the factor {f}, so that in the backtests 80 % of the real closes lay in the 80 % range. The values above are for the uncalibrated model.'
+    'Ranges calibrated: the uncertainty ranges are stretched (above 1) or shrunk (below 1) by the factor {f}, so that in the backtests 80 % of the real closes lay in the 80 % range. The values above are for the uncalibrated model.',
+  'Fibonacci-Erweiterung (3 Klicks: Start, Ende der Bewegung, Rücksetzer)':
+    'Fibonacci extension (3 clicks: start, end of the move, pullback)',
+  'Fibonacci-Fächer (2 Klicks: Start → Ende der Bewegung)':
+    'Fibonacci fan (2 clicks: start → end of the move)',
+  'Fibonacci-Zeitzonen (2 Klicks: Start und Länge einer Einheit)':
+    'Fibonacci time zones (2 clicks: start and length of one unit)',
+  'Elliott-Dreieck 0-A-B-C-D-E (6 Klicks)':
+    'Elliott triangle 0-A-B-C-D-E (6 clicks)',
+  'Elliott-Kombination 0-W-X-Y (4 Klicks)':
+    'Elliott combination 0-W-X-Y (4 clicks)',
+  'Elliott-Dreifachkombination 0-W-X-Y-X-Z (6 Klicks)':
+    'Elliott triple combination 0-W-X-Y-X-Z (6 clicks)',
+  'Sinuswelle (2 Klicks: Tief → nächstes Hoch oder umgekehrt)':
+    'Sine wave (2 clicks: trough → next peak or the reverse)'
 }
