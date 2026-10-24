@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { t } from '../../../shared/i18n'
 import { isCrypto } from '../../../shared/types'
@@ -44,6 +44,7 @@ export default function Watchlist() {
     setName(s, '')
   }
 
+  const anyOpen = folders.some((f) => !f.collapsed)
   const [menu, setMenu] = useState<RowAt | null>(null)
   const [info, setInfo] = useState<RowAt | null>(null)
   useEffect(() => {
@@ -61,12 +62,25 @@ export default function Watchlist() {
     <aside className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted">Watchlist</span>
-        <button
-          onClick={() => setEditing(addFolder(t('Neuer Ordner')))}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
-        >
-          <FolderPlus size={15} /> {t('Ordner')}
-        </button>
+        <span className="flex items-center gap-1">
+          {folders.length > 0 && (
+            // Closes all while any is open, otherwise opens all.
+            <button
+              onClick={() => useStore.setState((s) => ({ folders: s.folders.map((f) => ({ ...f, collapsed: anyOpen })) }))}
+              title={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
+              aria-label={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
+              className="rounded p-0.5 text-muted hover:bg-line hover:text-white"
+            >
+              {anyOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+            </button>
+          )}
+          <button
+            onClick={() => setEditing(addFolder(t('Neuer Ordner')))}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
+          >
+            <FolderPlus size={15} /> {t('Ordner')}
+          </button>
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-6">
@@ -243,6 +257,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
           y={headMenu.y}
           label={t('Aktionen für {symbol}', { symbol: f.name })}
           items={[
+            { label: f.collapsed ? t('Aufklappen') : t('Zuklappen'), run: () => toggle(f.id) },
             { label: t('Umbenennen'), run: onEdit },
             { label: t('Symbol hinzufügen'), run: startAdding },
             { label: t('Ordner löschen'), run: deleteFolder, danger: true }

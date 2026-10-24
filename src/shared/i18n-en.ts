@@ -648,5 +648,13 @@ export const EN: Record<string, string> = {
   'Elliott-Dreifachkombination 0-W-X-Y-X-Z (6 Klicks)':
     'Elliott triple combination 0-W-X-Y-X-Z (6 clicks)',
   'Sinuswelle (2 Klicks: Tief → nächstes Hoch oder umgekehrt)':
-    'Sine wave (2 clicks: trough → next peak or the reverse)'
+    'Sine wave (2 clicks: trough → next peak or the reverse)',
+  'Aufklappen':
+    'Expand',
+  'Zuklappen':
+    'Collapse',
+  'Alle Ordner aufklappen':
+    'Expand all folders',
+  'Alle Ordner zuklappen':
+    'Collapse all folders'
 }
