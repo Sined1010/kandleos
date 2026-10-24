@@ -5,7 +5,7 @@
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer.
 
-![KandleOS with a Chronos-2 forecast for XRP (daily candles): forecast candles with 50 % and 80 % ranges](docs/screenshot.png)
+![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (15-minute candles): forecast candles, uncertainty ranges and the values of one forecast step](docs/screenshot.webp)
 
 ## Features
 
@@ -52,8 +52,11 @@ You choose the stock data source on first start; you can change it any time in t
 | Yahoo Finance | Stocks worldwide, indices, commodities, pre-/post-market | not needed, opt-in |
 | [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks and company info | your own free key |
 
-**About Yahoo Finance:** KandleOS uses Yahoo's unofficial, undocumented interface. It is only enabled after you
-confirm that you use it for private purposes. It may stop working at any time. KandleOS is not affiliated with Yahoo.
+**About Yahoo Finance:** Yahoo does not offer an official API for this. Like the open-source library yfinance,
+KandleOS reads the publicly available data that Yahoo's own finance website loads. Yahoo Finance data is meant for
+personal use, so this source is opt-in and only enabled after you confirm private use. It may stop working at any
+time. KandleOS is not affiliated with, endorsed or vetted by Yahoo, Inc.; Yahoo! and Yahoo Finance are trademarks of
+Yahoo, Inc.
 
 API keys are stored encrypted with the operating system's key store (on Linux only with gnome-keyring or KWallet,
 otherwise in a file readable only by you).
