@@ -624,5 +624,15 @@ export const EN: Record<string, string> = {
   'Passwort für die API-Keys':
     'Password for the API keys',
   'Ersetzt Watchlist, Zeichnungen und Einstellungen auf diesem Rechner. KandleOS lädt danach neu.':
-    'Replaces the watchlist, drawings and settings on this computer. KandleOS then reloads.'
+    'Replaces the watchlist, drawings and settings on this computer. KandleOS then reloads.',
+  'Bänder kalibrieren':
+    'Calibrate ranges',
+  'Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 10 Rückblicken am verlässlichsten.':
+    'Make the ranges as wide as they would have needed to be in the backtests; the median stays the same. Most reliable with 10 backtests.',
+  'Braucht den Rückblick (3, 5 oder 10).':
+    'Needs the backtest (3, 5 or 10).',
+  'Bänder ×{f} kalibriert':
+    'ranges calibrated ×{f}',
+  'Bänder kalibriert: Die Unsicherheitsbereiche sind um den Faktor {f} gestreckt (über 1) oder gestaucht (unter 1), damit im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Die Werte oben gelten für das unkalibrierte Modell.':
+    'Ranges calibrated: the uncertainty ranges are stretched (above 1) or shrunk (below 1) by the factor {f}, so that in the backtests 80 % of the real closes lay in the 80 % range. The values above are for the uncalibrated model.'
 }

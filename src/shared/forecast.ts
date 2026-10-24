@@ -69,6 +69,39 @@ export function backtest(closes: number[], cutoffs: number[], forecasts: number[
   return { runs: cutoffs.length, steps, error: error / n, inside80: in80 / n, inside50: in50 / n, direction }
 }
 
+/**
+ * Conformal calibration of the ranges: the factor by which every quantile's distance from the median must be
+ * stretched (above 1) or shrunk (below 1) so that `level` of the real closes in the backtests lay inside the
+ * 80 % range. Distances are relative (log prices), as prices move in percent and never go below zero.
+ * 1 when there is nothing to compare. Steps of one backtest are correlated, so this is a sound correction
+ * but not an exact guarantee.
+ */
+export function bandScale(closes: number[], cutoffs: number[], forecasts: number[][][], steps: number, level = 0.8): number {
+  const scores: number[] = []
+  cutoffs.forEach((c, r) => {
+    for (let i = 0; i < steps; i++) {
+      const q = forecasts[r][i]
+      const real = closes[c + i]
+      const med = q[Q.median]
+      const edge = real < med ? q[Q.p10] : q[Q.p90]
+      if (!(real > 0 && med > 0 && edge > 0)) continue
+      const half = Math.abs(Math.log(edge / med))
+      if (half > 0) scores.push(Math.abs(Math.log(real / med)) / half)
+    }
+  })
+  if (!scores.length) return 1
+  scores.sort((a, b) => a - b)
+  // Finite-sample conformal quantile: the ceil((n + 1) · level)-th smallest score.
+  return scores[Math.min(scores.length, Math.ceil((scores.length + 1) * level)) - 1]
+}
+
+/** Quantiles stretched around each step's median by `factor` in log prices; the median itself stays. */
+export const scaleBands = (steps: number[][], factor: number): number[][] =>
+  steps.map((q) => {
+    const med = q[Q.median]
+    return q.map((v) => (v > 0 && med > 0 ? med * (v / med) ** factor : med + factor * (v - med)))
+  })
+
 export interface ForecastCandle {
   open: number
   high: number

@@ -42,6 +42,8 @@ export interface ForecastRun {
    * grey over the real bars); 0 switches the backtest off and saves computing it.
    */
   backtestRuns: 0 | 3 | 5 | 10
+  /** Stretch or shrink the ranges so that in the backtests 80 % of the real closes lay in the 80 % range. */
+  calibrate: boolean
   /** Recompute a shown forecast whenever a new candle begins. */
   autoUpdate: boolean
 }
@@ -235,7 +237,7 @@ export const useStore = create<State>()(
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
       forecastView: { style: 'line', band50: true, band80: true, band90: true, hover: true },
       setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
-      forecastRun: { horizon: 'auto', backtestRuns: 3, autoUpdate: false },
+      forecastRun: { horizon: 'auto', backtestRuns: 3, calibrate: false, autoUpdate: false },
       setForecastRun: (patch) => set((s) => ({ forecastRun: { ...s.forecastRun, ...patch } })),
       agentsConfig: {
         provider: 'anthropic',

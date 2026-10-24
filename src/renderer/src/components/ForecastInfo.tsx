@@ -17,6 +17,8 @@ export interface ForecastResult {
   baseTime: number
   /** Backtest against the real past, null when the history is too short for one. */
   check: BacktestResult | null
+  /** Factor the ranges were calibrated by (see bandScale), null when not calibrated. */
+  bandScale: number | null
   /** The latest backtest's median over the real bars after its cutoff (starting at the cutoff close). */
   backtestPath: { time: number; value: number }[] | null
 }
@@ -92,7 +94,7 @@ export function ForecastTip({ result, index, x, y, width, height, intraday, cand
 }
 
 /** One-line summary of how well the model forecast this chart's own recent past. */
-export function ForecastCheck({ check }: { check: BacktestResult | null }) {
+export function ForecastCheck({ check, scale }: { check: BacktestResult | null; scale: number | null }) {
   if (!check)
     return (
       <div className="mt-1 text-muted" title={t('Für einen Rückblick muss vor dem Prognosezeitraum noch genug Historie liegen.')}>
@@ -108,7 +110,10 @@ export function ForecastCheck({ check }: { check: BacktestResult | null }) {
     '\n' +
     t('Richtung: ob der Median am Ende richtig über oder unter dem Startkurs lag.') +
     '\n' +
-    t('Vergangene Treffsicherheit ist keine Garantie für die Zukunft.')
+    t('Vergangene Treffsicherheit ist keine Garantie für die Zukunft.') +
+    (scale === null
+      ? ''
+      : '\n' + t('Bänder kalibriert: Die Unsicherheitsbereiche sind um den Faktor {f} gestreckt (über 1) oder gestaucht (unter 1), damit im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Die Werte oben gelten für das unkalibrierte Modell.', { f: scale.toLocaleString(locale(), { maximumFractionDigits: 2 }) }))
   return (
     <div className="pointer-events-auto mt-1 w-fit text-muted" title={title}>
       <span className="text-slate-300">{t('Rückblick:')}</span>{' '}
@@ -118,6 +123,9 @@ export function ForecastCheck({ check }: { check: BacktestResult | null }) {
         hits: check.direction,
         runs: check.runs
       })}
+      {scale !== null && (
+        <span className="text-amber-200"> · {t('Bänder ×{f} kalibriert', { f: scale.toLocaleString(locale(), { maximumFractionDigits: 2 }) })}</span>
+      )}
     </div>
   )
 }
@@ -247,6 +255,22 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         <p className="px-1 pb-1 pt-1 text-[11px] leading-snug text-muted">
           {t('Treffsicherheit früherer Prognosen (die jüngste grau im Chart): mehr ist aussagekräftiger, rechnet aber länger')}
         </p>
+        <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-bg">
+          <input
+            type="checkbox"
+            checked={run.calibrate}
+            onChange={(e) => setRun({ calibrate: e.target.checked })}
+            className="mt-0.5 accent-accent"
+          />
+          <span>
+            <span className="text-slate-200">{t('Bänder kalibrieren')}</span>
+            <span className="block text-[11px] leading-snug text-muted">
+              {run.backtestRuns
+                ? t('Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 10 Rückblicken am verlässlichsten.')
+                : t('Braucht den Rückblick (3, 5 oder 10).')}
+            </span>
+          </span>
+        </label>
         <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-bg">
           <input
             type="checkbox"

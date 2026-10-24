@@ -18,7 +18,7 @@ import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
-import { backtest, backtestCutoffs, forecastCandles, Q } from '../../../shared/forecast'
+import { backtest, backtestCutoffs, bandScale, forecastCandles, Q, scaleBands } from '../../../shared/forecast'
 import type { Decision } from '../../../shared/agents'
 import { locale, t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
@@ -335,7 +335,7 @@ export default function ChartArea() {
       // Wick lengths above and below each body, for the forecast candles.
       const upper = bars.map((c) => c.high - Math.max(c.open, c.close))
       const lower = bars.map((c) => Math.min(c.open, c.close) - c.low)
-      const { horizon, backtestRuns } = useStore.getState().forecastRun
+      const { horizon, backtestRuns, calibrate } = useStore.getState().forecastRun
       const n = forecastSteps(timeframe, bars.length, horizon === 'auto' ? 64 : horizon)
       const cutoffs = backtestCutoffs(bars.length, n, backtestRuns)
       // One model call: the close on its own (grouping it with the wicks made it measurably worse in
@@ -348,11 +348,14 @@ export default function ChartArea() {
       const median = (q: number[][]) => q.slice(0, n).map((v) => v[Q.median])
       const last = bars[bars.length - 1]
       const c = cutoffs[0]
+      // Calibration only stretches the ranges around the median; the backtest line keeps the raw model's accuracy.
+      const scale = calibrate && cutoffs.length ? bandScale(closes, cutoffs, past, n) : null
       setFc({
         state: 'shown',
         result: {
           times: futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe]),
-          steps: live.slice(0, n),
+          steps: scale === null ? live.slice(0, n) : scaleBands(live.slice(0, n), scale),
+          bandScale: scale,
           upperWicks: median(liveUpper),
           lowerWicks: median(liveLower),
           base: last.close,
@@ -384,7 +387,7 @@ export default function ChartArea() {
   // Changed forecast length or backtest depth: recompute a shown forecast.
   useEffect(() => {
     if (fc.state === 'shown') void runForecast()
-  }, [forecastRun.horizon, forecastRun.backtestRuns])
+  }, [forecastRun.horizon, forecastRun.backtestRuns, forecastRun.calibrate])
 
   // Automatic refresh: a new candle has begun, so the shown forecast is recomputed over the new history.
   const barCount = useRef(0)
@@ -564,7 +567,7 @@ export default function ChartArea() {
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
-          {fc.result && forecastRun.backtestRuns > 0 && <ForecastCheck check={fc.result.check} />}
+          {fc.result && forecastRun.backtestRuns > 0 && <ForecastCheck check={fc.result.check} scale={fc.result.bandScale} />}
         </div>
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
             with its display settings right next to it. */}
