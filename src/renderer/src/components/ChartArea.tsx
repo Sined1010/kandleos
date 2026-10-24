@@ -148,6 +148,8 @@ export default function ChartArea() {
     setData([])
     api.candles.setData([])
     api.volume.setData([])
+    // Dragging a price axis turns its auto-scale off; a new symbol or candle size would keep the old price range.
+    api.chart.panes().forEach((p) => p.priceScale('right').applyOptions({ autoScale: true }))
     setStatus(t('Lade {symbol} …', { symbol }))
     setCurrency('')
     setExchangeZone(undefined)
