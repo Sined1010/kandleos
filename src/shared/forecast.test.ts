@@ -31,6 +31,8 @@ test('backtest measures deviation, range hits and direction against the real clo
   const r = backtest(closes, [2], [f], 3)
   assert.equal(r.runs, 1)
   assert.ok(Math.abs(r.error - (0 / 101 + 1 / 102 + 2 / 103) / 3) < 1e-12)
+  // "Unchanged" forecasts the cutoff close 100 for every step.
+  assert.ok(Math.abs(r.naiveError - (1 / 101 + 2 / 102 + 3 / 103) / 3) < 1e-12)
   assert.equal(r.inside80, 1)
   assert.equal(r.inside50, 2 / 3) // 103 lies outside the 50 % range
   assert.equal(r.direction, 1) // both the forecast and the real close end above the 100 at the cutoff

@@ -110,6 +110,8 @@ export function ForecastCheck({ check, scale }: { check: BacktestResult | null; 
     '\n' +
     t('Richtung: ob der Median am Ende richtig über oder unter dem Startkurs lag.') +
     '\n' +
+    t('Gegenüber „unverändert“: Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Ist das Modell ungenauer, ist seine Prognose für diesen Chart nicht mehr wert als der aktuelle Kurs.') +
+    '\n' +
     t('Vergangene Treffsicherheit ist keine Garantie für die Zukunft.') +
     (scale === null
       ? ''
@@ -123,10 +125,23 @@ export function ForecastCheck({ check, scale }: { check: BacktestResult | null; 
         hits: check.direction,
         runs: check.runs
       })}
+      {check.naiveError > 0 && (
+        // Relative to "unchanged": below 0 means the model missed the real closes by more than the start price did.
+        <NaiveComparison skill={1 - check.error / check.naiveError} />
+      )}
       {scale !== null && (
         <span className="text-amber-200"> · {t('Bänder ×{f} kalibriert', { f: scale.toLocaleString(locale(), { maximumFractionDigits: 2 }) })}</span>
       )}
     </div>
+  )
+}
+
+function NaiveComparison({ skill }: { skill: number }) {
+  const p = pct(Math.abs(skill), 0)
+  return skill >= 0 ? (
+    <span className="text-up"> · {t('{p} genauer als „unverändert“', { p })}</span>
+  ) : (
+    <span className="text-down"> · {t('{p} ungenauer als „unverändert“', { p })}</span>
   )
 }
 

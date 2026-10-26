@@ -39,6 +39,8 @@ export interface BacktestResult {
   steps: number
   /** Mean absolute deviation of the median from the real closes, as a share of the close. */
   error: number
+  /** The same for "unchanged": the close at the cutoff as the forecast for every step. */
+  naiveError: number
   /** Share of real closes inside the 80 % and 50 % ranges (ideally about 0.8 and 0.5). */
   inside80: number
   inside50: number
@@ -49,24 +51,26 @@ export interface BacktestResult {
 /** Compares backtest forecasts (one per cutoff, as from backtestCutoffs) with the closes that followed. */
 export function backtest(closes: number[], cutoffs: number[], forecasts: number[][][], steps: number): BacktestResult {
   let error = 0
+  let naiveError = 0
   let in80 = 0
   let in50 = 0
   let direction = 0
   let n = 0
   cutoffs.forEach((c, r) => {
     const f = forecasts[r]
+    const base = closes[c - 1]
     for (let i = 0; i < steps; i++) {
       const real = closes[c + i]
       const q = f[i]
       error += Math.abs(q[Q.median] - real) / real
+      naiveError += Math.abs(base - real) / real
       if (real >= q[Q.p10] && real <= q[Q.p90]) in80++
       if (real >= q[Q.p25] && real <= q[Q.p75]) in50++
       n++
     }
-    const base = closes[c - 1]
     if (Math.sign(f[steps - 1][Q.median] - base) === Math.sign(closes[c + steps - 1] - base)) direction++
   })
-  return { runs: cutoffs.length, steps, error: error / n, inside80: in80 / n, inside50: in50 / n, direction }
+  return { runs: cutoffs.length, steps, error: error / n, naiveError: naiveError / n, inside80: in80 / n, inside50: in50 / n, direction }
 }
 
 /**

@@ -660,5 +660,11 @@ export const EN: Record<string, string> = {
   'Text (1 Klick, dann tippen · Doppelklick bearbeitet)':
     'Text (1 click, then type · double-click edits)',
   'Text eingeben':
-    'Enter text'
+    'Enter text',
+  'Gegenüber „unverändert“: Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Ist das Modell ungenauer, ist seine Prognose für diesen Chart nicht mehr wert als der aktuelle Kurs.':
+    'Compared with "unchanged": the simplest forecast, that the price stays at the start price. If the model is less accurate, its forecast for this chart is worth no more than the current price.',
+  '{p} genauer als „unverändert“':
+    '{p} more accurate than "unchanged"',
+  '{p} ungenauer als „unverändert“':
+    '{p} less accurate than "unchanged"'
 }
