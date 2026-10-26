@@ -1,4 +1,6 @@
-import { BrainCircuit, ChevronRight, Sparkles } from 'lucide-react'
+import { BrainCircuit, ChevronRight, Info, Sparkles, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { forecastCandles, probabilityAbove, Q, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
@@ -177,6 +179,92 @@ function Segments<V extends string | number>({
   )
 }
 
+// Glossary for the forecast: [section, [term, explanation][]].
+const HELP: [string, [string, string][]][] = [
+  [
+    msg('Darstellung'),
+    [
+      [msg('Median'), msg('Die mittlere Prognose: Laut Modell liegt der Kurs je zur Hälfte darüber oder darunter. Im Chart die gestrichelte Linie.')],
+      [msg('Kerzen'), msg('Zeigt den Median als Kerzen mit der prognostizierten typischen Dochtlänge. Das ist der wahrscheinlichste Verlauf, keine echten Kursschwankungen.')]
+    ]
+  ],
+  [
+    msg('Unsicherheitsbereiche'),
+    [
+      [msg('50 / 80 / 90 %-Bereich'), msg('Mit dieser Wahrscheinlichkeit liegt der Kurs laut Modell im jeweiligen Band. Je weiter in der Zukunft, desto breiter der Fächer.')],
+      [msg('Werte beim Überfahren'), msg('Kasten mit Median, Bereichen und der Wahrscheinlichkeit, dass der Kurs über dem aktuellen Kurs liegt.')]
+    ]
+  ],
+  [
+    msg('Berechnung'),
+    [
+      [msg('Prognose-Länge'), msg('Wie viele Kerzen in die Zukunft prognostiziert werden. Je weiter, desto unsicherer. Auto nimmt bis zu 64, je nach vorhandener Historie.')],
+      [msg('Rückblick'), msg('Das Modell prognostiziert ab früheren Zeitpunkten und wird mit dem echten Verlauf verglichen. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mehr Rückblicke sind aussagekräftiger, rechnen aber länger.')],
+      [msg('Bänder kalibrieren'), msg('Streckt oder staucht die Bereiche so, dass im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Der Median bleibt gleich.')],
+      [msg('Automatisch aktualisieren'), msg('Rechnet die Prognose neu, sobald eine neue Kerze beginnt.')]
+    ]
+  ],
+  [
+    msg('Werte im Rückblick'),
+    [
+      [msg('Ø Abweichung'), msg('Mittlerer Abstand des Medians zum echten Schlusskurs, in Prozent des Kurses.')],
+      [msg('Im 80 %-Bereich'), msg('Anteil der echten Kurse innerhalb des 80 %-Fächers. Gut sind etwa 80 %; deutlich weniger heißt, die Bereiche sind zu schmal, deutlich mehr, sie sind zu breit.')],
+      [msg('Richtung'), msg('Wie oft der Median am Ende richtig über oder unter dem Startkurs lag. Etwa die Hälfte entspricht dem Zufall.')],
+      [msg('Gegenüber „unverändert“'), msg('Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Grün: Das Modell lag näher an den echten Kursen. Rot: Es lag weiter weg, die Prognose ist für diesen Chart also nicht mehr wert als der aktuelle Kurs.')],
+      [msg('Bänder ×… kalibriert'), msg('Faktor, um den die Bereiche gestreckt (über 1) oder gestaucht (unter 1) wurden. Die übrigen Rückblick-Werte gelten für das unkalibrierte Modell.')]
+    ]
+  ],
+  [
+    msg('Grenzen'),
+    [
+      [msg('Was das Modell weiß'), msg('Chronos-2 kennt nur den Kursverlauf, keine Nachrichten, Zahlen oder Stimmung. Bei Kursen schlägt es die Annahme „unverändert“ oft nur knapp oder gar nicht, besonders bei Krypto. Vergangene Treffsicherheit ist keine Garantie, und die Prognose ist keine Anlageberatung.')]
+    ]
+  ]
+]
+
+/** Explains every term and setting of the forecast. Portalled: the settings popover's backdrop blur would trap a fixed overlay. */
+function ForecastHelp({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="forecast-help-title"
+        className="max-h-[85vh] w-[520px] overflow-y-auto rounded-xl border border-line bg-panel/95 p-5 text-xs leading-relaxed text-slate-300 shadow-2xl backdrop-blur"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="forecast-help-title" className="text-base font-semibold text-white">
+            {t('KI-Prognose: Begriffe und Einstellungen')}
+          </h2>
+          <button onClick={onClose} className="text-muted hover:text-white" aria-label={t('Schließen')}>
+            <X size={18} />
+          </button>
+        </div>
+        {HELP.map(([section, items]) => (
+          <section key={section}>
+            <h3 className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wider text-muted">{t(section)}</h3>
+            <dl className="space-y-1.5">
+              {items.map(([term, text]) => (
+                <div key={term}>
+                  <dt className="font-semibold text-slate-200">{t(term)}</dt>
+                  <dd>{t(text)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 /** What a forecast shows and how it is computed; display changes only redraw, the others recompute. */
 export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => void; onOpenAnalysis: () => void }) {
   const view = useStore((s) => s.forecastView)
@@ -207,8 +295,10 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
     </button>
   )
   const heading = 'px-1 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted'
+  const [help, setHelp] = useState(false)
   return (
     <>
+      {help && <ForecastHelp onClose={() => setHelp(false)} />}
       <div className="fixed inset-0 z-20" onClick={onClose} />
       <div
         role="dialog"
@@ -219,12 +309,20 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         {/* What the forecast is, before its display options. */}
         <div className="flex items-start gap-2 px-1 pb-1 pt-1">
           <Sparkles size={14} className="mt-0.5 shrink-0 text-amber-200" />
-          <span>
+          <span className="flex-1">
             <span className="font-semibold text-slate-200">{t('KI-Prognose mit Chronos-2')}</span>
             <span className="block text-[11px] leading-snug text-muted">
               {t('Statistische Prognose aus dem Kursverlauf, lokal auf deinem Rechner berechnet. Keine Anlageberatung.')}
             </span>
           </span>
+          <button
+            onClick={() => setHelp(true)}
+            title={t('Begriffe und Einstellungen erklärt')}
+            aria-label={t('Begriffe und Einstellungen erklärt')}
+            className="shrink-0 rounded p-0.5 text-muted hover:bg-line hover:text-white"
+          >
+            <Info size={15} />
+          </button>
         </div>
         <div className="mx-1 mt-1 h-px bg-line" />
         <p className={heading}>{t('Darstellung')}</p>

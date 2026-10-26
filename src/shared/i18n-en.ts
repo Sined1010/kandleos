@@ -666,5 +666,55 @@ export const EN: Record<string, string> = {
   '{p} genauer als „unverändert“':
     '{p} more accurate than "unchanged"',
   '{p} ungenauer als „unverändert“':
-    '{p} less accurate than "unchanged"'
+    '{p} less accurate than "unchanged"',
+  'Begriffe und Einstellungen erklärt':
+    'Terms and settings explained',
+  'KI-Prognose: Begriffe und Einstellungen':
+    'AI forecast: terms and settings',
+  'Die mittlere Prognose: Laut Modell liegt der Kurs je zur Hälfte darüber oder darunter. Im Chart die gestrichelte Linie.':
+    'The middle forecast: according to the model, the price is equally likely to end up above or below it. The dashed line in the chart.',
+  'Zeigt den Median als Kerzen mit der prognostizierten typischen Dochtlänge. Das ist der wahrscheinlichste Verlauf, keine echten Kursschwankungen.':
+    'Shows the median as candles with the forecast typical wick length. This is the most likely path, not real price swings.',
+  '50 / 80 / 90 %-Bereich':
+    '50 / 80 / 90 % range',
+  'Mit dieser Wahrscheinlichkeit liegt der Kurs laut Modell im jeweiligen Band. Je weiter in der Zukunft, desto breiter der Fächer.':
+    'According to the model, the price lies within the band with this probability. The further into the future, the wider the fan.',
+  'Kasten mit Median, Bereichen und der Wahrscheinlichkeit, dass der Kurs über dem aktuellen Kurs liegt.':
+    'Box with the median, the ranges and the probability that the price ends up above the current price.',
+  'Wie viele Kerzen in die Zukunft prognostiziert werden. Je weiter, desto unsicherer. Auto nimmt bis zu 64, je nach vorhandener Historie.':
+    'How many candles into the future are forecast. The further, the less certain. Auto uses up to 64, depending on the available history.',
+  'Das Modell prognostiziert ab früheren Zeitpunkten und wird mit dem echten Verlauf verglichen. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mehr Rückblicke sind aussagekräftiger, rechnen aber länger.':
+    'The model forecasts from earlier points in time and is compared with what really happened. The most recent of these forecasts is dotted grey in the chart. More backtests are more meaningful but take longer.',
+  'Streckt oder staucht die Bereiche so, dass im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Der Median bleibt gleich.':
+    'Widens or narrows the ranges so that in the backtest 80 % of the real prices lay within the 80 % range. The median stays the same.',
+  'Rechnet die Prognose neu, sobald eine neue Kerze beginnt.':
+    'Recalculates the forecast as soon as a new candle starts.',
+  'Werte im Rückblick':
+    'Backtest values',
+  'Ø Abweichung':
+    'Avg. error',
+  'Mittlerer Abstand des Medians zum echten Schlusskurs, in Prozent des Kurses.':
+    'Average distance of the median from the real close, as a percentage of the price.',
+  'Im 80 %-Bereich':
+    'In 80 % range',
+  'Anteil der echten Kurse innerhalb des 80 %-Fächers. Gut sind etwa 80 %; deutlich weniger heißt, die Bereiche sind zu schmal, deutlich mehr, sie sind zu breit.':
+    'Share of real prices within the 80 % fan. About 80 % is good; clearly less means the ranges are too narrow, clearly more that they are too wide.',
+  'Richtung':
+    'Direction',
+  'Wie oft der Median am Ende richtig über oder unter dem Startkurs lag. Etwa die Hälfte entspricht dem Zufall.':
+    'How often the median correctly ended above or below the start price. About half is what chance would give.',
+  'Gegenüber „unverändert“':
+    'Compared with "unchanged"',
+  'Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Grün: Das Modell lag näher an den echten Kursen. Rot: Es lag weiter weg, die Prognose ist für diesen Chart also nicht mehr wert als der aktuelle Kurs.':
+    'Comparison with the simplest forecast, that the price stays at the start price. Green: the model was closer to the real prices. Red: it was further away, so for this chart the forecast is worth no more than the current price.',
+  'Bänder ×… kalibriert':
+    'Ranges calibrated ×…',
+  'Faktor, um den die Bereiche gestreckt (über 1) oder gestaucht (unter 1) wurden. Die übrigen Rückblick-Werte gelten für das unkalibrierte Modell.':
+    'Factor by which the ranges were widened (above 1) or narrowed (below 1). The other backtest values apply to the uncalibrated model.',
+  'Grenzen':
+    'Limits',
+  'Was das Modell weiß':
+    'What the model knows',
+  'Chronos-2 kennt nur den Kursverlauf, keine Nachrichten, Zahlen oder Stimmung. Bei Kursen schlägt es die Annahme „unverändert“ oft nur knapp oder gar nicht, besonders bei Krypto. Vergangene Treffsicherheit ist keine Garantie, und die Prognose ist keine Anlageberatung.':
+    'Chronos-2 only knows the price history, not news, figures or sentiment. With prices it often beats the assumption "unchanged" only narrowly or not at all, especially for crypto. Past accuracy is no guarantee, and the forecast is not investment advice.'
 }
