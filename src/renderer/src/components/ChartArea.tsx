@@ -42,6 +42,7 @@ import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
 import FullscreenButton from './FullscreenButton'
 import { ForecastCheck, ForecastSettings, ForecastTip, type ForecastResult } from './ForecastInfo'
+import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
@@ -99,6 +100,7 @@ export default function ChartArea() {
   const [api, setApi] = useState<ChartApi | null>(null)
   const [data, setData] = useState<Candle[]>([])
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
+  const [legend, setLegend] = useState<LegendGroup[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [currency, setCurrency] = useState('')
   // Exchange time zone of the loaded symbol; the forecast's time axis follows that exchange's calendar.
@@ -245,20 +247,31 @@ export default function ChartArea() {
       for (const price of levels)
         series.createPriceLine({ price, color: '#5d6375', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false })
     }
+    const groups: LegendGroup[] = []
+    const legend = (pane: number, label: string, color: string, series: ISeriesApi<SeriesType>[], osc?: boolean) =>
+      groups.push({ pane, label, color, series, osc })
     const { sma: s, ema: e, ema3, bb, vwap: vw, supertrend: st, rsi: r, macd: m, stoch, atr: at } = indicators
-    if (s.on) line('#f5c542', (c) => sma(c, s.period))
-    if (e.on) line('#42a5f5', (c) => ema(c, e.period))
+    if (s.on) legend(0, `SMA ${s.period}`, '#f5c542', [line('#f5c542', (c) => sma(c, s.period))])
+    if (e.on) legend(0, `EMA ${e.period}`, '#42a5f5', [line('#42a5f5', (c) => ema(c, e.period))])
     if (ema3.on) {
-      line('#26c6da', (c) => ema(c, ema3.fast))
-      line('#ffa726', (c) => ema(c, ema3.mid))
-      line('#ec407a', (c) => ema(c, ema3.slow))
+      legend(0, `EMA ${ema3.fast} ${ema3.mid} ${ema3.slow}`, '#26c6da', [
+        line('#26c6da', (c) => ema(c, ema3.fast)),
+        line('#ffa726', (c) => ema(c, ema3.mid)),
+        line('#ec407a', (c) => ema(c, ema3.slow))
+      ])
     }
     if (bb.on) {
-      line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).upper)
-      line('#9c6ade88', (c) => bollinger(c, bb.period, bb.mult).mid)
-      line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).lower)
+      legend(0, `BB ${bb.period} ${bb.mult}`, '#9c6ade', [
+        line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).upper),
+        line('#9c6ade88', (c) => bollinger(c, bb.period, bb.mult).mid),
+        line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).lower)
+      ])
     }
-    if (vw.on) line('#e0e0e0', (_, d) => vwap(d)).applyOptions({ lineStyle: LineStyle.Dashed })
+    if (vw.on) {
+      const series = line('#e0e0e0', (_, d) => vwap(d))
+      series.applyOptions({ lineStyle: LineStyle.Dashed })
+      legend(0, 'VWAP', '#e0e0e0', [series])
+    }
     if (st.on) {
       // Line series bridge gaps, so one line is coloured per point. A segment takes the colour of its start
       // point, so the last point before a trend flip is transparent to hide the jump to the other side.
@@ -274,24 +287,35 @@ export default function ChartArea() {
         color: (_, i) =>
           i + 1 < r.rising.length && r.rising[i + 1] !== r.rising[i] ? 'transparent' : r.rising[i] ? UP : DOWN
       })
+      legend(0, `Supertrend ${st.period} ${st.mult}`, UP, [series])
     }
     let pane = 1
-    if (r.on) guides(line('#b388ff', (c) => rsi(c, r.period), pane++), [70, 30])
+    if (r.on) {
+      const series = line('#b388ff', (c) => rsi(c, r.period), pane)
+      guides(series, [70, 30])
+      legend(pane++, `RSI ${r.period}`, '#b388ff', [series], true)
+    }
     if (m.on) {
       const calc = (c: number[]) => macd(c, m.fast, m.slow, m.signal)
       const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
       list.push({ series: hist, calc: (c) => calc(c).hist, color: (v) => (v >= 0 ? UP : DOWN) + '99' })
-      line('#42a5f5', (c) => calc(c).line, pane)
-      line('#ff9800', (c) => calc(c).signal, pane++)
+      const macdLine = line('#42a5f5', (c) => calc(c).line, pane)
+      legend(pane, `MACD ${m.fast} ${m.slow} ${m.signal}`, '#42a5f5', [macdLine, line('#ff9800', (c) => calc(c).signal, pane++), hist])
     }
     if (stoch.on) {
       const calc = (d: Candle[]) => stochastic(d, stoch.period, stoch.smoothK, stoch.smoothD)
-      guides(line('#42a5f5', (_, d) => calc(d).k, pane), [80, 20])
-      line('#ff9800', (_, d) => calc(d).d, pane++)
+      const k = line('#42a5f5', (_, d) => calc(d).k, pane)
+      guides(k, [80, 20])
+      legend(pane, `${t('Stochastik')} ${stoch.period} ${stoch.smoothK} ${stoch.smoothD}`, '#42a5f5', [k, line('#ff9800', (_, d) => calc(d).d, pane++)], true)
     }
-    if (at.on) line('#b0bec5', (_, d) => atr(d, at.period), pane++).applyOptions({ lastValueVisible: true })
+    if (at.on) {
+      const series = line('#b0bec5', (_, d) => atr(d, at.period), pane)
+      series.applyOptions({ lastValueVisible: true })
+      legend(pane++, `ATR ${at.period}`, '#b0bec5', [series])
+    }
     chart.panes().forEach((p, i) => i > 0 && p.setStretchFactor(0.3))
     setIndicatorSeries(list)
+    setLegend(groups)
     return () => {
       list.forEach((i) => chart.removeSeries(i.series))
       while (chart.panes().length > 1) chart.removePane(chart.panes().length - 1)
@@ -548,6 +572,7 @@ export default function ChartArea() {
         {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
         <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: agentsOpen ? AGENTS_WIDTH : 0 }} />
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
+        {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide) instead of running under them.
@@ -567,6 +592,7 @@ export default function ChartArea() {
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
+          {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main />}
           {fc.result && forecastRun.backtestRuns > 0 && <ForecastCheck check={fc.result.check} scale={fc.result.bandScale} />}
         </div>
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
