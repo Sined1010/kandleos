@@ -112,7 +112,7 @@ export function ForecastCheck({ check, scale }: { check: BacktestResult | null; 
     '\n' +
     t('Richtung: ob der Median am Ende richtig über oder unter dem Startkurs lag.') +
     '\n' +
-    t('Gegenüber „unverändert“: Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Ist das Modell ungenauer, ist seine Prognose für diesen Chart nicht mehr wert als der aktuelle Kurs.') +
+    t('Gegenüber „unverändert“: Backtest mit festem Kurs, also der einfachsten Schätzung, dass der Kurs ab dem früheren Zeitpunkt gleich bleibt. Orange: Diese Schätzung lag näher, die KI-Prognose hat bei diesem Chart also womöglich nichts gebracht.') +
     '\n' +
     t('Vergangene Treffsicherheit ist keine Garantie für die Zukunft.') +
     (scale === null
@@ -141,9 +141,9 @@ export function ForecastCheck({ check, scale }: { check: BacktestResult | null; 
 function NaiveComparison({ skill }: { skill: number }) {
   const p = pct(Math.abs(skill), 0)
   return skill >= 0 ? (
-    <span className="text-up"> · {t('{p} genauer als „unverändert“', { p })}</span>
+    <span> · {t('{p} genauer als „unverändert“', { p })}</span>
   ) : (
-    <span className="text-down"> · {t('{p} ungenauer als „unverändert“', { p })}</span>
+    <span className="text-orange-400"> · {t('{p} ungenauer als „unverändert“', { p })}</span>
   )
 }
 
@@ -210,7 +210,7 @@ const HELP: [string, [string, string][]][] = [
       [msg('Ø Abweichung'), msg('Mittlerer Abstand des Medians zum echten Schlusskurs, in Prozent des Kurses.')],
       [msg('Im 80 %-Bereich'), msg('Anteil der echten Kurse innerhalb des 80 %-Fächers. Gut sind etwa 80 %; deutlich weniger heißt, die Bereiche sind zu schmal, deutlich mehr, sie sind zu breit.')],
       [msg('Richtung'), msg('Wie oft der Median am Ende richtig über oder unter dem Startkurs lag. Etwa die Hälfte entspricht dem Zufall.')],
-      [msg('Gegenüber „unverändert“'), msg('Vergleich mit der einfachsten Prognose, dass der Kurs auf dem Startkurs bleibt. Grün: Das Modell lag näher an den echten Kursen. Rot: Es lag weiter weg, die Prognose ist für diesen Chart also nicht mehr wert als der aktuelle Kurs.')],
+      [msg('Gegenüber „unverändert“'), msg('Backtest mit festem Kurs: Ab einem früheren Zeitpunkt wird die KI-Prognose mit der einfachsten Schätzung verglichen, dass der Kurs gleich bleibt. Beispiel: Stand der Kurs damals bei 100 €, lautet die einfache Schätzung für jede folgende Kerze 100 €. Orange: Die einfache Schätzung lag näher am echten Verlauf, die KI-Prognose hat bei diesem Chart also womöglich nichts gebracht. Ohne Farbe: Die KI lag näher, das macht sie aber noch nicht verlässlich.')],
       [msg('Bänder ×… kalibriert'), msg('Faktor, um den die Bereiche gestreckt (über 1) oder gestaucht (unter 1) wurden. Die übrigen Rückblick-Werte gelten für das unkalibrierte Modell.')]
     ]
   ],
