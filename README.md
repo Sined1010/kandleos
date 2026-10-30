@@ -5,7 +5,7 @@
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer.
 
-![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (15-minute candles): forecast candles, uncertainty ranges and the values of one forecast step](docs/screenshot.webp)
+![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary and the values of one forecast step](docs/screenshot.webp)
 
 ## Features
 
