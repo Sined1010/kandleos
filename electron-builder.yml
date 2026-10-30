@@ -51,6 +51,8 @@ linux:
   files:
     - '!node_modules/onnxruntime-node/bin/napi-v*/{win32,darwin}/**'
     - '!node_modules/onnxruntime-node/bin/napi-v*/linux/arm64/**'
+    # GPU providers (~270 MB), fetched by onnxruntime's install script when building on Linux; the forecast runs on the CPU.
+    - '!node_modules/onnxruntime-node/bin/napi-v*/linux/x64/libonnxruntime_providers_{cuda,tensorrt}.so'
   extraFiles:
     - from: linux/install.sh
       to: install.sh
