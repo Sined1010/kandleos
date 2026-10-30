@@ -41,7 +41,7 @@ import AgentsPanel from './AgentsPanel'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
 import FullscreenButton from './FullscreenButton'
-import { ForecastCheck, ForecastSettings, ForecastTip, type ForecastResult } from './ForecastInfo'
+import { ForecastSettings, ForecastSummary, ForecastTip, type ForecastResult } from './ForecastInfo'
 import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
@@ -575,8 +575,8 @@ export default function ChartArea() {
         {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
-          // Wraps before the buttons at the top right (about 200 px wide) instead of running under them.
-          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 215 }}
+          // Wraps before the buttons at the top right (about 200 px wide, plus the 288 px summary card) instead of running under them.
+          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 515 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -593,15 +593,21 @@ export default function ChartArea() {
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
           {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main />}
-          {fc.result && forecastRun.backtestRuns > 0 && <ForecastCheck check={fc.result.check} scale={fc.result.bandScale} />}
         </div>
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
-            with its display settings right next to it. */}
+            with its display settings right next to it and the summary card to its left. */}
         <div
-          className="absolute top-2 z-30 flex gap-2"
+          className="absolute top-2 z-30 flex items-start gap-2"
           style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          {fc.result && (
+            <ForecastSummary
+              result={fc.result}
+              intraday={TF_SECONDS[timeframe] < 86400}
+              showCheck={forecastRun.backtestRuns > 0}
+            />
+          )}
           <div className="relative flex">
             <button
               onClick={toggleForecast}

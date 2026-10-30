@@ -1,7 +1,7 @@
-import { BrainCircuit, ChevronRight, Info, Sparkles, X } from 'lucide-react'
+import { BrainCircuit, ChevronDown, ChevronRight, Info, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { forecastCandles, probabilityAbove, Q, type BacktestResult } from '../../../shared/forecast'
+import { forecastCandles, probabilityAbove, Q, trend, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
 import { useStore, type ForecastView } from '../store/useStore'
@@ -27,6 +27,8 @@ export interface ForecastResult {
 
 const pct = (v: number, digits = 1) => `${(v * 100).toLocaleString(locale(), { maximumFractionDigits: digits })} %`
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${pct(v)}`
+// probabilityAbove stays within 1-99 %; at the caps the model says nothing finer.
+const chance = (up: number) => (up >= 0.99 ? '≥ 99 %' : up <= 0.01 ? '≤ 1 %' : pct(up, 0))
 
 /** Values of one forecast step, shown next to the crosshair. */
 export function ForecastTip({ result, index, x, y, width, height, intraday, candles }: {
@@ -62,10 +64,7 @@ export function ForecastTip({ result, index, x, y, width, height, intraday, cand
     [t('50 %-Bereich'), range(Q.p25, Q.p75)],
     [t('80 %-Bereich'), range(Q.p10, Q.p90)],
     [t('90 %-Bereich'), range(Q.p05, Q.p95)],
-    [
-      t('Über {price}', { price: formatPrice(result.base) }),
-      up >= 0.99 ? '≥ 99 %' : up <= 0.01 ? '≤ 1 %' : pct(up, 0)
-    ]
+    [t('Über {price}', { price: formatPrice(result.base) }), chance(up)]
   ]
   const flipX = x > width - 260
   const flipY = y > height - 170
@@ -91,6 +90,81 @@ export function ForecastTip({ result, index, x, y, width, height, intraday, cand
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+const HEADLINE = {
+  up: msg('Fazit: eher steigend'),
+  down: msg('Fazit: eher fallend'),
+  flat: msg('Fazit: keine klare Richtung')
+}
+
+/** Card under the forecast button: the forecast in plain words, with the backtest below; folds to its headline. */
+export function ForecastSummary({ result, intraday, showCheck }: {
+  result: ForecastResult
+  intraday: boolean
+  /** Backtest switched on in the settings. */
+  showCheck: boolean
+}) {
+  // Starts folded each time a forecast is shown.
+  const [open, setOpen] = useState(false)
+  const [help, setHelp] = useState(false)
+  const end = result.steps[result.steps.length - 1]
+  const up = probabilityAbove(end, result.base)
+  const worse = showCheck && result.check !== null && result.check.error > result.check.naiveError
+  const date = new Date(result.times[result.times.length - 1] * 1000).toLocaleString(locale(), {
+    dateStyle: 'medium',
+    ...(intraday && { timeStyle: 'short' })
+  })
+  return (
+    <div className="w-72 rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
+      {help && <ForecastHelp onClose={() => setHelp(false)} />}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 text-left font-semibold text-slate-200 hover:text-white"
+      >
+        {worse && <TriangleAlert size={13} className="shrink-0 text-orange-400" />}
+        <span className="flex-1">{t(HEADLINE[trend(up)])}</span>
+        <ChevronDown size={14} className={`shrink-0 text-muted transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <p className="mt-1 text-slate-300">
+            {t('In {n} Kerzen (bis {date}) liegt der Kurs laut KI mit 80 % Wahrscheinlichkeit zwischen {lo} und {hi} ({from} bis {to}).', {
+              n: result.steps.length,
+              date,
+              lo: formatPrice(end[Q.p10]),
+              hi: formatPrice(end[Q.p90]),
+              from: signed(end[Q.p10] / result.base - 1),
+              to: signed(end[Q.p90] / result.base - 1)
+            })}
+          </p>
+          <p className="mt-1 text-slate-300">{t('Wahrscheinlichkeit für einen höheren Kurs: {p}', { p: chance(up) })}</p>
+          {worse && (
+            <p className="mt-1 text-orange-400">
+              {t('Im Rückblick war „Kurs bleibt gleich“ genauer. Diese Prognose mit Vorsicht betrachten.')}
+            </p>
+          )}
+          {showCheck && (
+            <div className="mt-2 border-t border-line pt-1">
+              <ForecastCheck check={result.check} scale={result.bandScale} />
+            </div>
+          )}
+          <div className="mt-2 flex items-center justify-between gap-2 text-muted">
+            <span>{t('Keine Anlageberatung')}</span>
+            <button
+              onClick={() => setHelp(true)}
+              title={t('Begriffe und Einstellungen erklärt')}
+              className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-line hover:text-white"
+            >
+              <Info size={13} />
+              {t('Was bedeutet das?')}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -184,6 +258,7 @@ const HELP: [string, [string, string][]][] = [
   [
     msg('Darstellung'),
     [
+      [msg('Fazit'), msg('Die Prognose in Worten, neben dem Knopf: Richtung, Spanne des 80 %-Bereichs am Ende und Wahrscheinlichkeit für einen höheren Kurs. „Eher steigend“ über 60 %, „eher fallend“ unter 40 %, dazwischen „keine klare Richtung“. Ein Klick auf die Überschrift klappt die Karte auf.')],
       [msg('Median'), msg('Die mittlere Prognose: Laut Modell liegt der Kurs je zur Hälfte darüber oder darunter. Im Chart die gestrichelte Linie.')],
       [msg('Kerzen'), msg('Zeigt den Median als Kerzen mit der prognostizierten typischen Dochtlänge. Das ist der wahrscheinlichste Verlauf, keine echten Kursschwankungen.')]
     ]

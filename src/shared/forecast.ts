@@ -24,6 +24,11 @@ export function probabilityAbove(step: number[], price: number): number {
   return 1 - (QUANTILES[i] + share * (QUANTILES[i + 1] - QUANTILES[i]))
 }
 
+/** Direction in plain words from the chance of a higher close: between 40 and 60 % the model has no clear view. */
+export function trend(up: number): 'up' | 'down' | 'flat' {
+  return up > 0.6 ? 'up' : up < 0.4 ? 'down' : 'flat'
+}
+
 /**
  * Where backtests start: forecasts made `steps`, 2×`steps`, ... bars before the end, so each one can be
  * compared with the bars that really followed. Only cutoffs with enough history for the model count.

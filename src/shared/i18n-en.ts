@@ -716,5 +716,22 @@ export const EN: Record<string, string> = {
   'Was das Modell weiß':
     'What the model knows',
   'Chronos-2 kennt nur den Kursverlauf, keine Nachrichten, Zahlen oder Stimmung. Bei Kursen schlägt es die Annahme „unverändert“ oft nur knapp oder gar nicht, besonders bei Krypto. Vergangene Treffsicherheit ist keine Garantie, und die Prognose ist keine Anlageberatung.':
-    'Chronos-2 only knows the price history, not news, figures or sentiment. With prices it often beats the assumption "unchanged" only narrowly or not at all, especially for crypto. Past accuracy is no guarantee, and the forecast is not investment advice.'
+    'Chronos-2 only knows the price history, not news, figures or sentiment. With prices it often beats the assumption "unchanged" only narrowly or not at all, especially for crypto. Past accuracy is no guarantee, and the forecast is not investment advice.',
+  'Fazit: eher steigend':
+    'Summary: leaning up',
+  'Fazit: eher fallend':
+    'Summary: leaning down',
+  'Fazit: keine klare Richtung':
+    'Summary: no clear direction',
+  'In {n} Kerzen (bis {date}) liegt der Kurs laut KI mit 80 % Wahrscheinlichkeit zwischen {lo} und {hi} ({from} bis {to}).':
+    'In {n} candles (by {date}) the AI puts the price between {lo} and {hi} ({from} to {to}) with 80 % probability.',
+  'Wahrscheinlichkeit für einen höheren Kurs: {p}':
+    'Probability of a higher price: {p}',
+  'Im Rückblick war „Kurs bleibt gleich“ genauer. Diese Prognose mit Vorsicht betrachten.':
+    'In the backtest, "price stays the same" was more accurate. Treat this forecast with caution.',
+  'Fazit':
+    'Summary',
+  'Die Prognose in Worten, neben dem Knopf: Richtung, Spanne des 80 %-Bereichs am Ende und Wahrscheinlichkeit für einen höheren Kurs. „Eher steigend“ über 60 %, „eher fallend“ unter 40 %, dazwischen „keine klare Richtung“. Ein Klick auf die Überschrift klappt die Karte auf.':
+    'The forecast in words, next to the button: direction, the 80 % range at the end and the probability of a higher price. "Leaning up" above 60 %, "leaning down" below 40 %, in between "no clear direction". Clicking the headline opens the card.',
+  'Was bedeutet das?': 'What does this mean?'
 }

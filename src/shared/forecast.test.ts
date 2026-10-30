@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { backtest, backtestCutoffs, bandScale, forecastCandles, probabilityAbove, Q, QUANTILES, scaleBands } from './forecast.ts'
+import { backtest, backtestCutoffs, bandScale, forecastCandles, probabilityAbove, Q, QUANTILES, scaleBands, trend } from './forecast.ts'
 
 // A step whose quantile values equal 100 + 100 × level: 101 at 1 %, 150 at the median, 199 at 99 %.
 const step = QUANTILES.map((l) => 100 + 100 * l)
@@ -15,6 +15,10 @@ test('probabilityAbove reads the chance of a higher close off the quantiles', ()
   const crossed = [...step]
   ;[crossed[9], crossed[10]] = [crossed[10], crossed[9]]
   assert.equal(probabilityAbove(crossed, 150), 0.5)
+})
+
+test('trend calls 40 to 60 % flat and only clearer chances a direction', () => {
+  assert.deepEqual([0.39, 0.4, 0.5, 0.6, 0.61].map(trend), ['down', 'flat', 'flat', 'flat', 'up'])
 })
 
 test('backtestCutoffs steps back one horizon at a time while enough history is left', () => {
