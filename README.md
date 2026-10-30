@@ -2,20 +2,36 @@
 
 <h1 align="center">KandleOS</h1>
 
+<p align="center">
+  <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="https://img.shields.io/github/v/release/Sined1010/kandleos" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-6366f1" alt="Platforms: Windows and Linux">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Sined1010/kandleos" alt="License: GPL-3.0"></a>
+</p>
+
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer.
 
 ![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary and the values of one forecast step](docs/screenshot.webp)
 
+## Why KandleOS?
+
+- **Local and private:** no account, no cloud, no telemetry. Your watchlist and drawings stay on your computer
+- **An AI forecast that tells you how good it is:** instead of a single target price you get uncertainty ranges,
+  a backtest on past data and a comparison against simply assuming "the price stays the same". If that simple
+  guess would have been closer, KandleOS says so
+- **Organize your watchlist your way:** as many folders as you like, collapsible, with drag & drop and your own names
+- **Free and open source** (GPL-3.0), no subscription, no ads, no paid tier
+
 ## Features
 
 - **Charts** with volume, live prices and candle sizes from 1 minute to 12 months, plus pre- and post-market prices and candles
-- **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR
-- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, Fibonacci, Elliott waves, measure
-- **Watchlist** with folders, drag & drop, market status and a right-click menu
-- **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker
-- **AI forecast (Chronos-2):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan instead of a single target price, plus a backtest so you can see how accurate past forecasts were
+- **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR, with a legend in the chart showing their values
+- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure
+- **Watchlist** with folders, drag & drop, renaming, market status and a right-click menu
+- **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker, company info
+- **AI forecast (Chronos-2):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
 - **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama
+- **Back up your data:** export watchlist, drawings and settings to one file, API keys only password-encrypted
 - English and German interface
 
 ## Download and installation
@@ -30,12 +46,16 @@ The installer is not code-signed, so Windows SmartScreen may warn you. Click **M
 
 ### Linux (x64)
 
+- **Debian, Ubuntu, Mint, Pop!_OS:** `sudo apt install ./KandleOS-<version>-amd64.deb`
+- **Any distribution, no installation:** `chmod +x KandleOS-<version>-x86_64.AppImage`, then run it
+- **tar.gz:**
+
 ```bash
 tar xzf KandleOS-<version>-x64.tar.gz
 bash KandleOS-<version>-x64/install.sh
 ```
 
-This installs to `~/.local/share/kandleos-app` and adds a launcher to the app menu and the desktop.
+The tar.gz installs to `~/.local/share/kandleos-app` and adds a launcher to the app menu and the desktop.
 For Electron's sandbox the script asks for your `sudo` password once (recommended). If you skip it, KandleOS
 runs without the sandbox and shows a warning.
 
