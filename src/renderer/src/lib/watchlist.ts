@@ -24,3 +24,7 @@ export function moveSymbolTo<F extends SymbolFolder>(
     return { ...f, symbols: at < 0 ? [...rest, symbol] : [...rest.slice(0, at), symbol, ...rest.slice(at)] }
   })
 }
+
+/** Drop position over item `i`: in front of it, or with `after` (lower/right half) in front of the next; null = at the end. */
+export const insertTarget = (symbols: string[], i: number, after: boolean): string | null =>
+  after ? (symbols[i + 1] ?? null) : symbols[i]

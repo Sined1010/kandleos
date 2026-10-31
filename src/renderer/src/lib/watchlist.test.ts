@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { moveSymbolTo } from './watchlist.ts'
+import { insertTarget, moveSymbolTo } from './watchlist.ts'
 
 const folders = [
   { id: 'a', symbols: ['AAPL', 'NVDA', 'MSFT', 'TSLA'] },
@@ -22,4 +22,12 @@ test('moves into another folder at a position, without duplicates', () => {
   assert.deepEqual(list(moved, 'b'), ['BTCUSDT', 'NVDA', 'ETHUSDT'])
   const twice = [{ id: 'a', symbols: ['AAPL'] }, { id: 'b', symbols: ['AAPL', 'BTCUSDT'] }]
   assert.deepEqual(list(moveSymbolTo(twice, 'AAPL', 'a', 'b', null), 'b'), ['BTCUSDT', 'AAPL'])
+})
+
+test('insertTarget: before the item, or before the next one, null at the end', () => {
+  const s = ['AAPL', 'NVDA', 'MSFT']
+  assert.equal(insertTarget(s, 1, false), 'NVDA')
+  assert.equal(insertTarget(s, 1, true), 'MSFT')
+  assert.equal(insertTarget(s, 2, true), null)
+  assert.equal(insertTarget(s, 0, false), 'AAPL')
 })

@@ -1,14 +1,30 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  FolderPlus,
+  LayoutGrid,
+  List,
+  Pencil,
+  Plus,
+  Trash2,
+  X
+} from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { t } from '../../../shared/i18n'
 import { isCrypto } from '../../../shared/types'
 import { formatChange, formatPrice } from '../lib/format'
+import { insertTarget } from '../lib/watchlist'
 import { MAX_TABS, useQuotes, useStore, type Folder } from '../store/useStore'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
+/** Marks drags that started on a watchlist symbol. */
+const DRAG_TYPE = 'application/x-kandleos-symbol'
 /**
  * A right-clicked watchlist row: which symbol in which folder, where the mouse was, the row's left edge and how
  * to start renaming it (the row edits its own name).
@@ -16,10 +32,78 @@ type Drag = RefObject<{ symbol: string; from: string } | null>
 type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number; rename: () => void }
 type MenuItem = { label: string; run?: () => void; reason?: string; danger?: boolean }
 
+const deleteFolder = (f: Folder) =>
+  (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
+  useStore.getState().removeFolder(f.id)
+
+/** Folder menu shared by the list heading, the open folder's bar and the folder tile; only the first entry differs. */
+const folderMenu = (f: Folder, first: MenuItem, rename: () => void, add: () => void): MenuItem[] => [
+  first,
+  { label: t('Umbenennen'), run: rename },
+  { label: t('Symbol hinzufügen'), run: add },
+  { label: t('Ordner löschen'), run: () => deleteFolder(f), danger: true }
+]
+
+function FolderNameInput({ folder: f, onDone, className }: { folder: Folder; onDone: () => void; className: string }) {
+  const rename = useStore((s) => s.renameFolder)
+  return (
+    <input
+      autoFocus
+      defaultValue={f.name}
+      maxLength={40}
+      aria-label={t('Ordnername')}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={(e) => e.target.select()}
+      onBlur={(e) => {
+        rename(f.id, e.target.value.trim() || f.name)
+        onDone()
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') e.currentTarget.value = f.name
+        if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
+      }}
+      className={`min-w-0 rounded bg-bg px-1 text-xs text-white outline-none ring-1 ring-accent ${className}`}
+    />
+  )
+}
+
 export default function Watchlist() {
   const folders = useStore((s) => s.folders)
   const addFolder = useStore((s) => s.addFolder)
+  const view = useStore((s) => s.watchlistView)
+  const setView = useStore((s) => s.setWatchlistView)
   const [editing, setEditing] = useState<string | null>(null)
+  // Folder whose symbol search is open.
+  const [addingId, setAddingId] = useState<string | null>(null)
+  // Folder opened in the folder view; null shows the folder tiles.
+  const [openId, setOpenId] = useState<string | null>(null)
+  const open = view === 'list' ? undefined : folders.find((f) => f.id === openId)
+  // A deleted folder cannot stay open.
+  useEffect(() => {
+    if (openId && !folders.some((f) => f.id === openId)) setOpenId(null)
+  }, [folders, openId])
+  const asideRef = useRef<HTMLElement>(null)
+  // Whether the last click or focus was in the watchlist: Backspace elsewhere belongs to the chart (deletes a drawing).
+  const inside = useRef(false)
+  useEffect(() => {
+    const track = (e: Event) => (inside.current = !!asideRef.current?.contains(e.target as Node))
+    window.addEventListener('pointerdown', track, true)
+    window.addEventListener('focusin', track, true)
+    return () => {
+      window.removeEventListener('pointerdown', track, true)
+      window.removeEventListener('focusin', track, true)
+    }
+  }, [])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      // Backspace while typing edits the text, it does not navigate.
+      if (e.key === 'Backspace' && inside.current && !el.closest('input, textarea, [contenteditable="true"]')) setOpenId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
   const drag = useRef<{ symbol: string; from: string } | null>(null)
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
@@ -47,6 +131,16 @@ export default function Watchlist() {
   const anyOpen = folders.some((f) => !f.collapsed)
   const [menu, setMenu] = useState<RowAt | null>(null)
   const [info, setInfo] = useState<RowAt | null>(null)
+  // Second menu of "Move to …": the other folders.
+  const [moveMenu, setMoveMenu] = useState<RowAt | null>(null)
+  const moveSymbol = useStore((s) => s.moveSymbol)
+  useEffect(() => {
+    // A row dragged back to the folder tiles unmounts and never gets its dragend, so the ref can outlive its drag.
+    // Any drag that is not one of ours (a file, text from elsewhere) forgets it before it reaches a drop target.
+    const forget = (e: DragEvent) => !e.dataTransfer?.types.includes(DRAG_TYPE) && (drag.current = null)
+    window.addEventListener('dragenter', forget, true)
+    return () => window.removeEventListener('dragenter', forget, true)
+  }, [])
   useEffect(() => {
     if (!menu && !info) return
     const onKey = (e: KeyboardEvent) => {
@@ -59,11 +153,30 @@ export default function Watchlist() {
   }, [menu, info])
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
+    <aside ref={asideRef} className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted">Watchlist</span>
         <span className="flex items-center gap-1">
-          {folders.length > 0 && (
+          <span className="mr-1 flex overflow-hidden rounded border border-line">
+            {(
+              [
+                ['list', List, t('Listenansicht')],
+                ['folders', LayoutGrid, t('Ordneransicht')]
+              ] as const
+            ).map(([v, Icon, label]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                aria-pressed={view === v}
+                title={label}
+                aria-label={label}
+                className={`p-0.5 ${view === v ? 'bg-brand text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+              >
+                <Icon size={14} />
+              </button>
+            ))}
+          </span>
+          {view === 'list' && folders.length > 0 && (
             // Closes all while any is open, otherwise opens all.
             <button
               onClick={() => useStore.setState((s) => ({ folders: s.folders.map((f) => ({ ...f, collapsed: anyOpen })) }))}
@@ -75,7 +188,11 @@ export default function Watchlist() {
             </button>
           )}
           <button
-            onClick={() => setEditing(addFolder(t('Neuer Ordner')))}
+            onClick={() => {
+              // A new folder shows up among the tiles, so leave an open folder.
+              setOpenId(null)
+              setEditing(addFolder(t('Neuer Ordner')))
+            }}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
           >
             <FolderPlus size={15} /> {t('Ordner')}
@@ -84,21 +201,57 @@ export default function Watchlist() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-6">
-        {folders.map((f) => (
+        {(view === 'list' ? folders : open ? [open] : []).map((f) => (
           <FolderSection
             key={f.id}
             folder={f}
             editing={editing === f.id}
             onEdit={() => setEditing(f.id)}
             onEditDone={() => setEditing(null)}
+            adding={addingId === f.id}
+            onAdding={(on) => setAddingId(on ? f.id : null)}
+            onBack={open && (() => setOpenId(null))}
             onNameReset={resetName}
             onMenu={setMenu}
             drag={drag}
           />
         ))}
+        {view !== 'list' && !open && (
+          <FolderGrid
+            folders={folders}
+            editing={editing}
+            onOpen={setOpenId}
+            onEdit={setEditing}
+            onEditDone={() => setEditing(null)}
+            onAdd={(id) => {
+              setOpenId(id)
+              setAddingId(id)
+            }}
+            drag={drag}
+          />
+        )}
         {!folders.length && <p className="p-4 text-xs text-muted">{t('Noch keine Ordner – oben „Ordner“ klicken.')}</p>}
       </div>
-      {menu && <RowMenu at={menu} onInfo={() => setInfo(menu)} onClose={() => setMenu(null)} />}
+      {menu && (
+        <RowMenu
+          at={menu}
+          canMove={folders.length > 1}
+          onInfo={() => setInfo(menu)}
+          onMove={() => setMoveMenu(menu)}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {moveMenu && (
+        <ContextMenu
+          x={moveMenu.x}
+          y={moveMenu.y}
+          label={t('Verschieben nach …')}
+          items={folders
+            .filter((f) => f.id !== moveMenu.folderId)
+            .map((f) => ({ label: f.name, run: () => moveSymbol(moveMenu.symbol, moveMenu.folderId, f.id, null) }))}
+          onClose={() => setMoveMenu(null)}
+        />
+      )}
       {info && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setInfo(null)} />
@@ -116,7 +269,8 @@ export default function Watchlist() {
 }
 
 /** Right-click menu of a watchlist row. Unavailable entries stay visible with the reason underneath. */
-function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClose: () => void }) {
+function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onMove: () => void; onClose: () => void }) {
+  const { at, canMove, onInfo, onMove, onClose } = props
   const setSymbol = useStore((s) => s.setSymbol)
   const addTab = useStore((s) => s.addTab)
   const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
@@ -136,6 +290,7 @@ function RowMenu({ at, onInfo, onClose }: { at: RowAt; onInfo: () => void; onClo
         },
     isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
     { label: t('Umbenennen'), run: at.rename },
+    canMove ? { label: t('Verschieben nach …'), run: onMove } : { label: t('Verschieben nach …'), reason: t('Kein anderer Ordner') },
     { label: t('Aus Watchlist löschen'), run: () => removeFromFolder(at.folderId, s), danger: true }
   ]
   return <ContextMenu x={at.x} y={at.y} label={t('Aktionen für {symbol}', { symbol: s })} items={items} onClose={onClose} />
@@ -161,12 +316,14 @@ function ContextMenu({ x, y, label, items, onClose }: { x: number; y: number; la
       <div
         role="menu"
         aria-label={label}
-        className="fixed z-50 w-52 rounded-lg border border-line bg-panel/95 py-1 text-xs shadow-2xl shadow-black/50 backdrop-blur"
-        style={{ left: Math.min(x, window.innerWidth - 216), top: Math.min(y, window.innerHeight - 40 * items.length - 10) }}
+        className="fixed z-50 max-h-[calc(100vh-16px)] w-52 overflow-y-auto rounded-lg border border-line bg-panel/95 py-1 text-xs shadow-2xl shadow-black/50 backdrop-blur"
+        // Long menus ("Move to …" with many folders) start at the top and scroll instead of leaving the window.
+        style={{ left: Math.min(x, window.innerWidth - 216), top: Math.max(8, Math.min(y, window.innerHeight - 40 * items.length - 10)) }}
       >
         {items.map((item, i) => (
           <button
-            key={item.label}
+            // Folder names can repeat ("Move to …" lists them), so the position is the key.
+            key={i}
             role="menuitem"
             autoFocus={i === 0}
             disabled={!item.run}
@@ -192,40 +349,52 @@ interface SectionProps {
   editing: boolean
   onEdit: () => void
   onEditDone: () => void
+  adding: boolean
+  onAdding: (on: boolean) => void
+  /** Set when the folder is open in the folder view: the heading becomes a bar with a back button. */
+  onBack?: () => void
   onNameReset: (symbol: string) => void
   onMenu: (row: RowAt) => void
   drag: Drag
 }
 
-function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, onMenu, drag }: SectionProps) {
+function FolderSection(props: SectionProps) {
+  const { folder: f, editing, onEdit, onEditDone, adding, onAdding, onBack, onNameReset, onMenu, drag } = props
   const active = useStore((s) => s.symbol)
   const setSymbol = useStore((s) => s.setSymbol)
   const toggle = useStore((s) => s.toggleFolder)
-  const rename = useStore((s) => s.renameFolder)
-  const removeFolder = useStore((s) => s.removeFolder)
   const addToFolder = useStore((s) => s.addToFolder)
   const removeFromFolder = useStore((s) => s.removeFromFolder)
   const moveSymbol = useStore((s) => s.moveSymbol)
   const quotes = useQuotes((s) => s.quotes)
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
-  const [adding, setAdding] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   // Right-click menu of the folder heading, at the mouse position.
   const [headMenu, setHeadMenu] = useState<{ x: number; y: number } | null>(null)
+  // An open folder always shows its symbols; its collapsed state belongs to the list view.
+  const shown = !!onBack || !f.collapsed
+  const tiles = !!onBack
   const startAdding = () => {
-    setAdding(true)
-    if (f.collapsed) toggle(f.id)
+    onAdding(true)
+    if (!shown) toggle(f.id)
   }
-  const deleteFolder = () =>
-    (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
-    removeFolder(f.id)
   const [dropTarget, setDropTarget] = useState(false)
   // Where a dragged symbol would land: in front of this symbol, null = at the end, undefined = nowhere.
   const [insertBefore, setInsertBefore] = useState<string | null | undefined>(undefined)
+  // Holding a dragged symbol on the back button returns to the folder tiles, where it can be dropped on another folder.
+  const spring = useRef<number | undefined>(undefined)
+  const [springing, setSpringing] = useState(false)
+  const stopSpring = () => {
+    clearTimeout(spring.current)
+    spring.current = undefined
+    setSpringing(false)
+  }
+  useEffect(() => () => clearTimeout(spring.current), [])
   const endDrag = () => {
     setDropTarget(false)
     setInsertBefore(undefined)
+    stopSpring()
   }
   // Dropping a symbol right where it already is changes nothing, so no marker for it.
   const dragged = drag.current
@@ -256,47 +425,59 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
           x={headMenu.x}
           y={headMenu.y}
           label={t('Aktionen für {symbol}', { symbol: f.name })}
-          items={[
-            { label: f.collapsed ? t('Aufklappen') : t('Zuklappen'), run: () => toggle(f.id) },
-            { label: t('Umbenennen'), run: onEdit },
-            { label: t('Symbol hinzufügen'), run: startAdding },
-            { label: t('Ordner löschen'), run: deleteFolder, danger: true }
-          ]}
+          items={folderMenu(
+            f,
+            onBack
+              ? { label: t('Zurück zu den Ordnern'), run: onBack }
+              : { label: f.collapsed ? t('Aufklappen') : t('Zuklappen'), run: () => toggle(f.id) },
+            onEdit,
+            startAdding
+          )}
           onClose={() => setHeadMenu(null)}
         />
       )}
       <div
-        className="group/head flex items-center gap-1 px-2 pb-1 pt-3"
+        className={`group/head flex items-center gap-1 px-2 ${onBack ? 'mb-1 border-b border-line py-1.5' : 'pb-1 pt-3'}`}
         onContextMenu={(e) => {
           e.preventDefault()
           if (!editing) setHeadMenu({ x: e.clientX, y: e.clientY })
         }}
       >
-        <button
-          onClick={() => toggle(f.id)}
-          aria-label={f.collapsed ? t('{name} aufklappen', { name: f.name }) : t('{name} zuklappen', { name: f.name })}
-          aria-expanded={!f.collapsed}
-          className="text-muted hover:text-white"
-        >
-          {f.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        </button>
+        {onBack ? (
+          <button
+            onClick={onBack}
+            onDragEnter={() => {
+              // The icon inside fires its own dragenter; one timer is enough.
+              if (!drag.current || spring.current) return
+              setSpringing(true)
+              spring.current = window.setTimeout(onBack, 600)
+            }}
+            onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && stopSpring()}
+            title={t('Zurück zu den Ordnern')}
+            aria-label={t('Zurück zu den Ordnern')}
+            className={`rounded border px-1 py-0.5 ${
+              springing ? 'border-accent bg-accent/20 text-white' : 'border-line text-muted hover:bg-line hover:text-white'
+            }`}
+          >
+            <ArrowLeft size={14} />
+          </button>
+        ) : (
+          <button
+            onClick={() => toggle(f.id)}
+            aria-label={f.collapsed ? t('{name} aufklappen', { name: f.name }) : t('{name} zuklappen', { name: f.name })}
+            aria-expanded={!f.collapsed}
+            className="text-muted hover:text-white"
+          >
+            {f.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
+        )}
         {editing ? (
-          <input
-            autoFocus
-            defaultValue={f.name}
-            maxLength={40}
-            aria-label={t('Ordnername')}
-            onFocus={(e) => e.target.select()}
-            onBlur={(e) => {
-              rename(f.id, e.target.value.trim() || f.name)
-              onEditDone()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') e.currentTarget.value = f.name
-              if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
-            }}
-            className="min-w-0 flex-1 rounded bg-bg px-1 text-xs text-white outline-none ring-1 ring-accent"
-          />
+          <FolderNameInput folder={f} onDone={onEditDone} className="flex-1" />
+        ) : onBack ? (
+          <span className="min-w-0 flex-1 truncate text-xs text-muted">
+            {t('Ordner')} › <span className="font-semibold text-white">{f.name}</span>{' '}
+            <span className="text-muted/50">{f.symbols.length}</span>
+          </span>
         ) : (
           // Double-click renames; its two clicks toggle twice, so the folder stays as it was.
           <span
@@ -308,7 +489,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
             {f.name} <span className="font-normal text-muted/50">{f.symbols.length}</span>
           </span>
         )}
-        <div className="flex opacity-0 focus-within:opacity-100 group-hover/head:opacity-100">
+        <div className={`flex ${onBack ? '' : 'opacity-0 focus-within:opacity-100 group-hover/head:opacity-100'}`}>
           <button
             onClick={startAdding}
             className={iconBtn}
@@ -321,7 +502,7 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
             <Pencil size={13} />
           </button>
           <button
-            onClick={deleteFolder}
+            onClick={() => deleteFolder(f)}
             className={`${iconBtn} hover:text-down`}
             title={t('Ordner löschen')}
             aria-label={t('{name} löschen', { name: f.name })}
@@ -337,66 +518,25 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
             compact
             autoFocus
             onPick={(s) => addToFolder(f.id, s)}
-            onClose={() => setAdding(false)}
+            onClose={() => onAdding(false)}
             placeholder={t('Name oder Symbol')}
             inputClassName="w-full rounded bg-bg px-2 py-1 text-xs uppercase outline-none ring-1 ring-accent placeholder:normal-case placeholder:text-muted/60"
           />
         </div>
       )}
 
-      {!f.collapsed && !f.symbols.length && !adding && (
+      {shown && !f.symbols.length && !adding && (
         <p className="px-8 py-1 text-xs text-muted/60">{t('Leer – „+“ oder Symbol hierher ziehen')}</p>
       )}
 
-      {!f.collapsed &&
-        f.symbols.map((s, i) => {
-          const q = quotes[s]
-          const last = i === f.symbols.length - 1
-          return (
-            <div
-              key={s}
-              draggable={renaming !== s}
-              title={t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                onMenu({
-                  symbol: s,
-                  folderId: f.id,
-                  x: e.clientX,
-                  y: e.clientY,
-                  left: e.currentTarget.getBoundingClientRect().left,
-                  rename: () => setRenaming(s)
-                })
-              }}
-              onDragStart={(e) => {
-                drag.current = { symbol: s, from: f.id }
-                e.dataTransfer.effectAllowed = 'move'
-                e.dataTransfer.setData('text/plain', s)
-              }}
-              onDragEnd={() => {
-                drag.current = null
-                endDrag()
-              }}
-              onDragOver={(e) => {
-                if (!drag.current) return
-                // Upper half: in front of this row, lower half: in front of the next one.
-                const r = e.currentTarget.getBoundingClientRect()
-                const target = e.clientY < r.top + r.height / 2 ? s : (f.symbols[i + 1] ?? null)
-                if (target !== insertBefore) setInsertBefore(target)
-              }}
-              onClick={() => setSymbol(s)}
-              className={`group/row relative grid cursor-pointer grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
-                s === active ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-brand-to)]' : 'hover:bg-bg'
-              }`}
-            >
-              {(markerAt === s || (last && markerAt === null)) && (
-                <span
-                  className={`pointer-events-none absolute inset-x-2 h-0.5 rounded-full bg-brand shadow-glow ${
-                    markerAt === s ? '-top-px' : '-bottom-px'
-                  }`}
-                />
-              )}
-              {renaming === s ? (
+      {shown && (
+        // An open folder in the folder view shows its symbols as tiles, two per row.
+        <div className={tiles ? 'grid grid-cols-2 gap-1.5 px-2 pb-2' : ''}>
+          {f.symbols.map((s, i) => {
+            const q = quotes[s]
+            const last = i === f.symbols.length - 1
+            const name =
+              renaming === s ? (
                 <input
                   autoFocus
                   defaultValue={names[s] ?? s}
@@ -432,18 +572,24 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
                   </span>
                   {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
                 </span>
-              )}
-              <span className="text-right tabular-nums">
+              )
+            const price = (
+              <span className={`tabular-nums ${tiles ? 'min-w-0 truncate text-xs' : 'text-right'}`}>
                 {q ? formatPrice(q.price) : '—'}
                 {q?.ext && (
-                  <span className="flex items-center justify-end gap-1 text-[10px] text-muted" title={extTitle(q.ext)}>
+                  <span
+                    className={`flex items-center gap-1 text-[10px] text-muted ${tiles ? '' : 'justify-end'}`}
+                    title={extTitle(q.ext)}
+                  >
                     <ExtIcon phase={q.ext.phase} />
                     {formatPrice(q.ext.price)}
                   </span>
                 )}
               </span>
+            )
+            const change = (
               <span
-                className={`w-16 text-right tabular-nums group-hover/row:hidden ${
+                className={`text-right tabular-nums ${tiles ? 'shrink-0 text-xs' : 'w-16 group-hover/row:hidden'} ${
                   !q ? 'text-muted' : q.changePct >= 0 ? 'text-up' : 'text-down'
                 }`}
               >
@@ -454,7 +600,13 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
                   </span>
                 )}
               </span>
-              <div className="hidden w-16 justify-end gap-1.5 group-hover/row:flex">
+            )
+            const buttons = (
+              <div
+                className={`hidden gap-1.5 group-hover/row:flex ${
+                  tiles ? 'absolute right-1 top-1 rounded bg-panel/90 px-1 py-0.5' : 'w-16 justify-end'
+                }`}
+              >
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -476,9 +628,168 @@ function FolderSection({ folder: f, editing, onEdit, onEditDone, onNameReset, on
                   <X size={14} />
                 </button>
               </div>
-            </div>
-          )
-        })}
+            )
+            return (
+              <div
+                key={s}
+                draggable={renaming !== s}
+                title={t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  onMenu({
+                    symbol: s,
+                    folderId: f.id,
+                    x: e.clientX,
+                    y: e.clientY,
+                    left: e.currentTarget.getBoundingClientRect().left,
+                    rename: () => setRenaming(s)
+                  })
+                }}
+                onDragStart={(e) => {
+                  drag.current = { symbol: s, from: f.id }
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', s)
+                  e.dataTransfer.setData(DRAG_TYPE, s)
+                }}
+                onDragEnd={() => {
+                  drag.current = null
+                  endDrag()
+                }}
+                onDragOver={(e) => {
+                  if (!drag.current) return
+                  // Rows: upper half in front of this row, lower half in front of the next. Tiles: left and right half.
+                  const r = e.currentTarget.getBoundingClientRect()
+                  const after = tiles ? e.clientX >= r.left + r.width / 2 : e.clientY >= r.top + r.height / 2
+                  const target = insertTarget(f.symbols, i, after)
+                  if (target !== insertBefore) setInsertBefore(target)
+                }}
+                onClick={() => setSymbol(s)}
+                className={`group/row relative cursor-pointer ${
+                  tiles
+                    ? `flex min-w-0 flex-col gap-1 rounded-md p-2 ${s === active ? 'bg-accent/10 ring-1 ring-brand-to' : 'bg-bg/60 hover:bg-bg'}`
+                    : `grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
+                        s === active ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-brand-to)]' : 'hover:bg-bg'
+                      }`
+                }`}
+              >
+                {(markerAt === s || (last && markerAt === null)) && (
+                  <span
+                    className={`pointer-events-none absolute rounded-full bg-brand shadow-glow ${
+                      tiles
+                        ? `inset-y-1 w-0.5 ${markerAt === s ? '-left-1' : '-right-1'}`
+                        : `inset-x-2 h-0.5 ${markerAt === s ? '-top-px' : '-bottom-px'}`
+                    }`}
+                  />
+                )}
+                {name}
+                {tiles ? (
+                  <span className="flex items-start justify-between gap-1">
+                    {price}
+                    {change}
+                  </span>
+                ) : (
+                  <>
+                    {price}
+                    {change}
+                  </>
+                )}
+                {buttons}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
+  )
+}
+
+interface GridProps {
+  folders: Folder[]
+  editing: string | null
+  onOpen: (id: string) => void
+  onEdit: (id: string) => void
+  onEditDone: () => void
+  onAdd: (id: string) => void
+  drag: Drag
+}
+
+/** Folder view: one tile per folder; a click opens it, a dragged symbol dropped on a tile moves to its end. */
+function FolderGrid({ folders, editing, onOpen, onEdit, onEditDone, onAdd, drag }: GridProps) {
+  const moveSymbol = useStore((s) => s.moveSymbol)
+  const [over, setOver] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ folder: Folder; x: number; y: number } | null>(null)
+  return (
+    <div className="grid grid-cols-3 gap-1 p-2">
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          label={t('Aktionen für {symbol}', { symbol: menu.folder.name })}
+          items={folderMenu(
+            menu.folder,
+            { label: t('Öffnen'), run: () => onOpen(menu.folder.id) },
+            () => onEdit(menu.folder.id),
+            () => onAdd(menu.folder.id)
+          )}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {folders.map((f) => (
+        <div
+          key={f.id}
+          role="button"
+          tabIndex={0}
+          aria-label={t('{name} öffnen', { name: f.name })}
+          onClick={() => editing !== f.id && onOpen(f.id)}
+          onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onOpen(f.id)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            if (editing !== f.id) setMenu({ folder: f, x: e.clientX, y: e.clientY })
+          }}
+          onDragOver={(e) => {
+            // A symbol dropped on its own folder would only jump to the end, so that is no target.
+            if (!drag.current || drag.current.from === f.id) return
+            e.preventDefault()
+            setOver(f.id)
+          }}
+          onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOver(null)}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (drag.current) moveSymbol(drag.current.symbol, drag.current.from, f.id, null)
+            drag.current = null
+            setOver(null)
+          }}
+          className={`group/tile relative flex cursor-pointer flex-col items-center gap-1 rounded-md px-1 pb-1.5 pt-2.5 outline-none hover:bg-bg focus-visible:ring-1 focus-visible:ring-accent ${
+            over === f.id ? 'bg-accent/10 ring-1 ring-accent' : ''
+          }`}
+        >
+          <span className="relative block h-9 w-12">
+            <span className="absolute left-0 top-0 h-2 w-5 rounded-t-sm bg-brand-from/80" />
+            <span className="absolute inset-x-0 bottom-0 top-1 rounded-md rounded-tl-none bg-brand shadow-glow" />
+            <span className="absolute bottom-1 right-1 rounded bg-bg/60 px-1 text-[10px] tabular-nums text-white">{f.symbols.length}</span>
+          </span>
+          {editing === f.id ? (
+            <FolderNameInput folder={f} onDone={onEditDone} className="w-full text-center" />
+          ) : (
+            <span className="w-full truncate text-center text-[11px] text-white" title={f.name}>
+              {f.name}
+            </span>
+          )}
+          {editing !== f.id && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(f.id)
+              }}
+              title={t('Umbenennen')}
+              aria-label={t('{name} umbenennen', { name: f.name })}
+              className="absolute right-0.5 top-0.5 hidden rounded p-0.5 text-muted hover:bg-line hover:text-white group-hover/tile:block group-focus-within/tile:block"
+            >
+              <Pencil size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }

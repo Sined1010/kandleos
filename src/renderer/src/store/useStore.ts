@@ -96,6 +96,9 @@ interface State {
   closeTab: (id: string) => void
   selectTab: (id: string) => void
   folders: Folder[]
+  /** The watchlist as a list of folders, or as folder tiles that open one at a time. */
+  watchlistView: 'list' | 'folders'
+  setWatchlistView: (view: 'list' | 'folders') => void
   /** Display names per symbol (automatic or set by the user); missing means "show the ticker". */
   names: Record<string, string>
   finnhubKey: string
@@ -211,6 +214,8 @@ export const useStore = create<State>()(
         }),
       // Created on first start, when the language is still the default English.
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
+      watchlistView: 'list',
+      setWatchlistView: (watchlistView) => set({ watchlistView }),
       names: {},
       stockSource: null,
       yahooExtra: false,
@@ -358,6 +363,7 @@ export const useStore = create<State>()(
         agentsConfig,
         language,
         folders,
+        watchlistView,
         names,
         indicators,
         drawings,
@@ -380,6 +386,7 @@ export const useStore = create<State>()(
         tabs,
         activeTab,
         folders,
+        watchlistView,
         indicators,
         drawings
       })
