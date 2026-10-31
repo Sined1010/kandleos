@@ -172,7 +172,17 @@ export default function ChartArea() {
         if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
         const last = bars[bars.length - 1].close
         const precision = last < 1 ? 6 : last < 10 ? 4 : 2
-        api.candles.applyOptions({ priceFormat: { type: 'price', precision, minMove: 10 ** -precision } })
+        const format = (p: number) => p.toFixed(precision)
+        // The volume margin below the candles would otherwise label the axis with negative prices.
+        const negative = bars.some((b) => b.low < 0)
+        api.candles.applyOptions({
+          priceFormat: {
+            type: 'custom',
+            minMove: 10 ** -precision,
+            formatter: format,
+            tickmarksFormatter: (ps: number[]) => ps.map((p) => (p < 0 && !negative ? '' : format(p)))
+          }
+        })
         api.candles.setData(bars.map(toBar))
         api.volume.setData(bars.map(toVol))
         showRange(bars, useStore.getState().range)
