@@ -29,7 +29,7 @@ AI price forecast (Chronos-2) that runs entirely on your computer.
 - **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure
 - **Watchlist** with folders, drag & drop, renaming, market status and a right-click menu
 - **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker, company info
-- **AI forecast (Chronos-2):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
+- **AI forecast ([Chronos-2](https://huggingface.co/amazon/chronos-2)):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
 - **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama
 - **Back up your data:** export watchlist, drawings and settings to one file, API keys only password-encrypted
 - English and German interface
@@ -134,5 +134,9 @@ KandleOS is free software under the [GNU General Public License v3.0 or later](L
 Third-party licenses are listed in [resources/THIRD_PARTY_LICENSES.txt](resources/THIRD_PARTY_LICENSES.txt).
 
 Charts: [TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/) (Apache-2.0).
-Forecast model: Amazon Chronos-2 (Apache-2.0), ONNX export by sktime. All trademarks belong to their owners;
+Forecast model: [Amazon Chronos-2](https://huggingface.co/amazon/chronos-2) (Apache-2.0),
+[ONNX export by sktime](https://huggingface.co/sktime/chronos2-onnx).
+Optional analysis: [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (Apache-2.0),
+installed on demand together with Python (PSF License) and [uv](https://github.com/astral-sh/uv) (MIT/Apache-2.0).
+All trademarks belong to their owners;
 KandleOS is not affiliated with these companies.
