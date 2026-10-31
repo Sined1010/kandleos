@@ -25,7 +25,7 @@ import {
 import { msg, t } from '../../../shared/i18n'
 import { drawingsKey, useStore, type Tool } from '../store/useStore'
 
-const TOOLS: [Tool, LucideIcon, string][] = [
+export const TOOLS: [Tool, LucideIcon, string][] = [
   ['cursor', MousePointer2, msg('Auswahl')],
   ['trend', Slash, msg('Trendlinie (2 Klicks)')],
   ['ray', MoveUpRight, msg('Strahl – Trendlinie bis zum Rand verlängert (2 Klicks)')],

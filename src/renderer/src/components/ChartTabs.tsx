@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react'
 import { t } from '../../../shared/i18n'
 import { tfLabel } from '../../../shared/types'
+import { drawingsKey, isDirty, linkedChart } from '../lib/charts'
 import { MAX_TABS, useStore } from '../store/useStore'
 
 /** Tabs above the chart: up to MAX_TABS charts, each with its own symbol, candle size and range. */
@@ -37,7 +38,11 @@ export default function ChartTabs() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  closeTab(tab.id)
+                  // Unsaved changes to a saved chart are lost with the tab; the saved chart itself stays.
+                  const { charts, drawings } = useStore.getState()
+                  const saved = linkedChart(tab, charts)
+                  const changed = saved && isDirty(saved, tab.timeframe, drawings[drawingsKey({ activeTab: tab.id, symbol: tab.symbol })] ?? [])
+                  if (!changed || confirm(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }))) closeTab(tab.id)
                 }}
                 aria-label={t('{name} schließen', { name })}
                 title={t('Tab schließen')}

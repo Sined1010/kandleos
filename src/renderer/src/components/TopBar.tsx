@@ -6,6 +6,7 @@ import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import CompanyInfoButton from './CompanyInfo'
 import Logo from './Logo'
+import SavedCharts from './SavedCharts'
 import SymbolSearch from './SymbolSearch'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
@@ -45,6 +46,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
         </button>
         {menuOpen && <IndicatorMenu onClose={() => setMenuOpen(false)} />}
       </div>
+      <SavedCharts />
 
       <FeedBadge onClick={onOpenSettings} />
       <button

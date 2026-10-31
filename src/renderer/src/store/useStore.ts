@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type StockSource, type Timeframe } from '../../../shared/types'
+import { drawingsKey, type SavedChart } from '../lib/charts'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
@@ -20,6 +21,7 @@ export type Drawing =
     }
   | { id: string; type: 'text'; points: Point[]; text: string }
 export type Tool = 'cursor' | Drawing['type']
+export { drawingsKey, type SavedChart }
 export interface Folder {
   id: string
   name: string
@@ -69,6 +71,8 @@ export interface ChartTab {
   symbol: string
   timeframe: Timeframe
   range: RangeId | null
+  /** Saved chart this tab was loaded from or saved as; it counts only while the tab shows that chart's symbol. */
+  chartId?: string
 }
 export const MAX_TABS = 3
 
@@ -149,6 +153,14 @@ interface State {
   updateDrawing: (d: Drawing) => void
   removeDrawing: (id: string) => void
   clearDrawings: () => void
+  charts: SavedChart[]
+  /** Saves the active chart; with overwriteId replaces that saved chart (same id). Links the active tab. Returns the id. */
+  saveChart: (name: string, overwriteId?: string) => string
+  /** 'here' replaces the active tab's chart, 'new' opens a tab (the caller checked MAX_TABS). Links the tab. */
+  loadChart: (id: string, where: 'here' | 'new') => void
+  renameChart: (id: string, name: string) => void
+  /** Removes it; tabs linked to it lose the link, their drawings stay. */
+  deleteChart: (id: string) => void
 }
 
 const chartTab = (symbol: string, timeframe: Timeframe, range: RangeId | null): ChartTab => ({
@@ -171,8 +183,6 @@ const showTab = (t: ChartTab) => ({
   selectedId: null,
   tool: 'cursor' as const
 })
-/** Drawings belong to a tab and its symbol, so two tabs on the same symbol are separate charts. */
-export const drawingsKey = (s: { activeTab: string; symbol: string }): string => `${s.activeTab}:${s.symbol}`
 const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [drawingsKey(s)]: list } })
 const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
 const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
@@ -292,7 +302,63 @@ export const useStore = create<State>()(
           ...withDrawings(s, (s.drawings[drawingsKey(s)] ?? []).filter((d) => d.id !== id)),
           selectedId: null
         })),
-      clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null }))
+      clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null })),
+      charts: [],
+      saveChart: (name, overwriteId) => {
+        const id = overwriteId ?? crypto.randomUUID()
+        set((s) => {
+          // Copies, so drawing on afterwards never changes what was saved.
+          const c: SavedChart = {
+            id,
+            name: name.trim(),
+            symbol: s.symbol,
+            timeframe: s.timeframe,
+            drawings: structuredClone(s.drawings[drawingsKey(s)] ?? []),
+            indicators: structuredClone(s.indicators),
+            savedAt: Date.now()
+          }
+          const exists = s.charts.some((x) => x.id === id)
+          return {
+            charts: exists ? s.charts.map((x) => (x.id === id ? c : x)) : [...s.charts, c],
+            tabs: s.tabs.map((t) => (t.id === s.activeTab ? { ...t, chartId: id } : t))
+          }
+        })
+        return id
+      },
+      loadChart: (id, where) =>
+        set((s) => {
+          const c = s.charts.find((x) => x.id === id)
+          if (!c) return {}
+          const drawings = structuredClone(c.drawings)
+          if (where === 'new') {
+            if (s.tabs.length >= MAX_TABS) return {}
+            const t = { ...chartTab(c.symbol, c.timeframe, null), chartId: id }
+            return {
+              tabs: [...s.tabs, t],
+              drawings: { ...s.drawings, [drawingsKey({ activeTab: t.id, symbol: c.symbol })]: drawings },
+              ...showTab(t)
+            }
+          }
+          const tabs = s.tabs.map((t) =>
+            t.id === s.activeTab ? { ...t, symbol: c.symbol, timeframe: c.timeframe, range: null, chartId: id } : t
+          )
+          return {
+            tabs,
+            symbol: c.symbol,
+            timeframe: c.timeframe,
+            range: null,
+            drawings: { ...s.drawings, [drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })]: drawings },
+            selectedId: null,
+            tool: 'cursor' as const
+          }
+        }),
+      renameChart: (id, name) =>
+        set((s) => ({ charts: s.charts.map((c) => (c.id === id && name.trim() ? { ...c, name: name.trim() } : c)) })),
+      deleteChart: (id) =>
+        set((s) => ({
+          charts: s.charts.filter((c) => c.id !== id),
+          tabs: s.tabs.map((t) => (t.chartId === id ? { ...t, chartId: undefined } : t))
+        }))
     }),
     {
       name: 'kandleos',
@@ -338,7 +404,9 @@ export const useStore = create<State>()(
           forecastView: { ...current.forecastView, ...view },
           // The backtest used to be a display switch of its own; switched off, it now means depth 0.
           forecastRun: { ...current.forecastRun, ...(backtest === false && { backtestRuns: 0 as const }), ...p.forecastRun },
-          agentsConfig: { ...current.agentsConfig, ...p.agentsConfig }
+          agentsConfig: { ...current.agentsConfig, ...p.agentsConfig },
+          // Files from before saved charts have none.
+          charts: p.charts ?? []
         }
         // Files from before tabs hold a single chart; it becomes the first tab.
         const tabs = p.tabs?.length
@@ -367,6 +435,7 @@ export const useStore = create<State>()(
         names,
         indicators,
         drawings,
+        charts,
         stockSource,
         yahooExtra,
         disclaimerAccepted
@@ -388,7 +457,8 @@ export const useStore = create<State>()(
         folders,
         watchlistView,
         indicators,
-        drawings
+        drawings,
+        charts
       })
     }
   )
