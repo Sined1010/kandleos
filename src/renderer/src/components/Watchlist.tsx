@@ -82,6 +82,13 @@ export default function Watchlist() {
   useEffect(() => {
     if (openId && !folders.some((f) => f.id === openId)) setOpenId(null)
   }, [folders, openId])
+  // Folder just left, so its tile gets the focus back; keyboard focus would otherwise fall to the page.
+  const lastOpen = useRef<string | null>(null)
+  const closeFolder = () => {
+    // Not while dragging back to the tiles: the drop target is the user's to pick.
+    lastOpen.current = drag.current ? null : openId
+    setOpenId(null)
+  }
   const asideRef = useRef<HTMLElement>(null)
   // Whether the last click or focus was in the watchlist: Backspace elsewhere belongs to the chart (deletes a drawing).
   const inside = useRef(false)
@@ -99,7 +106,7 @@ export default function Watchlist() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
       // Backspace while typing edits the text, it does not navigate.
-      if (e.key === 'Backspace' && inside.current && !el.closest('input, textarea, [contenteditable="true"]')) setOpenId(null)
+      if (e.key === 'Backspace' && inside.current && !el.closest('input, textarea, [contenteditable="true"]')) closeFolder()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -210,7 +217,7 @@ export default function Watchlist() {
             onEditDone={() => setEditing(null)}
             adding={addingId === f.id}
             onAdding={(on) => setAddingId(on ? f.id : null)}
-            onBack={open && (() => setOpenId(null))}
+            onBack={open && closeFolder}
             onNameReset={resetName}
             onMenu={setMenu}
             drag={drag}
@@ -227,6 +234,7 @@ export default function Watchlist() {
               setOpenId(id)
               setAddingId(id)
             }}
+            focus={lastOpen}
             drag={drag}
           />
         )}
@@ -382,6 +390,8 @@ function FolderSection(props: SectionProps) {
   const [dropTarget, setDropTarget] = useState(false)
   // Where a dragged symbol would land: in front of this symbol, null = at the end, undefined = nowhere.
   const [insertBefore, setInsertBefore] = useState<string | null | undefined>(undefined)
+  // Tiles: the tile whose right edge carries the marker, since the slot after a right-column tile starts the next row.
+  const [markRight, setMarkRight] = useState<string | undefined>(undefined)
   // Holding a dragged symbol on the back button returns to the folder tiles, where it can be dropped on another folder.
   const spring = useRef<number | undefined>(undefined)
   const [springing, setSpringing] = useState(false)
@@ -394,6 +404,7 @@ function FolderSection(props: SectionProps) {
   const endDrag = () => {
     setDropTarget(false)
     setInsertBefore(undefined)
+    setMarkRight(undefined)
     stopSpring()
   }
   // Dropping a symbol right where it already is changes nothing, so no marker for it.
@@ -445,6 +456,8 @@ function FolderSection(props: SectionProps) {
       >
         {onBack ? (
           <button
+            // Opening a folder by keyboard would otherwise leave the focus on the page.
+            autoFocus
             onClick={onBack}
             onDragEnter={() => {
               // The icon inside fires its own dragenter; one timer is enough.
@@ -662,6 +675,8 @@ function FolderSection(props: SectionProps) {
                   const after = tiles ? e.clientX >= r.left + r.width / 2 : e.clientY >= r.top + r.height / 2
                   const target = insertTarget(f.symbols, i, after)
                   if (target !== insertBefore) setInsertBefore(target)
+                  const right = tiles && after ? s : undefined
+                  if (right !== markRight) setMarkRight(right)
                 }}
                 onClick={() => setSymbol(s)}
                 className={`group/row relative cursor-pointer ${
@@ -672,11 +687,13 @@ function FolderSection(props: SectionProps) {
                       }`
                 }`}
               >
-                {(markerAt === s || (last && markerAt === null)) && (
+                {(tiles
+                  ? markerAt !== undefined && (markRight ? markRight === s : markerAt === s)
+                  : markerAt === s || (last && markerAt === null)) && (
                   <span
                     className={`pointer-events-none absolute rounded-full bg-brand shadow-glow ${
                       tiles
-                        ? `inset-y-1 w-0.5 ${markerAt === s ? '-left-1' : '-right-1'}`
+                        ? `inset-y-1 w-0.5 ${markRight === s ? '-right-1' : '-left-1'}`
                         : `inset-x-2 h-0.5 ${markerAt === s ? '-top-px' : '-bottom-px'}`
                     }`}
                   />
@@ -710,16 +727,24 @@ interface GridProps {
   onEdit: (id: string) => void
   onEditDone: () => void
   onAdd: (id: string) => void
+  /** Folder to focus once on mount (the one just left); cleared after use. */
+  focus: RefObject<string | null>
   drag: Drag
 }
 
 /** Folder view: one tile per folder; a click opens it, a dragged symbol dropped on a tile moves to its end. */
-function FolderGrid({ folders, editing, onOpen, onEdit, onEditDone, onAdd, drag }: GridProps) {
+function FolderGrid({ folders, editing, onOpen, onEdit, onEditDone, onAdd, focus, drag }: GridProps) {
   const moveSymbol = useStore((s) => s.moveSymbol)
   const [over, setOver] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ folder: Folder; x: number; y: number } | null>(null)
+  const grid = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const id = focus.current
+    focus.current = null
+    if (id) grid.current?.querySelector<HTMLElement>(`[data-folder="${CSS.escape(id)}"]`)?.focus()
+  }, [focus])
   return (
-    <div className="grid grid-cols-3 gap-1 p-2">
+    <div ref={grid} className="grid grid-cols-3 gap-1 p-2">
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -737,11 +762,17 @@ function FolderGrid({ folders, editing, onOpen, onEdit, onEditDone, onAdd, drag 
       {folders.map((f) => (
         <div
           key={f.id}
+          data-folder={f.id}
           role="button"
           tabIndex={0}
           aria-label={t('{name} öffnen', { name: f.name })}
           onClick={() => editing !== f.id && onOpen(f.id)}
-          onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onOpen(f.id)}
+          onKeyDown={(e) => {
+            if ((e.key !== 'Enter' && e.key !== ' ') || e.target !== e.currentTarget) return
+            // Space would scroll the list.
+            e.preventDefault()
+            onOpen(f.id)
+          }}
           onContextMenu={(e) => {
             e.preventDefault()
             if (editing !== f.id) setMenu({ folder: f, x: e.clientX, y: e.clientY })
