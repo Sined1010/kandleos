@@ -180,15 +180,16 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }, [selectedId, setTool, removeDrawing])
 
   const logicalOf = (time: number) => timeToLogical(axis, time, step)
-  const toX = (time: number) => (times.length ? chart.timeScale().logicalToCoordinate(logicalOf(time) as Logical) : null)
   const toY = (price: number) => series.priceToCoordinate(price)
   // logicalToCoordinate gives 0 between bars, so fractional positions are interpolated between the two neighbours.
+  // Points fall between bars after a timeframe switch (a 30m time on daily bars), not only for the time tools.
   const xAt = (logical: number) => {
     const base = Math.floor(logical)
     const a = chart.timeScale().logicalToCoordinate(base as Logical)
     const b = chart.timeScale().logicalToCoordinate((base + 1) as Logical)
     return a === null || b === null ? null : a + (logical - base) * (b - a)
   }
+  const toX = (time: number) => (times.length ? xAt(logicalOf(time)) : null)
   const fmt = (price: number) => series.priceFormatter().format(price)
 
   const logicalAt = (e: { clientX: number; clientY: number }) => {
