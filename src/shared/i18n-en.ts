@@ -764,5 +764,15 @@ export const EN: Record<string, string> = {
   'Löschen': 'Delete',
   'Gespeichert {date}': 'Saved {date}',
   'Ungespeicherte Änderungen im Tab': 'Unsaved changes in the tab',
-  'Für {symbol} gibt es schon einen Chart-Stand „{name}“.': 'There is already a saved chart “{name}” for {symbol}.'
+  'Für {symbol} gibt es schon einen Chart-Stand „{name}“.': 'There is already a saved chart “{name}” for {symbol}.',
+  'Farbe': 'Color',
+  'Standard': 'Default',
+  'Weiß': 'White',
+  'Rot': 'Red',
+  'Orange': 'Orange',
+  'Gelb': 'Yellow',
+  'Grün': 'Green',
+  'Blau': 'Blue',
+  'Violett': 'Purple',
+  'Textgröße': 'Text size'
 }

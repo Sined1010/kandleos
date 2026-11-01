@@ -31,6 +31,20 @@ const WAVE_LABELS = {
   wxy: ['0', 'W', 'X', 'Y'],
   wxyxz: ['0', 'W', 'X', 'Y', 'X', 'Z']
 }
+// Choices in the bar under a selected drawing; null goes back to the tool's own colours.
+// A function, so the names follow a language switch.
+const palette = (): { color: string | null; name: string }[] => [
+  { color: null, name: t('Standard') },
+  { color: '#e2e8f0', name: t('Weiß') },
+  { color: '#f43f5e', name: t('Rot') },
+  { color: '#ff9800', name: t('Orange') },
+  { color: '#ffca28', name: t('Gelb') },
+  { color: '#14b8a6', name: t('Grün') },
+  { color: '#42a5f5', name: t('Blau') },
+  { color: '#ab47bc', name: t('Violett') }
+]
+const TEXT_SIZE = 13
+const TEXT_SIZES = [11, 13, 16, 20, 28]
 const isWave = (type: string): type is keyof typeof WAVE_LABELS => Object.hasOwn(WAVE_LABELS, type)
 const NO_DRAWINGS: Drawing[] = []
 // How far right of the last candle drawings follow the trading calendar; beyond that, even steps.
@@ -258,7 +272,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
 
   const render = (d: Drawing, preview = false) => {
     const selected = d.id === selectedId
-    const stroke = selected ? SELECTED : COLOR
+    // An own colour stays when selected (handles and the style bar show the selection), else it turns cyan.
+    const stroke = d.color ?? (selected ? SELECTED : COLOR)
     const lineWidth = selected ? 2 : 1.5
     // A wide transparent twin of each line is the hit area; in cursor mode only these catch the mouse.
     const hit = (cursor = 'move') =>
@@ -327,7 +342,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               x={xs[0]}
               y={ys[0]}
               fill={stroke}
-              fontSize={13}
+              fontSize={d.size ?? TEXT_SIZE}
               fontWeight={600}
               style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move', userSelect: 'none' }}
               onMouseDown={preview ? undefined : (e) => startDrag(e, d, 'move')}
@@ -367,7 +382,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (d.type === 'rect' || d.type === 'measure') {
       const box = { x: Math.min(...xs), y: Math.min(...ys), width: Math.abs(xs[1] - xs[0]), height: Math.abs(ys[1] - ys[0]) }
       const up = pts[1].price >= pts[0].price
-      const color = d.type === 'rect' ? stroke : up ? THEME.up : THEME.down
+      const color = d.type === 'rect' ? stroke : (d.color ?? (up ? THEME.up : THEME.down))
       return (
         <g key={d.id}>
           <rect {...box} fill={color} fillOpacity={0.12} stroke={color} strokeWidth={selected ? 2 : 1} />
@@ -445,7 +460,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
             const price = fibExtPrice(pts[0].price, pts[1].price, pts[2].price, lvl)
             const y = toY(price)
             if (y === null) return null
-            const color = FIB_COLORS[i]
+            const color = d.color ?? FIB_COLORS[i]
             return (
               <g key={lvl}>
                 <line x1={left} x2={right} y1={y} y2={y} stroke={color} strokeWidth={selected ? 2 : 1} />
@@ -469,7 +484,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
             const through = toY(fanPrice(pts[0].price, pts[1].price, ratio))
             if (through === null) return null
             const [ex, ey] = rayEnd(xs[0], ys[0], xs[1], through, width)
-            const color = ratio ? FIB_COLORS[i + 1] : stroke
+            const color = ratio ? (d.color ?? FIB_COLORS[i + 1]) : stroke
             const ray = { x1: xs[0], y1: ys[0], x2: ex, y2: ey }
             return (
               <g key={ratio}>
@@ -536,7 +551,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     }
 
     if (isWave(d.type)) {
-      const color = selected ? SELECTED : WAVE_COLORS[d.type]
+      const color = d.color ?? (selected ? SELECTED : WAVE_COLORS[d.type])
       const labels = WAVE_LABELS[d.type]
       const path =xs.map((x, i) => `${x},${ys[i]}`).join(' ')
       return (
@@ -566,7 +581,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const right = Math.max(xs[0], xs[1])
     const levels = FIB_LEVELS.map((lvl, i) => {
       const price = pts[1].price + (pts[0].price - pts[1].price) * lvl
-      return { lvl, price, y: toY(price), color: FIB_COLORS[i] }
+      return { lvl, price, y: toY(price), color: d.color ?? FIB_COLORS[i] }
     })
     return (
       <g key={d.id}>
@@ -607,6 +622,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
 
   const preview = tool !== 'cursor' && draft.length > 0 && hover ? build(tool, 'draft', [...draft, hover]) : null
+  const styled = tool === 'cursor' && !drag && !editing ? drawings.find((d) => d.id === selectedId) : undefined
+  const swatch = 'h-5 w-5 rounded-full ring-offset-2 ring-offset-panel'
   return (
     <>
       <svg
@@ -634,9 +651,54 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           aria-label={t('Text eingeben')}
           onBlur={(e) => commitText(textEdit, e.currentTarget.value)}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
-          className="pointer-events-auto absolute z-20 w-48 rounded border border-accent/60 bg-panel px-1 text-[13px] font-semibold text-slate-100 outline-none"
-          style={{ left: editAt[0], top: editAt[1] - 17 }}
+          className="pointer-events-auto absolute z-20 w-48 rounded border border-accent/60 bg-panel px-1 font-semibold text-slate-100 outline-none"
+          // Baseline of the input text roughly on the drawing's point, as with the 13 px default.
+          style={{ left: editAt[0], top: editAt[1] - (textEdit.size ?? TEXT_SIZE) - 4, fontSize: textEdit.size ?? TEXT_SIZE }}
         />
+      )}
+      {styled && (
+        // Bottom centre like the click hint, which only shows while a tool is active. Own mousedown, so the
+        // chart underneath does not clear the selection.
+        <div
+          className="pointer-events-auto absolute bottom-12 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-lg bg-panel/90 px-2 py-1.5 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div role="group" aria-label={t('Farbe')} className="flex items-center gap-1.5">
+            {palette().map(({ color, name }) => {
+              const active = (styled.color ?? null) === color
+              return (
+                <button
+                  key={name}
+                  aria-label={name}
+                  title={name}
+                  aria-pressed={active}
+                  onClick={() => updateDrawing({ ...styled, color: color ?? undefined })}
+                  className={`${swatch} ${active ? 'ring-2 ring-white' : 'hover:ring-1 hover:ring-slate-400'}`}
+                  // "Standard" shows the drawing colour with a slash: the tool's own colours.
+                  style={{ background: color ?? `linear-gradient(135deg, ${COLOR} 45%, ${THEME.bg} 45% 55%, ${COLOR} 55%)` }}
+                />
+              )
+            })}
+          </div>
+          {styled.type === 'text' && (
+            <div role="group" aria-label={t('Textgröße')} className="ml-1 flex items-center gap-0.5 border-l border-line pl-2">
+              {TEXT_SIZES.map((n) => {
+                const active = (styled.size ?? TEXT_SIZE) === n
+                return (
+                  <button
+                    key={n}
+                    aria-pressed={active}
+                    title={t('Textgröße')}
+                    onClick={() => updateDrawing({ ...styled, size: n === TEXT_SIZE ? undefined : n })}
+                    className={`min-w-6 rounded px-1 py-0.5 tabular-nums ${active ? 'bg-brand text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+                  >
+                    {n}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
       {tool !== 'cursor' && CLICKS[tool] > 1 && (
         // Bottom centre: the top is taken by the legend row.

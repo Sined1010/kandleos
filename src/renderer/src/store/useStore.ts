@@ -9,7 +9,8 @@ import type { Lang } from '../../../shared/i18n'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
-export type Drawing =
+/** `color` is the user's choice; missing means the tool's own colours. */
+export type Drawing = { color?: string } & (
   | { id: string; type: 'trend' | 'fib'; p1: Point; p2: Point }
   | { id: string; type: 'hline'; price: number }
   | { id: string; type: 'vline'; time: number }
@@ -19,7 +20,8 @@ export type Drawing =
       type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure' | 'fibext' | 'fibfan' | 'fibtime' | 'triangle' | 'wxy' | 'wxyxz' | 'sine'
       points: Point[]
     }
-  | { id: string; type: 'text'; points: Point[]; text: string }
+  | { id: string; type: 'text'; points: Point[]; text: string; size?: number }
+)
 export type Tool = 'cursor' | Drawing['type']
 export { drawingsKey, type SavedChart }
 export interface Folder {
