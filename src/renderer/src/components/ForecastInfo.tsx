@@ -1,4 +1,4 @@
-import { BrainCircuit, ChevronDown, ChevronRight, Info, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { ArrowUp, BrainCircuit, ChevronDown, ChevronRight, Info, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { forecastCandles, probabilityAbove, Q, trend, type BacktestResult } from '../../../shared/forecast'
@@ -127,6 +127,13 @@ export function ForecastSummary({ result, intraday, showCheck }: {
       >
         {worse && <TriangleAlert size={13} className="shrink-0 text-orange-400" />}
         <span className="flex-1">{t(HEADLINE[trend(up)])}</span>
+        <span
+          title={t('Wahrscheinlichkeit für einen höheren Kurs: {p}', { p: chance(up) })}
+          className="inline-flex shrink-0 items-center gap-0.5 tabular-nums text-slate-300"
+        >
+          <ArrowUp size={12} />
+          {chance(up)}
+        </span>
         <ChevronDown size={14} className={`shrink-0 text-muted transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
