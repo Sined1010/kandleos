@@ -34,11 +34,12 @@ export function aggregateMonths(candles: Candle[], months: number, timeZone = 'U
 
 /**
  * Maps a timestamp to a fractional bar index. Between bars it interpolates, outside the data it
- * extrapolates by `step` seconds per bar, so drawings survive timeframe switches and future space.
+ * extrapolates, so drawings survive timeframe switches and future space: right by `step` seconds per bar,
+ * left by the bars' average spacing.
  */
 export function timeToLogical(times: number[], t: number, step: number): number {
   const n = times.length
-  if (t <= times[0]) return (t - times[0]) / step
+  if (t <= times[0]) return (t - times[0]) / backStep(times, step)
   if (t >= times[n - 1]) return n - 1 + (t - times[n - 1]) / step
   let lo = 0
   let hi = n - 1
@@ -50,9 +51,14 @@ export function timeToLogical(times: number[], t: number, step: number): number 
   return lo + (t - times[lo]) / (times[hi] - times[lo])
 }
 
+// A shorter timeframe loads less history, so points drawn on a longer one can lie before the first bar. Stock
+// bars skip nights and weekends; extrapolating there by `step` would push those points several times too far left.
+const backStep = (times: number[], step: number) =>
+  times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) : step
+
 export function logicalToTime(times: number[], l: number, step: number): number {
   const n = times.length
-  if (l <= 0) return times[0] + l * step
+  if (l <= 0) return times[0] + l * backStep(times, step)
   if (l >= n - 1) return times[n - 1] + (l - (n - 1)) * step
   const i = Math.floor(l)
   return times[i] + (l - i) * (times[i + 1] - times[i])

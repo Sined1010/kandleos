@@ -7,8 +7,20 @@ test('timeToLogical / logicalToTime round-trip inside, between and beyond bars',
   assert.equal(timeToLogical(times, 160, 60), 1)
   assert.equal(timeToLogical(times, 280, 60), 1.5)
   assert.equal(timeToLogical(times, 580, 60), 5)
-  assert.equal(timeToLogical(times, 40, 60), -1)
+  // Left of the data by the average spacing (360 s over 3 bars), right of it by the step.
+  assert.equal(timeToLogical(times, -20, 60), -1)
   for (const t of [40, 100, 130, 280, 460, 580]) assert.equal(logicalToTime(times, timeToLogical(times, t, 60), 60), t)
+})
+
+test('left of the first bar, drawing points keep the bars’ own spacing (nights and weekends), not the nominal step', () => {
+  // Two 30-minute bars per "day", one day apart: on average one bar every 43,200 s, not every 1,800 s.
+  const day = 86400
+  const times = [0, 1800, day, day + 1800, 2 * day, 2 * day + 1800, 3 * day, 3 * day + 1800]
+  const spacing = (3 * day + 1800) / 7
+  // A point drawn three average bars before the history (e.g. on the 4h chart, whose history reaches further)
+  // stays three bars left of it instead of flying off by a factor of 24.
+  assert.equal(timeToLogical(times, -3 * spacing, 1800), -3)
+  assert.equal(logicalToTime(times, -3, 1800), -3 * spacing)
 })
 
 const c = (time: number, o: number, h: number, l: number, cl: number, v = 1) => ({
