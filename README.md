@@ -11,7 +11,7 @@
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer.
 
-![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary and the values of one forecast step](docs/screenshot.webp)
+![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary, the values of one forecast step and colored drawings](docs/screenshot.webp)
 
 ## Why KandleOS?
 
@@ -19,19 +19,20 @@ AI price forecast (Chronos-2) that runs entirely on your computer.
 - **An AI forecast that tells you how good it is:** instead of a single target price you get uncertainty ranges,
   a backtest on past data and a comparison against simply assuming "the price stays the same". If that simple
   guess would have been closer, KandleOS says so
-- **Organize your watchlist your way:** as many folders as you like, collapsible, with drag & drop and your own names
+- **Organize your watchlist your way:** as many folders as you like, as a list or as folder tiles, with drag & drop and your own names
 - **Free and open source** (GPL-3.0), no subscription, no ads, no paid tier
 
 ## Features
 
 - **Charts** with volume, live prices and candle sizes from 1 minute to 12 months, plus pre- and post-market prices and candles
 - **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR, with a legend in the chart showing their values
-- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure
-- **Watchlist** with folders, drag & drop, renaming, market status and a right-click menu
+- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
+- **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
+- **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu
 - **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker, company info
 - **AI forecast ([Chronos-2](https://huggingface.co/amazon/chronos-2)):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
 - **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama
-- **Back up your data:** export watchlist, drawings and settings to one file, API keys only password-encrypted
+- **Back up your data:** export watchlist, drawings, saved charts and settings to one file, API keys only password-encrypted
 - English and German interface
 
 ## Download and installation
