@@ -1,10 +1,14 @@
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
+import { isNewer } from '../../../shared/version'
+import { checkForUpdate, RELEASES_URL } from './UpdateBadge'
 
 /** About KandleOS: disclaimer, privacy notes, data sources and third-party licenses (first start: WelcomeModal). */
 export default function AboutModal({ onClose }: { onClose: () => void }) {
   const [licenseError, setLicenseError] = useState('')
+  // '' before the click, 'busy', 'failed', or the newest version found.
+  const [update, setUpdate] = useState('')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -33,6 +37,32 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
+        <p className="mt-2">
+          <button
+            onClick={async () => {
+              setUpdate('busy')
+              setUpdate((await checkForUpdate(true)) ?? 'failed')
+            }}
+            disabled={update === 'busy'}
+            className={link}
+          >
+            {t('Nach Updates suchen')}
+          </button>{' '}
+          {update === 'busy' && <span className="text-muted">{t('Frage GitHub …')}</span>}
+          {update === 'failed' && <span className="text-down">{t('GitHub war nicht erreichbar.')}</span>}
+          {update && update !== 'busy' && update !== 'failed' &&
+            (isNewer(update, __APP_VERSION__) ? (
+              <>
+                {t('Version {v} ist verfügbar:', { v: update })}{' '}
+                <a href={RELEASES_URL} target="_blank" rel="noreferrer" className={link}>
+                  {t('herunterladen')}
+                </a>
+              </>
+            ) : (
+              <span className="text-muted">{t('Du hast die neueste Version.')}</span>
+            ))}
+        </p>
+
         <h3 className={h}>{t('Keine Anlageberatung')}</h3>
         <p>
           {t(
@@ -56,6 +86,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
           <li>{t('Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
+          <li>{t('GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“')}</li>
         </ul>
         <p className="mt-2">
           {t('Nur wenn du die')} <strong className="text-white">{t('umfassende Analyse mit TradingAgents')}</strong>{' '}

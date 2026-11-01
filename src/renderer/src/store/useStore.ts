@@ -148,6 +148,11 @@ interface State {
   /** Whether the disclaimer shown on first start has been confirmed. */
   disclaimerAccepted: boolean
   acceptDisclaimer: () => void
+  /** Ask GitHub once a day for a newer release; off unless the user turns it on. */
+  updateCheck: boolean
+  /** Newest release found by the last check (automatic or clicked), and when the automatic one last succeeded. */
+  updateLatest: string | null
+  updateCheckedAt: number
   setIndicator: <K extends keyof Indicators>(name: K, patch: Partial<Indicators[K]>) => void
   setTool: (tool: Tool) => void
   select: (id: string | null) => void
@@ -235,6 +240,9 @@ export const useStore = create<State>()(
         set({ stockSource, yahooExtra: stockSource === 'alpaca' && yahooExtra }),
       disclaimerAccepted: false,
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
+      updateCheck: false,
+      updateLatest: null,
+      updateCheckedAt: 0,
       finnhubKey: window.api.keyGet(),
       indicators: {
         sma: { on: true, period: 20 },
@@ -440,8 +448,14 @@ export const useStore = create<State>()(
         charts,
         stockSource,
         yahooExtra,
-        disclaimerAccepted
+        disclaimerAccepted,
+        updateCheck,
+        updateLatest,
+        updateCheckedAt
       }) => ({
+        updateCheck,
+        updateLatest,
+        updateCheckedAt,
         stockSource,
         yahooExtra,
         language,

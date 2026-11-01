@@ -47,6 +47,8 @@ const api = {
   },
   /** Opens the third-party license file; resolves to an error message, or '' on success. */
   openLicenses: (): Promise<string> => ipcRenderer.invoke('app:licenses'),
+  /** Newest KandleOS release on GitHub ("0.4.1"), null when GitHub could not be reached. */
+  latestVersion: (): Promise<string | null> => ipcRenderer.invoke('app:latest-version'),
   /**
    * Chronos-2 forecast per price series: the 21 quantiles (shared/forecast.ts) for each of the next 64 bars.
    * Series sharing a group id are forecast together; without `groups` each stands alone.

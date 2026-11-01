@@ -95,7 +95,9 @@ otherwise in a file readable only by you).
 
 KandleOS collects no usage data and sends nothing to its author (no telemetry). Watchlist, drawings and settings stay
 on your computer (`%APPDATA%\kandleos` on Windows, `~/.config/kandleos` on Linux). To load prices the app connects
-directly to the providers above, which see your IP address. Details are in the app under **About KandleOS**.
+directly to the providers above, which see your IP address. The update check is off by default: if you turn it on,
+KandleOS asks GitHub once a day for the latest version number (or when you click **Check for updates** in About);
+nothing is downloaded or installed automatically. Details are in the app under **About KandleOS**.
 
 ## Not investment advice
 

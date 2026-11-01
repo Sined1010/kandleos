@@ -774,5 +774,17 @@ export const EN: Record<string, string> = {
   'Grün': 'Green',
   'Blau': 'Blue',
   'Violett': 'Purple',
-  'Textgröße': 'Text size'
+  'Textgröße': 'Text size',
+  'Neue Version auf GitHub herunterladen': 'Download the new version from GitHub',
+  'Update': 'Update',
+  'Updates': 'Updates',
+  'Einmal täglich bei GitHub nachsehen, ob es eine neue Version gibt. GitHub sieht dabei deine IP-Adresse; heruntergeladen oder installiert wird nichts automatisch.': 'Check GitHub once a day for a new version. GitHub sees your IP address; nothing is downloaded or installed automatically.',
+  'Nach Updates suchen': 'Check for updates',
+  'Frage GitHub …': 'Asking GitHub …',
+  'GitHub war nicht erreichbar.': 'Could not reach GitHub.',
+  'Version {v} ist verfügbar:': 'Version {v} is available:',
+  'herunterladen': 'download',
+  'Du hast die neueste Version.': 'You have the latest version.',
+  'GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“': 'GitHub – checking for new versions, only when turned on in the settings (once a day) or when you click “Check for updates”',
+  'Installiert: {v}': 'Installed: {v}'
 }

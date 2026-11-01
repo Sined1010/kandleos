@@ -8,6 +8,7 @@ import CompanyInfoButton from './CompanyInfo'
 import Logo from './Logo'
 import SavedCharts from './SavedCharts'
 import SymbolSearch from './SymbolSearch'
+import UpdateBadge from './UpdateBadge'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
   const symbol = useStore((s) => s.symbol)
@@ -48,6 +49,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
       </div>
       <SavedCharts />
 
+      <UpdateBadge />
       <FeedBadge onClick={onOpenSettings} />
       <button
         onClick={onOpenSettings}

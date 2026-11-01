@@ -17,6 +17,7 @@ import {
 import icon from '../../resources/icon.png?asset'
 import { setLang } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
+import { VERSION_RE } from '../shared/version'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
@@ -168,6 +169,22 @@ ipcMain.handle('app:licenses', () =>
       : join(app.getAppPath(), 'resources', 'THIRD_PARTY_LICENSES.txt')
   )
 )
+
+// Only when the user turned the update check on or clicked "Check for updates": the newest release number, or null.
+ipcMain.handle('app:latest-version', async () => {
+  try {
+    const res = await fetch('https://api.github.com/repos/Sined1010/kandleos/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KandleOS' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000)
+    })
+    const tag = res.ok ? ((await res.json()) as { tag_name?: unknown }).tag_name : null
+    const version = typeof tag === 'string' ? tag.replace(/^v/, '') : ''
+    return VERSION_RE.test(version) ? version : null
+  } catch {
+    return null
+  }
+})
 
 // A second instance would load its own copy of the store and overwrite this one's changes on its next save.
 if (!app.requestSingleInstanceLock()) app.quit()

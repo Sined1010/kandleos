@@ -6,6 +6,7 @@ import DrawingToolbar from './components/DrawingToolbar'
 import { FULLSCREEN_ID } from './components/FullscreenButton'
 import SettingsModal from './components/SettingsModal'
 import TopBar from './components/TopBar'
+import { checkForUpdate } from './components/UpdateBadge'
 import Watchlist from './components/Watchlist'
 import WelcomeModal from './components/WelcomeModal'
 import { watchQuotes } from './services/marketData'
@@ -22,6 +23,7 @@ export default function App() {
   const stockSource = useStore((s) => s.stockSource)
   const yahooExtra = useStore((s) => s.yahooExtra)
   const activeTab = useStore((s) => s.activeTab)
+  const updateCheck = useStore((s) => s.updateCheck)
   // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
   // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
   // keeps the Finnhub and Binance connections open instead of reconnecting.
@@ -32,6 +34,9 @@ export default function App() {
     // yahooExtra: main routes by it, so the first poll after switching must see it.
     [feed, finnhubKey, stockSource, yahooExtra]
   )
+  useEffect(() => {
+    if (updateCheck) void checkForUpdate()
+  }, [updateCheck])
 
   return (
     // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.

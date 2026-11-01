@@ -1,14 +1,18 @@
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
+import { isNewer } from '../../../shared/version'
 import { useStore } from '../store/useStore'
 import BackupSection from './BackupSection'
 import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
+import { RELEASES_URL } from './UpdateBadge'
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const setFinnhubKey = useStore((s) => s.setFinnhubKey)
+  const updateCheck = useStore((s) => s.updateCheck)
+  const updateLatest = useStore((s) => s.updateLatest)
   const [key, setKey] = useState(finnhubKey)
   const valid = key === '' || /^[A-Za-z0-9]{1,64}$/.test(key.trim())
   const source = useSourceForm()
@@ -57,10 +61,39 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             useStore.setState({ disclaimerAccepted: false })
             onClose()
           }}
-          className="mb-5 text-xs text-accent hover:underline"
+          className="mb-3 text-xs text-accent hover:underline"
         >
           {t('Startfenster erneut zeigen')}
         </button>
+
+        {/* Applies at once, like the language. */}
+        <label className="mb-1 flex cursor-pointer items-start gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={updateCheck}
+            onChange={(e) => useStore.setState({ updateCheck: e.target.checked })}
+            className="mt-0.5 accent-accent"
+          />
+          <span>
+            {t('Einmal täglich bei GitHub nachsehen, ob es eine neue Version gibt. GitHub sieht dabei deine IP-Adresse; heruntergeladen oder installiert wird nichts automatisch.')}
+          </span>
+        </label>
+        {/* Fills in by itself once the check (started by ticking the box) has an answer. */}
+        <p className="mb-5 ml-5 text-xs text-muted">
+          {t('Installiert: {v}', { v: __APP_VERSION__ })}
+          {updateLatest &&
+            (isNewer(updateLatest, __APP_VERSION__) ? (
+              <>
+                {' · '}
+                <span className="text-slate-200">{t('Version {v} ist verfügbar:', { v: updateLatest })}</span>{' '}
+                <a href={RELEASES_URL} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  {t('herunterladen')}
+                </a>
+              </>
+            ) : (
+              <> · {t('Du hast die neueste Version.')}</>
+            ))}
+        </p>
 
         <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>
         <StockSourcePicker form={source} />
