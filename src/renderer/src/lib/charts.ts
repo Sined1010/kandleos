@@ -59,10 +59,10 @@ export function groupCharts(charts: SavedChart[], current: string, query: string
   return [...groups.values()].sort((a, b) => Number(b.current) - Number(a.current) || a.label.localeCompare(b.label))
 }
 
-export type LoadTarget = { kind: 'switch'; tabId: string } | { kind: 'here' } | { kind: 'new' } | { kind: 'confirm' }
+export type LoadTarget = { kind: 'switch'; tabId: string } | { kind: 'here' } | { kind: 'new' } | { kind: 'confirm' } | { kind: 'revert' }
 
 /**
- * Where a saved chart opens: the tab already showing it (the active one reloads it), the active tab if it has no drawings to lose,
+ * Where a saved chart opens: the tab already showing it (the active one reloads it, asking first if drawings changed), the active tab if it has no drawings to lose,
  * else a new tab, or – with all tabs open – the active tab after the user confirms.
  */
 export function loadTarget(
@@ -71,8 +71,11 @@ export function loadTarget(
   max: number
 ): LoadTarget {
   const open = s.tabs.find((t) => t.chartId === chart.id && t.symbol === chart.symbol)
-  // Already in the active tab: load it there again, so the saved state comes back.
-  if (open?.id === s.activeTab) return { kind: 'here' }
+  // Already in the active tab: load it there again, so the saved state comes back – after asking, if lines drawn since would be lost.
+  if (open?.id === s.activeTab) {
+    const now = s.drawings[drawingsKey({ activeTab: s.activeTab, symbol: chart.symbol })] ?? []
+    return now.length && JSON.stringify(now) !== JSON.stringify(chart.drawings) ? { kind: 'revert' } : { kind: 'here' }
+  }
   if (open) return { kind: 'switch', tabId: open.id }
   const active = s.tabs.find((t) => t.id === s.activeTab)
   // The tab's drawings for the loaded symbol count too: loading would replace them unseen.

@@ -112,7 +112,10 @@ function ChartList({ onDone }: { onDone: () => void }) {
   const load = (c: SavedChart) => {
     const target = loadTarget(c, useStore.getState(), MAX_TABS)
     if (target.kind === 'switch') selectTab(target.tabId)
-    else if (target.kind !== 'confirm') loadChart(c.id, target.kind)
+    else if (target.kind === 'revert') {
+      if (!confirm(t('Zeichnungen seit dem Speichern gehen verloren. „{name}“ wieder laden?', { name: c.name }))) return
+      loadChart(c.id, 'here')
+    } else if (target.kind !== 'confirm') loadChart(c.id, target.kind)
     else if (
       confirm(
         t('Alle {max} Tabs sind belegt. Die Zeichnungen im aktuellen Tab werden durch „{name}“ ersetzt. Fortfahren?', {

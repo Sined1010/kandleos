@@ -80,6 +80,10 @@ test('loadTarget picks the tab a saved chart opens in', () => {
   assert.deepEqual(loadTarget(c, { tabs: [tab('a', 'BTCUSDT', 'c1')], activeTab: 'a', drawings: { 'a:BTCUSDT': [] } }, 3), {
     kind: 'here'
   })
+  // Drawn on since saving: those lines would be lost, so ask first; unchanged reloads without asking.
+  const linkedTab = [tab('a', 'BTCUSDT', 'c1')]
+  assert.deepEqual(loadTarget(c, { tabs: linkedTab, activeTab: 'a', drawings: { 'a:BTCUSDT': [trend] } }, 3), { kind: 'revert' })
+  assert.deepEqual(loadTarget(c, { tabs: linkedTab, activeTab: 'a', drawings: { 'a:BTCUSDT': [trend, hline] } }, 3), { kind: 'here' })
   assert.deepEqual(loadTarget(c, { tabs: [tab('a', 'ETHUSDT')], activeTab: 'a', drawings: { 'a:ETHUSDT': [hline] } }, 3), {
     kind: 'new'
   })
