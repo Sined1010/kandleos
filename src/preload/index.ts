@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
 import type { BackupSummary } from '../main/backup'
-import type { CandleData, CompanyInfo, Quote, SearchResult, Timeframe } from '../shared/types'
+import type { CandleData, CompanyInfo, OlderRequest, Quote, SearchResult, Timeframe } from '../shared/types'
 
 /** Subscribes to a main-process event channel; returns the unsubscribe function. */
 function listen<T>(channel: string, cb: (value: T) => void): () => void {
@@ -25,9 +25,12 @@ const api = {
   storeSet: (data: string): Promise<void> => ipcRenderer.invoke('store:set', data),
   keyGet: (): string => ipcRenderer.sendSync('key:get'),
   keySet: (key: string): Promise<void> => ipcRenderer.invoke('key:set', key),
-  /** `extended`: intraday candles include pre-market and after-hours trading (Yahoo only). */
-  stockCandles: (symbol: string, tf: Timeframe, key: string, extended = false): Promise<CandleData> =>
-    ipcRenderer.invoke('stocks:candles', symbol, tf, key, extended),
+  /**
+   * `extended`: intraday candles include pre-market and after-hours trading (Yahoo only).
+   * `older`: the section just before that time, from the same source; empty candles mean history ends.
+   */
+  stockCandles: (symbol: string, tf: Timeframe, key: string, extended = false, older?: OlderRequest): Promise<CandleData> =>
+    ipcRenderer.invoke('stocks:candles', symbol, tf, key, extended, older),
   stockQuotes: (symbols: string[], key: string): Promise<Record<string, Quote>> =>
     ipcRenderer.invoke('stocks:quotes', symbols, key),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),

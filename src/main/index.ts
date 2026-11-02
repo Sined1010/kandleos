@@ -89,7 +89,7 @@ ipcMain.handle('backup:apply', async (e, password) => {
   e.sender.once('did-finish-load', () => (storeLocked = false))
   e.sender.reload()
 })
-ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended) => stockCandles(symbol, tf, key, extended))
+ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended, older) => stockCandles(symbol, tf, key, extended, older))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))

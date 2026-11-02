@@ -9,6 +9,7 @@ import {
   TF_MONTHS,
   type Candle,
   type CandleData,
+  type OlderRequest,
   type Quote,
   type StockSource,
   type Timeframe
@@ -48,8 +49,10 @@ const kline = (k: (string | number)[]): Candle => ({
   volume: +k[5]
 })
 
-async function klines(symbol: string, interval: string, limit: number): Promise<Candle[]> {
-  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`)
+/** `endTime` is matched against a bar's close (ms), so `open - 1` ends just before that bar. */
+async function klines(symbol: string, interval: string, limit: number, endTime?: number): Promise<Candle[]> {
+  const end = endTime === undefined ? '' : `&endTime=${endTime}`
+  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`)
   if (!res.ok) throw new Error(t('Binance: {symbol} nicht gefunden (HTTP {status})', { symbol, status: res.status }))
   return ((await res.json()) as (string | number)[][]).map(kline)
 }
@@ -86,12 +89,18 @@ export async function loadCandles(
   symbol: string,
   tf: Timeframe,
   finnhubKey: string,
-  extended = false
+  extended = false,
+  older?: OlderRequest
 ): Promise<CandleData> {
-  if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey, extended)
-  const candles = await klines(symbol, BINANCE_TF[tf], 1000)
+  if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey, extended, older)
+  // Sections before a time come from the bar size itself; month-based charts load all history at once.
+  const candles = await klines(symbol, BINANCE_TF[tf], 1000, older && older.before * 1000 - 1)
   const months = combined(tf)
-  return { candles: months ? aggregateMonths(candles, months) : candles, currency: cryptoQuoteAsset(symbol) }
+  return {
+    candles: months ? aggregateMonths(candles, months) : candles,
+    currency: cryptoQuoteAsset(symbol),
+    provider: 'binance'
+  }
 }
 
 /** Live bars for a crypto chart. */

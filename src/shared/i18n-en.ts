@@ -786,5 +786,10 @@ export const EN: Record<string, string> = {
   'herunterladen': 'download',
   'Du hast die neueste Version.': 'You have the latest version.',
   'GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“': 'GitHub – checking for new versions, only when turned on in the settings (once a day) or when you click “Check for updates”',
-  'Installiert: {v}': 'Installed: {v}'
+  'Installiert: {v}': 'Installed: {v}',
+  'Ungültiger Zeitpunkt': 'Invalid time',
+  'Lade ältere Kerzen …': 'Loading older candles…',
+  'Keine älteren Daten': 'No older data',
+  'Grenze von 10.000 Kerzen erreicht': 'Limit of 10,000 candles reached',
+  'Ältere Kerzen konnten nicht geladen werden': 'Could not load older candles'
 }

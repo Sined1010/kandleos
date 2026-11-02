@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { aggregate } from '../shared/candles'
+import { firstWhole, sectionWindow } from '../shared/history'
 import { t } from '../shared/i18n'
 import { phaseAt } from '../shared/market'
 import { cleanName } from '../shared/names'
@@ -134,13 +135,14 @@ const DAYS: Record<Timeframe, number> = {
 
 const toCandle = (b: any): Candle => ({ time: Date.parse(b.t) / 1000, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v })
 
-async function bars(symbol: string, timeframe: string, start: Date, feed: 'sip' | 'iex'): Promise<Candle[]> {
+async function bars(symbol: string, timeframe: string, start: Date, feed: 'sip' | 'iex', end?: Date): Promise<Candle[]> {
   const out: Candle[] = []
   let page: string | undefined
-  // Pages of up to 10,000 bars; a few are plenty for the spans above.
+  // Pages of up to 10,000 bars, oldest first; a few are plenty for the spans above.
   for (let i = 0; i < 5; i++) {
     const d = await request(
       `${DATA}/stocks/bars?symbols=${encodeURIComponent(symbol)}&timeframe=${timeframe}&start=${start.toISOString()}` +
+        (end ? `&end=${end.toISOString()}` : '') +
         `&limit=10000&adjustment=split&feed=${feed}` +
         (page ? `&page_token=${encodeURIComponent(page)}` : '')
     )
@@ -155,16 +157,26 @@ async function bars(symbol: string, timeframe: string, start: Date, feed: 'sip' 
  * Candles from Alpaca. The free plan's full-market (SIP) data ends 15 minutes ago; for intraday charts the
  * last minutes come from IEX, the one exchange it serves in real time, and live quotes continue from there.
  */
-export async function alpacaCandles(symbol: string, tf: Timeframe, extended: boolean): Promise<CandleData> {
+export async function alpacaCandles(symbol: string, tf: Timeframe, extended: boolean, before?: number): Promise<CandleData> {
   if (!alpacaKnows(symbol)) throw notListed(symbol)
   const s = ticker(symbol)
   const intraday = TF_SECONDS[tf] < 86400
-  const start = new Date(Date.now() - DAYS[tf] * 86400_000)
+  const [from] = sectionWindow(DAYS[tf], before, Math.floor(Date.now() / 1000))!
   // Alpaca's hourly bars start on the clock hour and so mix the pre-market into the 9:00 bar. Without
   // extended hours, hours are built from half hours that start with the session at 9:30.
   const hourly = intraday && !extended && TF_SECONDS[tf] >= 3600
   const timeframe = hourly ? '30Min' : TIMEFRAME[tf]
-  let candles = await bars(s, timeframe, start, 'sip')
+  // Built bars start on their own edge, so the oldest one is whole; bars left of it are dropped below.
+  const first = hourly ? (tf === '1h' ? firstWhole(from, 3600, 1800) : firstWhole(from, TF_SECONDS[tf])) : from
+  // A section reaches through the bar at `before` (see prependOlder), built hours half an hour further:
+  // the hour starting at :30 needs the half hour after its bucket's edge too.
+  const end = before === undefined ? undefined : new Date((before + TF_SECONDS[tf] + (hourly ? 1800 : 0)) * 1000 - 1000)
+  let candles = await bars(s, timeframe, new Date(first * 1000), 'sip', end)
+  if (before !== undefined) {
+    if (!extended && intraday) candles = candles.filter((c) => phaseAt(symbol, ZONE, c.time) === 'open')
+    if (hourly) candles = build(candles, tf)
+    return { candles: candles.filter((c) => c.time >= first && c.time <= before), currency: 'USD', timezone: ZONE, provider: 'alpaca' }
+  }
   if (intraday) {
     const last = candles[candles.length - 1]
     const recent = await bars(s, timeframe, new Date(last ? last.time * 1000 : Date.now() - 3600_000), 'iex').catch(
@@ -180,12 +192,14 @@ export async function alpacaCandles(symbol: string, tf: Timeframe, extended: boo
     if (!extended) candles = candles.filter((c) => phaseAt(symbol, ZONE, c.time) === 'open')
   }
   if (!candles.length) throw new Error(t('Keine Kursdaten für {symbol}', { symbol }))
-  if (hourly) {
-    // Hours from 9:30 (a half-hour offset from the clock), then 2h/4h from those like the other sources.
-    candles = aggregate(candles, 3600, 1800)
-    if (tf !== '1h') candles = aggregate(candles, TF_SECONDS[tf])
-  }
-  return { candles, currency: 'USD', timezone: ZONE }
+  if (hourly) candles = build(candles, tf).filter((c) => c.time >= first)
+  return { candles, currency: 'USD', timezone: ZONE, provider: 'alpaca' }
+}
+
+/** Hours from 9:30 (a half-hour offset from the clock), then 2h/4h from those like the other sources. */
+function build(halfHours: Candle[], tf: Timeframe): Candle[] {
+  const hours = aggregate(halfHours, 3600, 1800)
+  return tf === '1h' ? hours : aggregate(hours, TF_SECONDS[tf])
 }
 
 const dayOf = (t: number) => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date(t * 1000))

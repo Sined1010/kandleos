@@ -18,9 +18,10 @@ import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
+import { HISTORY_LIMIT, mayLoadOlder, OLDER_RETRY_MS, prependOlder } from '../../../shared/history'
 import { backtest, backtestCutoffs, bandScale, forecastCandles, Q, scaleBands } from '../../../shared/forecast'
 import type { Decision } from '../../../shared/agents'
-import { locale, t } from '../../../shared/i18n'
+import { locale, msg, t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
 import {
   FORECAST_MIN_BARS,
@@ -29,7 +30,8 @@ import {
   TF_MONTHS,
   TF_SECONDS,
   tfLabel,
-  type Candle
+  type Candle,
+  type CandleProvider
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
 import { THEME } from '../lib/theme'
@@ -47,6 +49,14 @@ import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
 const FORECAST = '#ffd54f'
+// Bars left of the view at which the section before the oldest bar is loaded.
+const OLDER_MARGIN = 50
+const OLDER_HINT = {
+  loading: msg('Lade ältere Kerzen …'),
+  end: msg('Keine älteren Daten'),
+  limit: msg('Grenze von 10.000 Kerzen erreicht'),
+  error: msg('Ältere Kerzen konnten nicht geladen werden')
+}
 // Width of the analysis panel (w-[400px] in AgentsPanel).
 const AGENTS_WIDTH = 400
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
@@ -122,14 +132,67 @@ export default function ChartArea() {
   const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
   const fcRun = useRef(0)
+  // Older history loaded on scrolling left: one section at a time, from the source of the first load.
+  // `gen` changes with symbol, candle size or source, so a late section is dropped instead of prepended;
+  // `ready` waits for the first load's view, since the previous chart's scrolled-left view applies until then.
+  const older = useRef({ gen: 0, ready: false, busy: false, done: false, retryAt: 0, provider: undefined as CandleProvider | undefined })
+  const [olderHint, setOlderHint] = useState<'loading' | 'end' | 'limit' | 'error' | null>(null)
+  const hintTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  /** Scrolls to the preset's span, or to the last 150 bars when no preset is active. */
+  /** Shows a hint at the left edge; all but "loading" fade after a few seconds. */
+  const hint = (h: typeof olderHint) => {
+    clearTimeout(hintTimer.current)
+    setOlderHint(h)
+    if (h && h !== 'loading') hintTimer.current = setTimeout(() => setOlderHint(null), 4000)
+  }
+
+  const loadOlder = () => {
+    const o = older.current
+    const bars = dataRef.current
+    if (!api || !mayLoadOlder(o, Date.now()) || !bars.length) return
+    const gen = o.gen
+    o.busy = true
+    hint('loading')
+    loadCandles(symbol, timeframe, finnhubKey, extended, { before: bars[0].time, provider: o.provider })
+      .then(({ candles }) => {
+        if (gen !== older.current.gen) return
+        const merged = prependOlder(dataRef.current, candles)
+        const added = merged.length - dataRef.current.length
+        if (added <= 0) {
+          o.done = true
+          return hint('end')
+        }
+        // Keep the view where it was: logical indexes shift by the number of bars put in front.
+        const view = api.chart.timeScale().getVisibleLogicalRange()
+        api.candles.setData(merged.map(toBar))
+        api.volume.setData(merged.map(toVol))
+        if (view) api.chart.timeScale().setVisibleLogicalRange({ from: view.from + added, to: view.to + added })
+        dataRef.current = merged
+        setData([...merged])
+        o.done = merged.length >= HISTORY_LIMIT
+        hint(o.done ? 'limit' : null)
+      })
+      .catch(() => {
+        if (gen !== older.current.gen) return
+        o.retryAt = Date.now() + OLDER_RETRY_MS
+        hint('error')
+      })
+      .finally(() => {
+        if (gen === older.current.gen) o.busy = false
+      })
+  }
+  // The range subscription is made once; it always calls the current loadOlder.
+  const loadOlderRef = useRef(loadOlder)
+  loadOlderRef.current = loadOlder
+
+  /** Scrolls to the preset's span, or to the last 150 bars when no preset is active; returns the first bar shown. */
   const showRange = (bars: Candle[], id: RangeId | null) => {
-    if (!api || !bars.length) return
+    if (!api || !bars.length) return 0
     const from = id ? rangeStartIndex(bars.map((c) => c.time), id) : Math.max(0, bars.length - 150)
     // Free space right of the last bar; a few yearly bars would otherwise leave half the chart empty.
     const margin = id ? 3 : Math.min(10, Math.max(2, Math.round(bars.length / 10)))
     api.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + margin })
+    return from
   }
 
   // History + live updates for the current symbol/timeframe.
@@ -147,6 +210,9 @@ export default function ChartArea() {
       }
     })
     dataRef.current = []
+    // Month-based candles already come with all the history there is.
+    Object.assign(older.current, { gen: older.current.gen + 1, ready: false, busy: false, done: !!months, retryAt: 0, provider: undefined })
+    hint(null)
     setData([])
     api.candles.setData([])
     api.volume.setData([])
@@ -167,7 +233,7 @@ export default function ChartArea() {
     }
 
     loadCandles(symbol, timeframe, finnhubKey, extended)
-      .then(({ candles: bars, currency, timezone }) => {
+      .then(({ candles: bars, currency, timezone, provider }) => {
         if (!active) return
         if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
         const last = bars[bars.length - 1].close
@@ -185,13 +251,22 @@ export default function ChartArea() {
         })
         api.candles.setData(bars.map(toBar))
         api.volume.setData(bars.map(toVol))
-        showRange(bars, useStore.getState().range)
+        const shownFrom = showRange(bars, useStore.getState().range)
         dataRef.current = bars
         setData([...bars])
         setCurrency(currency)
         timezoneRef.current = timezone
         setExchangeZone(timezone)
         setStatus(null)
+        older.current.provider = provider
+        // The chart applies the new view on its next frame and reports the previous chart's view before it;
+        // its frame was requested first, so by this one only the new view counts.
+        requestAnimationFrame(() => {
+          if (!active) return
+          older.current.ready = true
+          // A short history may already show its left edge.
+          if (shownFrom < OLDER_MARGIN) loadOlderRef.current()
+        })
       })
       .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
 
@@ -212,6 +287,16 @@ export default function ChartArea() {
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])
+
+  // Scrolling near the oldest bar loads the section before it.
+  useEffect(() => {
+    if (!api) return
+    const onRange = (r: { from: number } | null) => {
+      if (r && r.from < OLDER_MARGIN) loadOlderRef.current()
+    }
+    api.chart.timeScale().subscribeVisibleLogicalRangeChange(onRange)
+    return () => api.chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange)
+  }, [api])
 
   // Grey background behind pre-market and after-hours candles. Rebuilt when bars are added, not on every tick.
   useEffect(() => {
@@ -424,12 +509,14 @@ export default function ChartArea() {
   }, [forecastRun.horizon, forecastRun.backtestRuns, forecastRun.calibrate])
 
   // Automatic refresh: a new candle has begun, so the shown forecast is recomputed over the new history.
-  const barCount = useRef(0)
+  // Keyed on the newest bar, not the count: older bars loaded in front change nothing about the forecast.
+  const newest = data[data.length - 1]?.time ?? 0
+  const lastNewest = useRef(0)
   useEffect(() => {
-    const grew = barCount.current > 0 && data.length > barCount.current
-    barCount.current = data.length
+    const grew = lastNewest.current > 0 && newest > lastNewest.current
+    lastNewest.current = newest
     if (grew && forecastRun.autoUpdate && fc.state === 'shown') void runForecast(true)
-  }, [data.length])
+  }, [newest])
 
   // Draws a computed forecast the way the forecast settings say; a settings change only redraws.
   useEffect(() => {
@@ -679,6 +766,11 @@ export default function ChartArea() {
         )}
         {status && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
+        )}
+        {olderHint && !status && (
+          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded-md border border-line bg-panel/80 px-2 py-1 text-xs text-muted backdrop-blur">
+            {t(OLDER_HINT[olderHint])}
+          </div>
         )}
         <AgentsPanel
           open={agentsOpen}

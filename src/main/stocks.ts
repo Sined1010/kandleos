@@ -7,6 +7,7 @@ import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
 import { aggregate, aggregateMonths } from '../shared/candles'
+import { firstWhole, sectionWindow } from '../shared/history'
 import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
 import {
   alpacaKnows,
@@ -18,7 +19,9 @@ import {
   TF_SECONDS,
   type Candle,
   type CandleData,
+  type CandleProvider,
   type CompanyInfo,
+  type OlderRequest,
   type Quote,
   type SearchResult,
   type StockSource,
@@ -68,21 +71,36 @@ const sourceOff = () =>
   new Error(t('Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.'))
 
 // 2h/4h are built from hourly bars, quarters, half-years and years from monthly bars (see stockCandles).
-const YAHOO: Record<Timeframe, [interval: string, range: string]> = {
-  '1m': ['1m', '5d'],
-  '5m': ['5m', '1mo'],
-  '15m': ['15m', '1mo'],
-  '30m': ['30m', '1mo'],
-  '1h': ['60m', '6mo'],
-  '2h': ['60m', '1y'],
-  '4h': ['60m', '1y'],
-  '1D': ['1d', '5y'],
-  '1W': ['1wk', '10y'],
-  '1M': ['1mo', 'max'],
-  '3M': ['1mo', 'max'],
-  '6M': ['1mo', 'max'],
-  '12M': ['1mo', 'max']
+// The first load asks for Yahoo's own range (counted on its clock, in sessions); each older section for
+// `days` days (0 = all).
+const YAHOO: Record<Timeframe, [interval: string, range: string, days: number]> = {
+  '1m': ['1m', '5d', 5],
+  '5m': ['5m', '1mo', 30],
+  '15m': ['15m', '1mo', 30],
+  '30m': ['30m', '1mo', 30],
+  '1h': ['60m', '6mo', 182],
+  '2h': ['60m', '1y', 365],
+  '4h': ['60m', '1y', 365],
+  '1D': ['1d', '5y', 1826],
+  '1W': ['1wk', '10y', 3652],
+  '1M': ['1mo', 'max', 0],
+  '3M': ['1mo', 'max', 0],
+  '6M': ['1mo', 'max', 0],
+  '12M': ['1mo', 'max', 0]
 }
+// Yahoo refuses intraday spans reaching further back than this many days (HTTP 422).
+const YAHOO_CAP: Record<string, number> = { '1m': 8, '5m': 60, '15m': 60, '30m': 60, '60m': 730 }
+
+/**
+ * End of a section that reaches through the bar at `before`: a section's first bar may be cut at its
+ * start, so the next older section brings a whole copy of it (see prependOlder). Yahoo leaves out bars
+ * that end after period2, and an hour starting at :30 ends past its 2h/4h bucket, so one bar size more is
+ * asked for; finish() drops what lies past `before`.
+ */
+const through = (before: number, tf: Timeframe) => before + 2 * TF_SECONDS[tf]
+
+/** 2h/4h are built from hours: starting on a bucket edge keeps the oldest bar whole. */
+const aligned = (from: number, tf: Timeframe) => (tf === '2h' || tf === '4h' ? firstWhole(from, TF_SECONDS[tf]) : from)
 const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
   '1m': ['1', 5],
   '5m': ['5', 30],
@@ -176,13 +194,16 @@ function checkArgs(symbol: unknown, key: unknown): [string, string] {
 // The key goes in a header, not the URL, so it never shows up in proxy or server logs.
 const finnhubAuth = (key: string) => ({ 'X-Finnhub-Token': key })
 
-async function finnhubCandles(symbol: string, tf: Timeframe, key: string): Promise<Candle[]> {
+async function finnhubCandles(symbol: string, tf: Timeframe, key: string, before?: number): Promise<Candle[]> {
   const [res, days] = FINNHUB[tf]
-  const to = Math.floor(Date.now() / 1000)
+  const [from, to] = sectionWindow(days, before, Math.floor(Date.now() / 1000))!
   const d = await getJson(
-    `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${res}&from=${to - days * 86400}&to=${to}`,
+    `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${res}` +
+      `&from=${aligned(from, tf)}&to=${before === undefined ? to : through(before, tf)}`,
     finnhubAuth(key)
   )
+  // At the start of its history Finnhub answers "no_data".
+  if (before !== undefined && d.s === 'no_data') return []
   if (d.s !== 'ok') throw new Error(`Finnhub: ${d.s ?? d.error}`)
   return d.t.map((t: number, i: number) => ({
     time: t,
@@ -205,15 +226,25 @@ function validTimeZone(tz: unknown): string | undefined {
   }
 }
 
-async function yahooCandles(symbol: string, tf: Timeframe, extended = false): Promise<CandleData> {
-  const [interval, range] = YAHOO[tf]
-  // With range=max Yahoo silently coarsens long histories (monthly becomes quarterly); an explicit span does not.
-  const span = range === 'max' ? `period1=0&period2=${Math.floor(Date.now() / 1000)}` : `range=${range}`
+async function yahooCandles(symbol: string, tf: Timeframe, extended = false, before?: number): Promise<CandleData> {
+  const [interval, range, days] = YAHOO[tf]
+  const now = Math.floor(Date.now() / 1000)
+  let span: string
+  if (before === undefined) {
+    // With range=max Yahoo silently coarsens long histories (monthly becomes quarterly); an explicit span does not.
+    span = range === 'max' ? `period1=0&period2=${now}` : `range=${range}`
+  } else {
+    // Older sections end at a bar's time, not the local clock (which may be off); only Yahoo's cap uses it.
+    const window = sectionWindow(days, before, now, YAHOO_CAP[interval])
+    if (!window) return { candles: [], currency: '', provider: 'yahoo' }
+    span = `period1=${aligned(window[0], tf)}&period2=${through(before, tf)}`
+  }
   const d = await getJson(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&${span}` +
       (extended ? '&includePrePost=true' : '')
   )
   const r = d.chart?.result?.[0]
+  if (before !== undefined && !r?.timestamp) return { candles: [], currency: '', provider: 'yahoo' }
   if (!r?.timestamp) throw new Error(t('Keine Kursdaten für {symbol}', { symbol }))
   const q = r.indicators.quote[0]
   const out: Candle[] = []
@@ -226,7 +257,7 @@ async function yahooCandles(symbol: string, tf: Timeframe, extended = false): Pr
   // Weekly and monthly data end with an extra bar stamped "now" holding only today's trading, while the
   // running week's or month's bar already includes it; keeping both would show the period twice.
   const [prev, live] = out.slice(-2)
-  if (live && interval !== '1d' && !interval.endsWith('m')) {
+  if (before === undefined && live && interval !== '1d' && !interval.endsWith('m')) {
     const zone = timezone ?? 'UTC'
     const samePeriod =
       interval === '1wk'
@@ -234,20 +265,34 @@ async function yahooCandles(symbol: string, tf: Timeframe, extended = false): Pr
         : periodIndex(live.time, 1, zone) === periodIndex(prev.time, 1, zone)
     if (samePeriod) out.pop()
   }
-  return { candles: out, currency: r.meta?.currency ?? '', timezone }
+  return { candles: out, currency: r.meta?.currency ?? '', timezone, provider: 'yahoo' }
 }
 
 export async function stockCandles(
   symbolArg: unknown,
   tfArg: unknown,
   keyArg: unknown,
-  extendedArg?: unknown
+  extendedArg?: unknown,
+  olderArg?: unknown
 ): Promise<CandleData> {
   const [symbol, key] = checkArgs(symbolArg, keyArg)
   if (typeof tfArg !== 'string' || !(tfArg in YAHOO)) throw new Error(t('Ungültiger Timeframe: {tf}', { tf: String(tfArg) }))
   const tf = tfArg as Timeframe
   // Pre-market and after-hours candles exist for intraday bars only.
   const extended = extendedArg === true && TF_SECONDS[tf] < 86400
+  const older = checkOlder(olderArg)
+  if (older) {
+    // A section before the oldest bar comes from the source that sent the first one, without falling back.
+    if (older.provider === 'alpaca' && viaAlpaca(symbol)) return alpacaCandles(symbol, tf, extended, older.before)
+    const data =
+      older.provider === 'finnhub' && key && !extended && yahooOn()
+          ? { candles: await finnhubCandles(symbol, tf, key, older.before), currency: '', provider: 'finnhub' as const }
+          : older.provider === 'yahoo' && yahooOn()
+            ? await yahooCandles(symbol, tf, extended, older.before)
+            : null
+    if (!data) throw sourceOff()
+    return finish(data, tf, older.before)
+  }
   if (viaAlpaca(symbol)) return alpacaCandles(symbol, tf, extended)
   if (!yahooOn()) throw sourceOff()
   let data: CandleData | undefined
@@ -258,16 +303,37 @@ export async function stockCandles(
       const meta = await yahooMeta(symbol).catch(() => null)
       // Finnhub candles carry no exchange time zone: take Yahoo's, else derive it from the ticker suffix.
       const timezone = validTimeZone(meta?.exchangeTimezoneName) ?? timeZoneForSymbol(symbol)
-      data = { candles, currency: meta?.currency ?? '', timezone }
+      data = { candles, currency: meta?.currency ?? '', timezone, provider: 'finnhub' }
     } catch (e) {
       console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, (e as Error).message)
     }
   }
   data ??= await yahooCandles(symbol, tf, extended)
-  const months = TF_MONTHS[tf]
-  if (months && months > 1) return { ...data, candles: aggregateMonths(data.candles, months, data.timezone) }
-  return tf === '2h' || tf === '4h' ? { ...data, candles: aggregate(data.candles, TF_SECONDS[tf]) } : data
+  return finish(data, tf)
 }
+
+/** Builds the longer candle sizes from the source's bars; a section keeps only bars up to `before`. */
+function finish(data: CandleData, tf: Timeframe, before = Infinity): CandleData {
+  const months = TF_MONTHS[tf]
+  const candles =
+    months && months > 1
+      ? aggregateMonths(data.candles, months, data.timezone)
+      : tf === '2h' || tf === '4h'
+        ? aggregate(data.candles, TF_SECONDS[tf])
+        : data.candles
+  return { ...data, candles: candles.filter((c) => c.time <= before) }
+}
+
+/** The renderer's request for an older section, checked: it crosses from the window into main. */
+function checkOlder(arg: unknown): OlderRequest | undefined {
+  if (arg === undefined || arg === null) return undefined
+  const { before, provider } = arg as Partial<OlderRequest>
+  // A day of slack for a local clock that runs ahead.
+  if (typeof before !== 'number' || !Number.isFinite(before) || before <= 0 || before > Date.now() / 1000 + 86400)
+    throw new Error(t('Ungültiger Zeitpunkt'))
+  return { before, provider: PROVIDERS.includes(provider as CandleProvider) ? provider : undefined }
+}
+const PROVIDERS: CandleProvider[] = ['alpaca', 'yahoo', 'finnhub']
 
 /** Validates the key with one cheap request. Returns null if it works, otherwise a user-facing reason. */
 export async function finnhubCheck(keyArg: unknown): Promise<string | null> {

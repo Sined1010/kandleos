@@ -119,6 +119,16 @@ export interface CandleData {
   currency: string
   /** IANA time zone of the exchange (stocks only), e.g. America/New_York; drives the trading calendar. */
   timezone?: string
+  /** Source that answered; older sections are asked from the same one, so bars stay stamped alike. */
+  provider?: CandleProvider
+}
+
+export type CandleProvider = 'binance' | 'alpaca' | 'yahoo' | 'finnhub'
+
+/** A history section just before `before` (Unix seconds of the oldest loaded bar). */
+export interface OlderRequest {
+  before: number
+  provider?: CandleProvider
 }
 
 // shortcut: market is guessed from the quote-currency suffix; add an explicit market field if exotic tickers collide.
