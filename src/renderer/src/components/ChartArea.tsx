@@ -37,6 +37,7 @@ import { BandSeries, ShadeSeries } from '../lib/bandSeries'
 import { THEME } from '../lib/theme'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
+import { sessionLine } from '../lib/sessionLine'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
@@ -48,6 +49,7 @@ import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
+const SESSION_TITLE = { pre: msg('Vorbörse'), post: msg('Nachbörse'), close: msg('Schluss') }
 const FORECAST = '#ffd54f'
 // Bars left of the view at which the section before the oldest bar is loaded.
 const OLDER_MARGIN = 50
@@ -607,6 +609,23 @@ export default function ChartArea() {
     }
   }, [api, agentLevels])
 
+  // US stocks outside the regular session: the pre-/after-market price in amber, or with those candles shown the regular close.
+  const session = sessionLine(quote, extended)
+  useEffect(() => {
+    if (!api || !session) return
+    const close = session.kind === 'close'
+    const line = api.candles.createPriceLine({
+      price: session.price,
+      color: close ? '#5d6375' : '#fbbf24',
+      title: t(SESSION_TITLE[session.kind]),
+      lineStyle: close ? LineStyle.Dotted : LineStyle.Dashed,
+      lineWidth: 1,
+      axisLabelVisible: true
+    })
+    return () => api.candles.removePriceLine(line)
+    // Primitives, so the 15 s quote refresh does not rebuild an unchanged line.
+  }, [api, session?.price, session?.kind])
+
   // Value box for the forecast step under the crosshair.
   useEffect(() => {
     const result = fc.result
@@ -668,12 +687,26 @@ export default function ChartArea() {
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
         {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
         <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: agentsOpen ? AGENTS_WIDTH : 0 }} />
+        {api && currency && (
+          // In the empty corner below the price axis (the chart library has no axis title; tick labels fill the axis itself).
+          <span
+            className="absolute bottom-0 z-10 flex items-center justify-center text-[11px] font-medium text-slate-300"
+            style={{
+              right: agentsOpen ? AGENTS_WIDTH : 0,
+              width: api.chart.priceScale('right').width(),
+              height: api.chart.timeScale().height()
+            }}
+            title={t('Währung der Kurse')}
+          >
+            {MINOR_UNITS[currency] ?? currency}
+          </span>
+        )}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
         {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
-          // Wraps before the buttons at the top right (about 200 px wide, plus the 288 px summary card) instead of running under them.
-          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 515 : 215) }}
+          // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
+          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 547 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -681,11 +714,6 @@ export default function ChartArea() {
               <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
             </span>
             <QuoteChip quote={quote} />
-            {currency && (
-              <span className="rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200" title={t('Währung der Kurse')}>
-                {MINOR_UNITS[currency] ?? currency}
-              </span>
-            )}
             <MarketBadge symbol={symbol} timeZone={exchangeZone} />
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>

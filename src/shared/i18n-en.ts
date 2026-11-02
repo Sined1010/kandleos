@@ -793,5 +793,6 @@ export const EN: Record<string, string> = {
   'Grenze von 10.000 Kerzen erreicht': 'Limit of 10,000 candles reached',
   'Ältere Kerzen konnten nicht geladen werden': 'Could not load older candles',
   'Zeichnungen seit dem Speichern gehen verloren. „{name}“ wieder laden?': 'Drawings made since saving will be lost. Load “{name}” again?',
-  'Chance': 'Chance'
+  'Chance': 'Chance',
+  'Schluss': 'Close'
 }
