@@ -62,7 +62,7 @@ export function groupCharts(charts: SavedChart[], current: string, query: string
 export type LoadTarget = { kind: 'switch'; tabId: string } | { kind: 'here' } | { kind: 'new' } | { kind: 'confirm' }
 
 /**
- * Where a saved chart opens: the tab already showing it, the active tab if it has no drawings to lose,
+ * Where a saved chart opens: the tab already showing it (the active one reloads it), the active tab if it has no drawings to lose,
  * else a new tab, or – with all tabs open – the active tab after the user confirms.
  */
 export function loadTarget(
@@ -71,6 +71,8 @@ export function loadTarget(
   max: number
 ): LoadTarget {
   const open = s.tabs.find((t) => t.chartId === chart.id && t.symbol === chart.symbol)
+  // Already in the active tab: load it there again, so the saved state comes back.
+  if (open?.id === s.activeTab) return { kind: 'here' }
   if (open) return { kind: 'switch', tabId: open.id }
   const active = s.tabs.find((t) => t.id === s.activeTab)
   // The tab's drawings for the loaded symbol count too: loading would replace them unseen.

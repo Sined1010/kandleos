@@ -76,6 +76,10 @@ test('loadTarget picks the tab a saved chart opens in', () => {
     tabId: 'b'
   })
   assert.deepEqual(loadTarget(c, { tabs: one, activeTab: 'a', drawings: { 'a:BTCUSDT': [] } }, 3), { kind: 'here' })
+  // The active tab already shows it (drawings since cleared): loading again restores what was saved.
+  assert.deepEqual(loadTarget(c, { tabs: [tab('a', 'BTCUSDT', 'c1')], activeTab: 'a', drawings: { 'a:BTCUSDT': [] } }, 3), {
+    kind: 'here'
+  })
   assert.deepEqual(loadTarget(c, { tabs: [tab('a', 'ETHUSDT')], activeTab: 'a', drawings: { 'a:ETHUSDT': [hline] } }, 3), {
     kind: 'new'
   })
