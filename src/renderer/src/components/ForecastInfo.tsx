@@ -118,7 +118,7 @@ export function ForecastSummary({ result, intraday, showCheck }: {
     ...(intraday && { timeStyle: 'short' })
   })
   return (
-    <div className="w-72 rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
+    <div className="w-80 rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
       {help && <ForecastHelp onClose={() => setHelp(false)} />}
       <button
         onClick={() => setOpen(!open)}
@@ -131,6 +131,7 @@ export function ForecastSummary({ result, intraday, showCheck }: {
           title={t('Wahrscheinlichkeit für einen höheren Kurs: {p}', { p: chance(up) })}
           className="inline-flex shrink-0 items-center gap-0.5 tabular-nums text-slate-300"
         >
+          {t('Chance')}
           <ArrowUp size={12} />
           {chance(up)}
         </span>
