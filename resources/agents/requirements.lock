@@ -1,4 +1,4 @@
-# TradingAgents 0.7.0 and every dependency, pinned with hashes (installed with --require-hashes, see src/main/agents.ts).
+# TradingAgents 0.7.1 and every dependency, pinned with hashes (installed with --require-hashes, see src/main/agents.ts).
 # Regenerate after changing TRADINGAGENTS or PYTHON_VERSION there, with uv 0.12.24:
 #   echo "tradingagents @ https://github.com/TauricResearch/TradingAgents/archive/<commit>.zip" > req.in
 #   uv pip compile req.in --universal --python-version 3.13 --generate-hashes --no-header --no-annotate -o resources/agents/requirements.lock
@@ -1495,8 +1495,8 @@ tiktoken==0.14.0 \
     --hash=sha256:f3d6cf93fbe2e7117eb7bedca684216fbe328a41f0843ce34245451d8eb2df1c \
     --hash=sha256:f5e7665f6624e052e5e7f6a36919ab69279decdc976d7b16b4fa15e1897d0513 \
     --hash=sha256:f702e0aeeb6506e57687e881c59e844ebe8f0a6a097ddafe20e3ab25f387be4e
-tradingagents @ https://github.com/TauricResearch/TradingAgents/archive/e8f5503e9b86d5c2710b0c76b1f686703968c9df.zip \
-    --hash=sha256:7f07e3e636496ce69a8cfa29cc42df4850718d79a0d3260d8d5bd56ae168c8de
+tradingagents @ https://github.com/TauricResearch/TradingAgents/archive/c4544913a14ed3df5f1ed7b9e8483270ce20682a.zip \
+    --hash=sha256:d1fc7f149b0df3bd4f79f91ffd42569fda7555255bbc10eadfe0e508af625745
 truststore==0.10.5 ; sys_platform != 'emscripten' \
     --hash=sha256:30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd \
     --hash=sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c

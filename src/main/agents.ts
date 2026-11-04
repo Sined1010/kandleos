@@ -26,7 +26,7 @@ const UV_BUILDS: Partial<Record<NodeJS.Platform, { file: string; sha256: string;
     exe: 'uv'
   }
 }
-const TRADINGAGENTS = { version: '0.7.0', commit: 'e8f5503e9b86d5c2710b0c76b1f686703968c9df' }
+const TRADINGAGENTS = { version: '0.7.1', commit: 'c4544913a14ed3df5f1ed7b9e8483270ce20682a' }
 const PYTHON_VERSION = '3.13'
 
 const base = (): string => join(app.getPath('userData'), 'agents')
