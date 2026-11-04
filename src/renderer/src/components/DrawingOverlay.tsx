@@ -1,5 +1,6 @@
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { futureTimes } from '../../../shared/calendar'
 import { locale, t } from '../../../shared/i18n'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
@@ -152,7 +153,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       ].join()
       if (sig !== last) {
         last = sig
-        redraw((n) => n + 1)
+        // The chart paints in this same frame; a normal update would land one frame later and the drawings trail behind.
+        flushSync(() => redraw((n) => n + 1))
       }
       raf = requestAnimationFrame(loop)
     }
