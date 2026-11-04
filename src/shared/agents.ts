@@ -12,7 +12,7 @@ export interface Provider {
   keyEnv: string | null
   /** Where to get a key. */
   keyUrl?: string
-  /** Model choices of TradingAgents 0.7.0 (llm_clients/model_catalog.py); any other ID can be typed in. */
+  /** Model choices of TradingAgents 0.7.1 (llm_clients/model_catalog.py); any other ID can be typed in. */
   quick: string[]
   deep: string[]
 }
@@ -135,11 +135,19 @@ function field(text: string, label: string): string {
   return /^(not provided|none|n\/a)$/i.test(value) ? '' : value
 }
 
-/** First number in a value like "$360", "360.50 USD" or "1,234.5". */
+/**
+ * First number in a value like "$360", "1,234.5" or – with German texts – "123,45 €" and "1.234,56 €".
+ * The last separator is the decimal one, unless it is repeated or followed by exactly three digits
+ * after a comma ("1,234", "1.234.567"): then it groups thousands.
+ */
 function price(value: string): number | null {
-  const m = /-?\d[\d,]*(?:\.\d+)?/.exec(value)
+  const m = /-?\d[\d.,]*/.exec(value)
   if (!m) return null
-  const n = Number(m[0].replace(/,/g, ''))
+  const s = m[0].replace(/[.,]$/, '')
+  const sep = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','))
+  const c = s[sep]
+  const grouping = sep < 0 || s.split(c).length > 2 || (c === ',' && s.length - sep - 1 === 3)
+  const n = grouping ? Number(s.replace(/[.,]/g, '')) : Number(s.slice(0, sep).replace(/[.,]/g, '') + '.' + s.slice(sep + 1))
   return Number.isFinite(n) ? n : null
 }
 

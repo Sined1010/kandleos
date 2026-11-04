@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { agentsTicker, keyEnvFor, parseDecision, stageOf } from './agents.ts'
 
-// Shapes as TradingAgents 0.7.0 renders them (agents/schemas.py), German body text, English labels.
+// Shapes as TradingAgents 0.7.1 renders them (agents/schemas.py), German body text, English labels.
 const DECISION = `**Rating**: Overweight
 
 **Executive Summary**: Solide Zahlen, Rückenwind durch KI-Nachfrage.
@@ -45,6 +45,19 @@ test('parseDecision falls back to the rating line and tolerates missing fields',
   assert.equal(d.priceTarget, null)
   assert.equal(d.action, null)
   assert.equal(parseDecision('', '').rating, null)
+})
+
+test('parseDecision reads prices with decimal comma as well as thousands separators', () => {
+  const target = (v: string) => parseDecision(`**Price Target**: ${v}`, '').priceTarget
+  assert.equal(target('$360'), 360)
+  assert.equal(target('360.50 USD'), 360.5)
+  assert.equal(target('1,234.5'), 1234.5)
+  assert.equal(target('1,234 USD'), 1234)
+  assert.equal(target('123,45 EUR'), 123.45)
+  assert.equal(target('0,5 €'), 0.5)
+  assert.equal(target('1.234,56 €'), 1234.56)
+  assert.equal(target('1.234.567'), 1234567)
+  assert.equal(target('ca. 95,40 € (3 Monate)'), 95.4)
 })
 
 test('agentsTicker turns Binance pairs into Yahoo pairs and leaves stocks alone', () => {
