@@ -100,7 +100,10 @@ export async function forecast(
   })
   const q = out.quantiles.data as Float32Array
   const steps = q.length / series.length / LEVELS
+  // The model can output slightly crossing quantiles; sorted once here, bands, median and backtests all see a valid order.
   return series.map((_, b) =>
-    Array.from({ length: steps }, (_, i) => Array.from(q.subarray((b * steps + i) * LEVELS, (b * steps + i + 1) * LEVELS)))
+    Array.from({ length: steps }, (_, i) =>
+      Array.from(q.subarray((b * steps + i) * LEVELS, (b * steps + i + 1) * LEVELS)).sort((x, y) => x - y)
+    )
   )
 }
