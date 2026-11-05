@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { agentsTicker, keyEnvFor, parseDecision, stageOf } from './agents.ts'
+import { agentsTicker, decisionOf, keyEnvFor, parseDecision, parseStructured, stageOf, structuredFromBridge } from './agents.ts'
 
 // Shapes as TradingAgents 0.7.1 renders them (agents/schemas.py), German body text, English labels.
 const DECISION = `**Rating**: Overweight
@@ -58,6 +58,34 @@ test('parseDecision reads prices with decimal comma as well as thousands separat
   assert.equal(target('1.234,56 €'), 1234.56)
   assert.equal(target('1.234.567'), 1234567)
   assert.equal(target('ca. 95,40 € (3 Monate)'), 95.4)
+})
+
+test('decisionOf prefers the structured numbers and falls back to the text', () => {
+  const reports = { decision: DECISION.replace('$360.50', '123,45 EUR'), trader: TRADER }
+  assert.deepEqual(decisionOf(reports, 'Overweight'), parseDecision(reports.decision, reports.trader, 'Overweight'))
+  const d = decisionOf(reports, 'Overweight', {
+    decision: { rating: 'Buy', priceTarget: 360.5, timeHorizon: null },
+    trader: { action: null, entryPrice: null, stopLoss: 320 }
+  })
+  assert.equal(d.rating, 'Buy')
+  assert.equal(d.priceTarget, 360.5)
+  assert.equal(d.horizon, '3-6 Monate') // null keeps the text
+  assert.equal(d.action, 'Buy')
+  assert.equal(d.entry, 338.2)
+  assert.equal(d.stopLoss, 320)
+})
+
+test('structuredFromBridge keeps only valid numbers and ratings', () => {
+  assert.deepEqual(
+    structuredFromBridge({ decision: { rating: 'Buy', price_target: 123.4, time_horizon: '3 months' }, trader: { action: 'Sell', entry_price: -1, stop_loss: NaN } }),
+    { decision: { rating: 'Buy', priceTarget: 123.4, timeHorizon: '3 months' }, trader: { action: 'Sell', entryPrice: null, stopLoss: null } }
+  )
+  assert.deepEqual(structuredFromBridge({ decision: { rating: 'Moon', price_target: '5' } }), {
+    decision: { rating: null, priceTarget: null, timeHorizon: null }
+  })
+  assert.equal(structuredFromBridge(null), undefined)
+  assert.equal(structuredFromBridge({}), undefined)
+  assert.deepEqual(parseStructured({ trader: { action: 'Hold', entryPrice: 5, stopLoss: null } }), { trader: { action: 'Hold', entryPrice: 5, stopLoss: null } })
 })
 
 test('agentsTicker turns Binance pairs into Yahoo pairs and leaves stocks alone', () => {

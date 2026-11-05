@@ -6,7 +6,8 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { agentsTicker, ANALYSTS, keyEnvFor, PROVIDERS, type ProviderId } from '../shared/agents'
+import { agentsTicker, ANALYSTS, keyEnvFor, PROVIDERS, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
+import { chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
 
@@ -220,6 +221,8 @@ export interface AgentsRequest {
   analysts: string[]
   debateRounds: number
   ollamaUrl?: string
+  /** The daily Chronos-2 forecast (its block goes to the market analyst), or why there is none. */
+  chronos?: ChronosSnapshot | ChronosSkip
 }
 
 export interface AgentsEvent {
@@ -245,6 +248,10 @@ export interface SavedAnalysis {
   rating: string
   reports: Record<string, string>
   stats: { calls: number; tokensIn: number; tokensOut: number }
+  /** What the analysis saw of Chronos-2; missing in analyses from before the link. */
+  chronos?: ChronosSnapshot | ChronosSkip
+  /** Price target, entry and stop as numbers, when the models gave structured results. */
+  structured?: Structured
 }
 
 function checkRequest(req: unknown): AgentsRequest {
@@ -265,7 +272,8 @@ function checkRequest(req: unknown): AgentsRequest {
     r.debateRounds <= 3 &&
     (r.ollamaUrl === undefined || /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl))
   if (!ok) throw new Error(t('Ungültige Anfrage für die Analyse'))
-  return r
+  // An unusable forecast does not refuse the analysis; it runs without Chronos and says so.
+  return { ...r, chronos: r.chronos === undefined ? undefined : chronosOrSkip(r.chronos) }
 }
 
 const resultsDir = (symbol: string): string => join(base(), 'results', symbol.replace(/[^A-Z0-9.=^-]/gi, '_'))
@@ -293,13 +301,13 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
   if (req.provider === 'ollama' && req.ollamaUrl) env.OLLAMA_BASE_URL = req.ollamaUrl.replace(/\/?$/, '').replace(/(\/v1)?$/, '/v1')
   const started = Date.now()
 
-  const result = await new Promise<{ rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats'] }>(
+  const result = await new Promise<{ rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats']; structured?: unknown }>(
     (resolve, reject) => {
       const child = spawn(venvPython(), [runner()], { env, cwd: workDir, windowsHide: true })
       current = child
       const stderr: string[] = []
       let error = ''
-      let done: { rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats'] } | null = null
+      let done: { rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats']; structured?: unknown } | null = null
       let buffer = ''
       child.stdout.on('data', (chunk: Buffer) => {
         buffer += chunk.toString('utf8')
@@ -338,6 +346,8 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
           quickModel: req.quickModel,
           analysts: req.analysts,
           debateRounds: req.debateRounds,
+          // Only the market analyst reads it (see the bridge); empty when there is no forecast.
+          chronosContext: req.chronos && 'block' in req.chronos ? req.chronos.block : '',
           // TradingAgents writes its reports in the interface language.
           language: getLang() === 'de' ? 'German' : 'English',
           workDir: workDir.replace(/\\/g, '/')
@@ -357,7 +367,11 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
     deepModel: req.deepModel,
     quickModel: req.quickModel,
     analysts: req.analysts,
-    ...result
+    rating: result.rating,
+    reports: result.reports,
+    stats: result.stats,
+    ...(req.chronos && { chronos: req.chronos }),
+    ...(structuredFromBridge(result.structured) && { structured: structuredFromBridge(result.structured) })
   }
   await saveAnalysis(saved)
   return saved

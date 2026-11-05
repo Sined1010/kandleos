@@ -20,7 +20,7 @@ import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
 import { applyBackup, exportBackup, pickBackup } from './backup'
-import { forecast } from './forecast'
+import { forecast, modelReady } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
 import {
   companyInfo,
@@ -104,6 +104,7 @@ ipcMain.handle('forecast:run', (e, series, groups) => {
     if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))
   })
 })
+ipcMain.handle('forecast:model-ready', () => modelReady())
 // Forecast archive (see archiveFile.ts); every input is checked there.
 ipcMain.handle('archive:add', (_e, entry) => archive().add(entry))
 ipcMain.handle('archive:due', (_e, symbol) => archive().due(typeof symbol === 'string' ? symbol : undefined))

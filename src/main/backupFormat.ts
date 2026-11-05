@@ -2,7 +2,8 @@
 // A backup may come from someone else, so everything read from it is checked here before backup.ts writes it.
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import type { SavedAnalysis } from './agents'
-import { keyEnvFor, PROVIDERS, type ProviderId } from '../shared/agents.ts'
+import { keyEnvFor, parseStructured, PROVIDERS, type ProviderId } from '../shared/agents.ts'
+import { parseChronos } from '../shared/chronosLink.ts'
 import { t } from '../shared/i18n.ts'
 import { ALPACA_KEY_RE, FINNHUB_KEY_RE, SYMBOL_RE } from '../shared/types.ts'
 
@@ -151,7 +152,10 @@ export function checkAnalysis(v: unknown): SavedAnalysis | null {
     analysts: analysts as string[],
     rating,
     reports: { ...(reports as Record<string, string>) },
-    stats: { calls: stats.calls as number, tokensIn: stats.tokensIn as number, tokensOut: stats.tokensOut as number }
+    stats: { calls: stats.calls as number, tokensIn: stats.tokensIn as number, tokensOut: stats.tokensOut as number },
+    // Since the Chronos link: optional, checked one by one; a broken one drops only that field.
+    ...(parseChronos(v.chronos) && { chronos: parseChronos(v.chronos) }),
+    ...(parseStructured(v.structured) && { structured: parseStructured(v.structured) })
   }
 }
 

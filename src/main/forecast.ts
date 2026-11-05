@@ -50,6 +50,9 @@ async function download(onProgress: (share: number) => void): Promise<void> {
   }
 }
 
+/** The model file is there in full, so a forecast needs no download first. */
+export const modelReady = (): Promise<boolean> => stat(modelFile()).then((s) => s.size === MODEL.bytes, () => false)
+
 let session: Promise<InferenceSession> | null = null
 
 function getSession(onProgress: (share: number) => void): Promise<InferenceSession> {

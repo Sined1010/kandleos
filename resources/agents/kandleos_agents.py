@@ -3,7 +3,7 @@
 Reads one JSON request on stdin and writes JSON lines on stdout:
   {"event": "step", "node": "...", "calls": n, "tokensIn": n, "tokensOut": n}   an agent called its model
   {"event": "tool", "node": "...", "name": "..."}                              an agent used a data tool
-  {"event": "done", "rating": "...", "reports": {...}, "stats": {...}}         the finished analysis
+  {"event": "done", "rating": "...", "reports": {...}, "structured": {...}, "stats": {...}}   the finished analysis
   {"event": "error", "message": "..."}                                         the run failed
 API keys come from the environment (set by KandleOS from its encrypted key store), never from the request.
 Library logging goes to stderr, which KandleOS keeps for error messages.
@@ -22,6 +22,65 @@ def emit(event: dict) -> None:
     with _lock:
         sys.stdout.write(json.dumps(event, ensure_ascii=False) + "\n")
         sys.stdout.flush()
+
+
+def install_chronos(context: str, setup_module: Any = None) -> None:
+    """Shows KandleOS' framed Chronos-2 forecast to the market analyst only, after its instrument context.
+
+    The graph builds the analyst through this module attribute when it is constructed, so it must be called
+    before TradingAgentsGraph(...). The other agents keep the unchanged context; the analyst's subgraph only
+    returns its report, so the changed context never reaches them.
+    """
+    from tradingagents.agents.context import get_instrument_context_from_state
+
+    if setup_module is None:
+        import tradingagents.graph.setup as setup_module
+    original = getattr(setup_module, "create_market_analyst", None)
+    if original is None:
+        # A silent run without Chronos would look like one with it: fail instead.
+        raise RuntimeError("TradingAgents changed: market analyst hook missing")
+
+    def create_market_analyst(llm: Any) -> Any:
+        node = original(llm)
+
+        def market_analyst_with_chronos(state: dict) -> Any:
+            return node({**state, "instrument_context": get_instrument_context_from_state(state) + "\n\n" + context})
+
+        return market_analyst_with_chronos
+
+    setup_module.create_market_analyst = create_market_analyst
+
+
+def capture_structured() -> dict:
+    """Keeps the Portfolio Manager's and the Trader's typed results before TradingAgents renders them as text.
+
+    Their nodes look these render functions up in their own modules when they run, so replacing the imported
+    names is enough. A model without structured output never calls them; then the result has no numbers and
+    KandleOS reads the text as before.
+    """
+    import tradingagents.agents.managers.portfolio_manager as pm
+    import tradingagents.agents.trader.trader as trader
+
+    captured: dict = {}
+
+    def wrap(module: Any, name: str, key: str, fields: tuple) -> None:
+        original = getattr(module, name, None)
+        if original is None:
+            return
+
+        def render(obj: Any) -> Any:
+            try:
+                data = obj.model_dump(mode="json")
+                captured[key] = {field: data.get(field) for field in fields}
+            except Exception:  # noqa: BLE001 - the numbers are a bonus, the text must always come through
+                pass
+            return original(obj)
+
+        setattr(module, name, render)
+
+    wrap(pm, "render_pm_decision", "decision", ("rating", "price_target", "time_horizon"))
+    wrap(trader, "render_trader_proposal", "trader", ("action", "entry_price", "stop_loss"))
+    return captured
 
 
 def main() -> int:
@@ -89,6 +148,10 @@ def main() -> int:
     })
 
     progress = Progress()
+    chronos = request.get("chronosContext") or ""
+    if chronos and "market" in request["analysts"]:
+        install_chronos(chronos)
+    structured = capture_structured()
     graph = TradingAgentsGraph(selected_analysts=tuple(request["analysts"]), config=config, callbacks=[progress])
     state, rating = graph.propagate(request["ticker"], request["date"], asset_type=request.get("assetType", "stock"))
 
@@ -114,6 +177,7 @@ def main() -> int:
             "trader": text("trader_investment_plan"),
             "risk": history("risk_debate_state"),
         },
+        "structured": structured,
         "stats": {"calls": progress.calls, "tokensIn": progress.tokens_in, "tokensOut": progress.tokens_out},
     })
     return 0

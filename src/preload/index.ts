@@ -70,6 +70,8 @@ const api = {
     summary: (key?: string): Promise<Record<string, SummaryRow>> => ipcRenderer.invoke('archive:summary', key),
     clear: (): Promise<void> => ipcRenderer.invoke('archive:clear')
   },
+  /** Whether the forecast model is downloaded already (about 480 MB otherwise). */
+  modelReady: (): Promise<boolean> => ipcRenderer.invoke('forecast:model-ready'),
   /** Model download progress in percent; returns an unsubscribe function. */
   onForecastProgress: (cb: (pct: number) => void): (() => void) => listen('forecast:progress', cb),
   /** Comprehensive analysis with TradingAgents: setup, keys (stored encrypted, only their presence comes back), runs. */

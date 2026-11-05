@@ -901,9 +901,6 @@ export default function ChartArea() {
           setupOpen={agentsSetup}
           symbol={symbol}
           price={quote?.price ?? data[data.length - 1]?.close}
-          chronos={
-            fc.result ? { value: fc.result.steps[fc.result.steps.length - 1][Q.median], steps: fc.result.steps.length } : null
-          }
           onClose={() => setAgentsOpen(false)}
           onSetup={() => setAgentsSetup(true)}
           onLevels={setAgentLevels}

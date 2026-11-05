@@ -151,6 +151,61 @@ function price(value: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** The Portfolio Manager's and the Trader's results as numbers, taken before TradingAgents renders them. */
+export interface Structured {
+  decision?: { rating: Rating | null; priceTarget: number | null; timeHorizon: string | null }
+  trader?: { action: 'Buy' | 'Hold' | 'Sell' | null; entryPrice: number | null; stopLoss: number | null }
+}
+
+const positive = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const short = (v: unknown): string | null => (typeof v === 'string' && v.length <= 200 ? v : null)
+const ACTIONS = ['Buy', 'Hold', 'Sell'] as const
+
+/** Checks structured results (as saved, camelCase); invalid values become null, nothing usable gives undefined. */
+export function parseStructured(v: unknown): Structured | undefined {
+  if (!isObj(v)) return undefined
+  const out: Structured = {}
+  const d = v.decision
+  const tr = v.trader
+  if (isObj(d))
+    out.decision = {
+      rating: RATINGS.find((r) => r === d.rating) ?? null,
+      priceTarget: positive(d.priceTarget),
+      timeHorizon: short(d.timeHorizon)
+    }
+  if (isObj(tr))
+    out.trader = { action: ACTIONS.find((a) => a === tr.action) ?? null, entryPrice: positive(tr.entryPrice), stopLoss: positive(tr.stopLoss) }
+  return out.decision || out.trader ? out : undefined
+}
+
+/** The bridge's snake_case results (TradingAgents' field names), checked. */
+export function structuredFromBridge(v: unknown): Structured | undefined {
+  if (!isObj(v)) return undefined
+  const d = isObj(v.decision) ? v.decision : undefined
+  const tr = isObj(v.trader) ? v.trader : undefined
+  return parseStructured({
+    ...(d && { decision: { rating: d.rating, priceTarget: d.price_target, timeHorizon: d.time_horizon } }),
+    ...(tr && { trader: { action: tr.action, entryPrice: tr.entry_price, stopLoss: tr.stop_loss } })
+  })
+}
+
+/** The decision of a saved analysis: structured values where TradingAgents gave them, the text otherwise. */
+export function decisionOf(reports: Record<string, string>, rating: string, structured?: Structured): Decision {
+  const d = parseDecision(reports.decision ?? '', reports.trader ?? '', rating)
+  const p = structured?.decision
+  const tr = structured?.trader
+  return {
+    ...d,
+    rating: p?.rating ?? d.rating,
+    priceTarget: p?.priceTarget ?? d.priceTarget,
+    horizon: p?.timeHorizon ?? d.horizon,
+    action: tr?.action ?? d.action,
+    entry: tr?.entryPrice ?? d.entry,
+    stopLoss: tr?.stopLoss ?? d.stopLoss
+  }
+}
+
 /** Reads the Portfolio Manager's decision and the Trader's proposal (TradingAgents' rendered markdown). */
 export function parseDecision(decision: string, trader: string, rating?: string): Decision {
   // Rating and action are one word; whatever follows on later lines is not part of them.

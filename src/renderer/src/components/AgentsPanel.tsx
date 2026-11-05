@@ -1,6 +1,8 @@
 import { BrainCircuit, Check, Circle, Loader2, Settings2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { parseDecision, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { decisionOf, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
+import { compareWithChronos, readWeighting, type ChronosSkip, type ChronosSnapshot } from '../../../shared/chronosLink'
+import { dailyForecast } from '../services/dailyForecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
 import { renderMarkdown } from '../lib/markdown'
@@ -48,9 +50,83 @@ ${message}` : message
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 const thousands = (n: number) => n.toLocaleString(locale())
 
+const SKIP = {
+  history: msg('zu wenig Tageshistorie für eine Prognose'),
+  load: msg('Tageskurse ließen sich nicht laden'),
+  model: msg('das Prognosemodell lief nicht'),
+  declined: msg('ohne Prognosemodell gestartet')
+} as const
+const LEVEL = { low: msg('gering'), medium: msg('mittel'), high: msg('hoch') } as const
+const TREND = { up: msg('eher steigend'), down: msg('eher fallend'), flat: msg('keine klare Richtung') } as const
+const ZONE = {
+  below: msg('unter dem 90 %-Bereich'),
+  in90: msg('im 90 %-Bereich'),
+  in80: msg('im 80 %-Bereich'),
+  in50: msg('im 50 %-Bereich'),
+  above: msg('über dem 90 %-Bereich')
+} as const
+const pct = (v: number) => `${(v * 100).toLocaleString(locale(), { maximumFractionDigits: 0 })} %`
+
+/** Fixed comparison of a saved analysis with the daily Chronos-2 forecast it was given; no language model involved. */
+function ChronosBox({ chronos, decision, analysis }: { chronos: ChronosSnapshot | ChronosSkip; decision: Decision; analysis: Saved }) {
+  if ('skipped' in chronos)
+    return <p className="mx-3 mt-2 text-muted">{t('Ohne Chronos-Abgleich: {reason}.', { reason: t(SKIP[chronos.skipped]) })}</p>
+  const c = compareWithChronos(chronos, decision)
+  const w = readWeighting(analysis.reports.market ?? '')
+  const check = chronos.check
+  return (
+    <div
+      className="mx-3 mt-2 space-y-0.5 rounded-lg bg-bg p-2 ring-1 ring-line"
+      title={t('Fester Vergleich ohne Sprachmodell: die Einschätzung der Agenten gegen die tägliche Chronos-2-Prognose, die nur der Markt-Analyst samt Rückblick gesehen hat.')}
+    >
+      <p className="font-semibold text-slate-200">{t('Abgleich mit Chronos-2')}</p>
+      <p>
+        {!analysis.analysts.includes('market')
+          ? t('Markt-Analyst nicht gewählt: Chronos ging nicht in die Analyse ein.')
+          : w
+            ? t('Markt-Analyst: Chronos {level} gewichtet – {reason}', { level: t(LEVEL[w.level]), reason: w.reason })
+            : t('Markt-Analyst: Gewichtung nicht angegeben')}
+      </p>
+      <p className={c.direction === 'contradict' ? 'text-orange-400' : ''}>
+        {t('Richtung: Chronos {trend}', { trend: t(TREND[c.chronos]) })} ·{' '}
+        {c.direction === 'agree' ? t('passt zur Einschätzung') : c.direction === 'contradict' ? t('widerspricht der Einschätzung') : t('kein klarer Vergleich')}
+      </p>
+      {c.target && (
+        <p>
+          {t('Kursziel {zone} · {p} Chance, dass der Kurs nach {n} Handelstagen darüber liegt', {
+            zone: t(ZONE[c.target.zone]),
+            p: pct(c.target.above),
+            n: chronos.steps
+          })}
+        </p>
+      )}
+      {c.stop && (
+        <p>
+          {t('Stop-Loss: {p} Chance, dass der Kurs am Ende des Zeitraums darunter liegt (ob er zwischendurch berührt wird, sagt Chronos nicht; der Stop stützt sich teils auf den Marktbericht)', { p: pct(c.stop.below) })}
+        </p>
+      )}
+      <p className={check && check.skill < 0 ? 'text-orange-400' : 'text-muted'}>
+        {check
+          ? t('Tages-Prognose: {runs} Rückblicke, im 80 %-Bereich {in80}', { runs: check.runs, in80: pct(check.inside80) }) +
+            ' · ' +
+            (check.skill >= 0 ? t('{p} genauer als „unverändert“', { p: pct(check.skill) }) : t('{p} ungenauer als „unverändert“', { p: pct(-check.skill) }))
+          : t('Tages-Prognose ohne Rückblick (zu wenig Historie)')}
+      </p>
+      <p className="text-[11px] text-muted/80">
+        {t('Stand {date} · {pair} · Tageskerzen', { date: new Date(chronos.asOf * 1000).toLocaleDateString(locale()), pair: chronos.pair })}
+        {chronos.factor ? ' · ' + t('Bänder ×{f} kalibriert', { f: chronos.factor.toLocaleString(locale(), { maximumFractionDigits: 2 }) }) : ''}
+      </p>
+    </div>
+  )
+}
+
 interface Running {
   symbol: string
   started: number
+  /** Before the agents start: the daily forecast for the comparison is being prepared. */
+  prep?: 'candles' | 'model'
+  /** Model download in percent, during the first forecast. */
+  pct?: number
   stage: number
   node: string
   tool: string
@@ -60,7 +136,7 @@ interface Running {
 }
 
 /** Side panel of the comprehensive analysis with TradingAgents: start a run, follow it, read saved results. */
-export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, onClose, onSetup, onLevels }: {
+export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, onSetup, onLevels }: {
   /** Hidden panels stay mounted, so a running analysis keeps its progress while the panel is closed. */
   open: boolean
   /** The setup dialog is open; when it closes, setup state and keys are read again. */
@@ -68,8 +144,6 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
   symbol: string
   /** Current price, for the distance to the price target. */
   price?: number
-  /** Median of a shown Chronos forecast at its last step, for comparison. */
-  chronos?: { value: number; steps: number } | null
   onClose: () => void
   onSetup: () => void
   /** Entry, stop and target of the shown analysis for the chart, or null. */
@@ -85,6 +159,12 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('decision')
   const [showLevels, setShowLevels] = useState(true)
   const [, tick] = useState(0)
+  // The forecast model is not downloaded yet: ask before a 480 MB download starts with the analysis.
+  const [askModel, setAskModel] = useState(false)
+  // Set by "Abbrechen"; checked before the agents start, since main has nothing to stop while the forecast runs.
+  const cancelled = useRef(false)
+  const finnhubKey = useStore((s) => s.finnhubKey)
+  const calibrate = useStore((s) => s.forecastRun.calibrate)
   const provider = providerById(config.provider)
   const models = modelsFor(config.provider, config.models[config.provider])
 
@@ -106,7 +186,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
 
   const shown = saved.find((a) => a.id === shownId) ?? saved[0]
   const decision = useMemo(
-    () => (shown ? parseDecision(shown.reports.decision ?? '', shown.reports.trader ?? '', shown.rating) : null),
+    () => (shown ? decisionOf(shown.reports, shown.rating, shown.structured) : null),
     [shown]
   )
   useEffect(() => {
@@ -116,10 +196,16 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
 
   const ready = status?.installed && (!provider.keyEnv || keys[provider.id])
 
-  const start = async () => {
+  /** `load`: download the model if needed; `skip`: analyse without Chronos; `ask`: ask first when it is missing. */
+  const start = async (mode: 'ask' | 'load' | 'skip' = 'ask') => {
+    if (mode === 'ask' && !(await window.api.modelReady())) return setAskModel(true)
+    setAskModel(false)
     setError('')
     const runSymbol = symbol
-    setRunning({ symbol: runSymbol, started: Date.now(), stage: 0, node: '', tool: '', calls: 0, tokensIn: 0, tokensOut: 0 })
+    cancelled.current = false
+    setRunning({ symbol: runSymbol, started: Date.now(), stage: 0, node: '', tool: '', calls: 0, tokensIn: 0, tokensOut: 0, prep: 'candles' })
+    // The first forecast downloads the model; its percent shows while the daily forecast is prepared.
+    const stopProgress = window.api.onForecastProgress((pct) => setRunning((r) => (r?.prep ? { ...r, pct } : r)))
     const stop = window.api.agents.onEvent((e) =>
       setRunning((r) => {
         if (!r) return r
@@ -136,6 +222,13 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
       })
     )
     try {
+      const chronos: ChronosSnapshot | ChronosSkip =
+        mode === 'skip'
+          ? { skipped: 'declined' }
+          : await dailyForecast(runSymbol, { finnhubKey, calibrate, onStage: (prep) => setRunning((r) => r && { ...r, prep }) })
+      // Cancelled while the forecast was prepared: the paid run must not start.
+      if (cancelled.current) throw new Error(t('Abgebrochen'))
+      setRunning((r) => r && { ...r, prep: undefined, pct: undefined })
       const result = await window.api.agents.run({
         symbol: runSymbol,
         provider: config.provider,
@@ -143,6 +236,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
         quickModel: models.quick,
         analysts: config.analysts,
         debateRounds: config.debateRounds,
+        chronos,
         ...(config.provider === 'ollama' && { ollamaUrl: config.ollamaUrl })
       })
       if (result.symbol === symbol) {
@@ -153,6 +247,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
     } catch (e) {
       setError(errorText(e))
     } finally {
+      stopProgress()
       stop()
       setRunning(null)
     }
@@ -189,6 +284,16 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                 time: clock(Math.round((Date.now() - running.started) / 1000))
               })}
             </p>
+            {running.prep && (
+              <p className="mb-2 flex items-center gap-2 text-slate-200">
+                <Loader2 size={14} className="animate-spin text-accent" />
+                {running.prep === 'candles'
+                  ? t('Lade Tageskurse für den Abgleich mit Chronos-2 …')
+                  : running.pct !== undefined && running.pct < 100
+                    ? t('Lade Modell {pct} %', { pct: running.pct })
+                    : t('Tages-Prognose wird berechnet …')}
+              </p>
+            )}
             <ol className="space-y-1.5">
               {STAGES.map((s, i) => (
                 <li key={s.id} className={`flex items-center gap-2 ${i > running.stage ? 'text-muted' : 'text-slate-200'}`}>
@@ -215,7 +320,10 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
               })}
             </p>
             <button
-              onClick={() => window.api.agents.cancel()}
+              onClick={() => {
+                cancelled.current = true
+                void window.api.agents.cancel()
+              }}
               className="mt-3 rounded-lg px-3 py-1.5 text-muted ring-1 ring-line hover:text-down"
             >
               {t('Abbrechen')}
@@ -240,12 +348,31 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                   {t(provider.label)} · {models.deep} / {models.quick} ·{' '}
                   {t('{analysts} Analysten · {rounds} Debattenrunde(n)', { analysts: config.analysts.length, rounds: config.debateRounds })}
                 </p>
-                <button
-                  onClick={start}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white shadow-glow hover:brightness-110"
-                >
-                  <BrainCircuit size={15} /> {t('{symbol} analysieren', { symbol })}
-                </button>
+                {askModel ? (
+                  <div className="mt-2">
+                    <p className="text-slate-200">
+                      {t('Für den Abgleich mit Chronos-2 wird einmalig das Prognosemodell geladen (ca. 480 MB).')}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => start('load')}
+                        className="rounded-lg bg-brand px-3 py-1.5 font-semibold text-white shadow-glow hover:brightness-110"
+                      >
+                        {t('Modell jetzt laden')}
+                      </button>
+                      <button onClick={() => start('skip')} className="rounded-lg px-3 py-1.5 text-slate-200 ring-1 ring-line hover:bg-line">
+                        {t('Ohne Chronos analysieren')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => start()}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white shadow-glow hover:brightness-110"
+                  >
+                    <BrainCircuit size={15} /> {t('{symbol} analysieren', { symbol })}
+                  </button>
+                )}
                 <p className="mt-2 text-[11px] leading-snug text-muted">
                   {provider.keyEnv
                     ? t('Dauert einige Minuten und kostet beim Anbieter Guthaben. Daten bis heute; keine Anlageberatung.')
@@ -326,12 +453,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, chronos, o
                 )}
               </dl>
             )}
-            {chronos && (
-              <p className="mx-3 mt-2 text-muted" title={t('Statistische Prognose von Chronos-2 aus dem Kursverlauf, zum Vergleich')}>
-                {t('Chronos-Prognose: Median nach {steps} Kerzen {value}', { steps: chronos.steps, value: formatPrice(chronos.value) })}
-                {price ? ` (${chronos.value >= price ? '+' : ''}${((chronos.value / price - 1) * 100).toFixed(1)} %)` : ''}
-              </p>
-            )}
+            {shown.chronos && <ChronosBox chronos={shown.chronos} decision={decision} analysis={shown} />}
             <label className="mx-3 mt-2 flex w-fit cursor-pointer items-center gap-2 text-muted">
               <input type="checkbox" checked={showLevels} onChange={(e) => setShowLevels(e.target.checked)} className="accent-accent" />
               {t('Kursziel, Einstieg und Stop im Chart zeigen')}

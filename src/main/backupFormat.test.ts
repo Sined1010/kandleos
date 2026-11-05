@@ -44,6 +44,15 @@ test('a backup is parsed only when it looks like one', () => {
     assert.throws(() => parseBackup(bad), bad.slice(0, 60))
 })
 
+test('analyses keep checked Chronos and structured results; old ones stay as they are', () => {
+  assert.deepEqual(checkAnalysis(analysis), analysis)
+  const chronos = { skipped: 'declined' }
+  const structured = { decision: { rating: 'Buy', priceTarget: 200, timeHorizon: null } }
+  assert.deepEqual(checkAnalysis({ ...analysis, chronos, structured }), { ...analysis, chronos, structured })
+  // A broken extra drops only that field.
+  assert.deepEqual(checkAnalysis({ ...analysis, chronos: { skipped: 'nope' }, structured: 'x' }), analysis)
+})
+
 test('the forecast archive is optional and dropped when it is not text', () => {
   assert.equal(parseBackup(backup()).archive, undefined)
   const ok = parseBackup(backup({ archive: { archive: '{"entry":{}}\n', summary: {} } }))
