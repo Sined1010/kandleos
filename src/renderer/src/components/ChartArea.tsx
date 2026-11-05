@@ -47,7 +47,7 @@ import ForecastQuality from './ForecastQuality'
 import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
-import ForecastLoader from './ForecastLoader'
+import ForecastLoader, { BrandLoader } from './ForecastLoader'
 import FullscreenButton from './FullscreenButton'
 import { ForecastSettings, ForecastSummary, ForecastTip, type ForecastResult } from './ForecastInfo'
 import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
@@ -927,7 +927,9 @@ export default function ChartArea() {
           />
         )}
         {status && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted">
+            {/* A new symbol or candle size loading into the empty chart. */}
+            {!data.length && status === t('Lade {symbol} …', { symbol }) && <BrandLoader />}
             {/* Over candles (the phone's stored copy) the message needs a background to stay readable. */}
             {data.length ? <span className="rounded-md border border-line bg-panel/90 px-2 py-1 text-xs backdrop-blur">{status}</span> : status}
           </div>

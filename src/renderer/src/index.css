@@ -148,8 +148,9 @@ input[type='number']::-webkit-inner-spin-button {
 .fc-loader i::before {
   content: '';
   position: absolute;
-  background: #ffd54f;
-  box-shadow: 0 0 3px #ffd54f;
+  /* Amber for the forecast; the brand loader gives each candle its own colour (--c). */
+  background: var(--c, #ffd54f);
+  box-shadow: 0 0 3px var(--c, #ffd54f);
 }
 .fc-loader i::after {
   left: 0;
