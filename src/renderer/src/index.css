@@ -126,3 +126,73 @@ input[type='number']::-webkit-inner-spin-button {
   margin: 0.8em 0;
   border-color: var(--color-line);
 }
+
+/* Candle loader while the forecast is computed (ForecastLoader.tsx), after "Candle Loader" by Bilal Bostan
+   (uiverse.io, MIT). Only transform and opacity move, so the browser animates it without repainting. */
+.fc-loader {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 64px;
+  /* Fast forecasts finish before this: no flash. */
+  animation: fc-loader-in 1ms 250ms both;
+}
+.fc-loader i {
+  position: relative;
+  width: 5px;
+  height: 110%;
+  opacity: 0;
+  animation: fc-candle 2.2s calc(var(--i) * 55ms) infinite ease-in-out;
+}
+.fc-loader i::after,
+.fc-loader i::before {
+  content: '';
+  position: absolute;
+  background: #ffd54f;
+  box-shadow: 0 0 3px #ffd54f;
+}
+.fc-loader i::after {
+  left: 0;
+  width: 100%;
+  bottom: var(--b);
+  height: var(--h);
+}
+.fc-loader i::before {
+  left: 2px;
+  width: 1px;
+  bottom: var(--wb);
+  height: var(--wh);
+}
+@keyframes fc-loader-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fc-candle {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  10% {
+    opacity: 1;
+    transform: scaleY(1.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.35);
+  }
+  70% {
+    opacity: 0;
+    transform: scaleY(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fc-loader i {
+    animation: none;
+    opacity: 0.8;
+  }
+}

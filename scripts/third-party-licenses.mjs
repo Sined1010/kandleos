@@ -54,6 +54,8 @@ const out = [
   '- Umfassende Analyse (optional): TradingAgents von Tauric Research (Apache-2.0,',
   '  https://github.com/TauricResearch/TradingAgents), Python (PSF-Lizenz) und uv von Astral (MIT/Apache-2.0).',
   '  Nichts davon ist im Installer enthalten; alles wird erst beim Einrichten der Analyse heruntergeladen.',
+  '- Ladeanimation der Prognose nach „Candle Loader“ von Bilal Bostan (MIT,',
+  '  https://uiverse.io/bilal_9731/new-moose-50); Lizenztext ganz unten.',
   '',
   'Übersicht:',
   ...entries.map((e) => `- ${e.key} (${e.license})`),
@@ -63,5 +65,23 @@ for (const e of entries) {
   out.push(line, `${e.key} – ${e.license}${e.url ? ` – ${String(e.url).replace(/^git\+/, '')}` : ''}`, line, '')
   out.push(e.text ?? `(Das Paket enthält keinen eigenen Lizenztext; Lizenz laut Paketangabe: ${e.license}.)`, '')
 }
+// Adapted CSS from Uiverse (not an npm package, so its notice is kept here).
+out.push(line, 'Candle Loader (Uiverse) – MIT – https://uiverse.io/bilal_9731/new-moose-50', line, '', `MIT License
+
+Copyright (c) 2026 Bilal Bostan
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`, '')
 writeFileSync(join(root, 'resources', 'THIRD_PARTY_LICENSES.txt'), out.join('\n'))
 console.log(`THIRD_PARTY_LICENSES.txt: ${entries.length} Pakete`)

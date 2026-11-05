@@ -47,6 +47,7 @@ import ForecastQuality from './ForecastQuality'
 import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
+import ForecastLoader from './ForecastLoader'
 import FullscreenButton from './FullscreenButton'
 import { ForecastSettings, ForecastSummary, ForecastTip, type ForecastResult } from './ForecastInfo'
 import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
@@ -810,6 +811,16 @@ export default function ChartArea() {
           </span>
         )}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
+        {api && fc.state === 'loading' && data.length > 0 && (
+          <ForecastLoader
+            chart={api.chart}
+            series={api.candles}
+            time={data[data.length - 1].time}
+            price={data[data.length - 1].close}
+            right={(sideOpen ? AGENTS_WIDTH : 0) + api.chart.priceScale('right').width()}
+            bottom={api.chart.timeScale().height()}
+          />
+        )}
         {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
