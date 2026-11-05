@@ -42,8 +42,17 @@ export default function ChartTabs() {
                   // Unsaved changes to a saved chart are lost with the tab; the saved chart itself stays.
                   const { charts, drawings } = useStore.getState()
                   const saved = linkedChart(tab, charts)
-                  const changed = saved && isDirty(saved, tab.timeframe, drawings[drawingsKey({ activeTab: tab.id, symbol: tab.symbol })] ?? [])
-                  if (!changed || confirm(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }))) closeTab(tab.id)
+                  const key = drawingsKey({ activeTab: tab.id, symbol: tab.symbol })
+                  const changed = saved && isDirty(saved, tab.timeframe, drawings[key] ?? [])
+                  // All drawings of this tab (any symbol) go with it, except those kept in its saved chart.
+                  const lost = Object.entries(drawings).reduce(
+                    (n, [k, d]) => n + (k.startsWith(`${tab.id}:`) && !(saved && k === key) ? d.length : 0),
+                    0
+                  )
+                  const ok = changed
+                    ? confirm(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }))
+                    : !lost || confirm(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }))
+                  if (ok) closeTab(tab.id)
                 }}
                 aria-label={t('{name} schließen', { name })}
                 title={t('Tab schließen')}

@@ -36,6 +36,11 @@ const deleteFolder = (f: Folder) =>
   (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
   useStore.getState().removeFolder(f.id)
 
+const removeSymbol = (folderId: string, symbol: string) => {
+  const { names, removeFromFolder } = useStore.getState()
+  if (confirm(t('„{name}“ aus der Watchlist löschen?', { name: names[symbol] ?? symbol }))) removeFromFolder(folderId, symbol)
+}
+
 /** Folder menu shared by the list heading, the open folder's bar and the folder tile; only the first entry differs. */
 const folderMenu = (f: Folder, first: MenuItem, rename: () => void, add: () => void): MenuItem[] => [
   first,
@@ -291,7 +296,6 @@ function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onMov
   const setSymbol = useStore((s) => s.setSymbol)
   const addTab = useStore((s) => s.addTab)
   const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
-  const removeFromFolder = useStore((s) => s.removeFromFolder)
   const s = at.symbol
   const items: MenuItem[] = [
     { label: t('Öffnen'), run: () => setSymbol(s) },
@@ -308,7 +312,7 @@ function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onMov
     isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
     { label: t('Umbenennen'), run: at.rename },
     canMove ? { label: t('Verschieben nach …'), run: onMove } : { label: t('Verschieben nach …'), reason: t('Kein anderer Ordner') },
-    { label: t('Aus Watchlist löschen'), run: () => removeFromFolder(at.folderId, s), danger: true }
+    { label: t('Aus Watchlist löschen'), run: () => removeSymbol(at.folderId, s), danger: true }
   ]
   return <ContextMenu x={at.x} y={at.y} label={t('Aktionen für {symbol}', { symbol: s })} items={items} onClose={onClose} />
 }
@@ -381,7 +385,6 @@ function FolderSection(props: SectionProps) {
   const setSymbol = useStore((s) => s.setSymbol)
   const toggle = useStore((s) => s.toggleFolder)
   const addToFolder = useStore((s) => s.addToFolder)
-  const removeFromFolder = useStore((s) => s.removeFromFolder)
   const moveSymbol = useStore((s) => s.moveSymbol)
   const quotes = useQuotes((s) => s.quotes)
   const names = useStore((s) => s.names)
@@ -642,7 +645,7 @@ function FolderSection(props: SectionProps) {
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    removeFromFolder(f.id, s)
+                    removeSymbol(f.id, s)
                   }}
                   className="text-muted hover:text-down"
                   aria-label={t('{symbol} aus {name} entfernen', { symbol: s, name: f.name })}

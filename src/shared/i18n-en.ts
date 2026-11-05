@@ -401,6 +401,8 @@ export const EN: Record<string, string> = {
   'Symbol hinzufügen': 'Add symbol',
   'Symbol zu {name} hinzufügen': 'Add symbol to {name}',
   'Ordner „{name}“ mit {count} Symbolen löschen?': 'Delete folder “{name}” with {count} symbols?',
+  '„{name}“ aus der Watchlist löschen?': 'Remove “{name}” from the watchlist?',
+  'Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.': 'Close tab “{name}”? Its drawings ({count}) will be lost.',
   'Ordner löschen': 'Delete folder',
   '{name} löschen': 'Delete {name}',
   'Name oder Symbol': 'Name or symbol',

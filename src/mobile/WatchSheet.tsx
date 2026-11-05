@@ -72,7 +72,9 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
               items: others.map((f) => ({ label: f.name, onPick: () => s.moveSymbol(symbol, folderId, f.id) }))
             })
         },
-        { label: t('Aus Watchlist löschen'), danger: true, onPick: () => s.removeFromFolder(folderId, symbol) }
+        { label: t('Aus Watchlist löschen'), danger: true, onPick: () =>
+            confirm(t('„{name}“ aus der Watchlist löschen?', { name: s.names[symbol] ?? symbol })) && s.removeFromFolder(folderId, symbol)
+        }
       ]
     }
   }
