@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addToSummary, givenUp, parseEntry, roundSig, settleEntry, shouldArchive, slotOf, type ArchiveEntry, type SummaryRow } from './archive.ts'
+import { addToSummary, givenUp, parseEntry, roundSig, settleBefore, settleEntry, shouldArchive, slotOf, type ArchiveEntry, type SummaryRow } from './archive.ts'
 import { QUANTILES } from './forecast.ts'
 import type { Candle } from './types.ts'
 
@@ -90,6 +90,14 @@ test('givenUp drops a forecast whose source fails for more than 30 days after it
   const closed = e.times[7] + DAY
   assert.equal(givenUp(e, closed + 29 * DAY), false)
   assert.equal(givenUp(e, closed + 31 * DAY), true)
+})
+
+test('settleBefore never asks for bars from the future', () => {
+  const e = { ...entry(), timeframe: '3M' as const }
+  const last = e.times[e.times.length - 1]
+  // Settled as soon as the last 3-month bar has closed: two bars on would be half a year ahead.
+  assert.equal(settleBefore(e, last + 91 * DAY + 0.5), last + 91 * DAY)
+  assert.equal(settleBefore(entry(), last + 365 * DAY), last + 2 * DAY)
 })
 
 test('settleEntry also scores the ranges as shown when they were calibrated', () => {

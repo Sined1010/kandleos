@@ -40,7 +40,13 @@ export async function exportBackup(wc: WebContents, store: string | null, opts: 
   }
   // The archive's raw lines are capped at 20 MB, but saved analyses share the file's limit: if both together are
   // too much, only the summary goes in, so the file can still be imported.
-  if (JSON.stringify(backup, null, 1).length > MAX_BACKUP_BYTES) backup.archive!.archive = ''
+  let json = JSON.stringify(backup, null, 1)
+  if (json.length > MAX_BACKUP_BYTES) {
+    backup.archive!.archive = ''
+    json = JSON.stringify(backup, null, 1)
+  }
+  // Import refuses bigger files, so a backup that would never load back is not written at all.
+  if (json.length > MAX_BACKUP_BYTES) throw new Error(t('Die Sicherung wäre größer als 50 MB (zu viele gespeicherte Analysen).'))
   const day = backup.exportedAt.slice(0, 10)
   const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(wc)!, {
     title: t('Daten exportieren'),
@@ -48,7 +54,7 @@ export async function exportBackup(wc: WebContents, store: string | null, opts: 
     filters: FILTERS
   })
   if (canceled || !filePath) return null
-  await writeFile(filePath, JSON.stringify(backup, null, 1), 'utf8')
+  await writeFile(filePath, json, 'utf8')
   return filePath
 }
 

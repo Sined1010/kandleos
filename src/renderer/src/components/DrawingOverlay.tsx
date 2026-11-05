@@ -176,7 +176,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return
+      if ((e.target as Element).closest?.('input, textarea, select, [contenteditable="true"]')) return
       if (e.key === 'Escape') {
         setTool('cursor')
         dragRef.current = null

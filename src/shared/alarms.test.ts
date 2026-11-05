@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hit, mergeTriggered, newAlarm, type Alarm } from './alarms.ts'
+import { checkedAfter, hit, mergeTriggered, newAlarm, type Alarm } from './alarms.ts'
 
 test('newAlarm picks above or below from where the price is now', () => {
   assert.equal((newAlarm('AAPL', 230, 227) as Alarm).op, 'above')
@@ -49,4 +49,13 @@ test('a trigger from before the alarm was armed again is ignored', () => {
   const merged = mergeTriggered([rearmed], [{ id: 'a', triggeredAt: 500, triggeredPrice: 230, checkedUntil: 500 }])
   assert.equal(merged[0].triggeredAt, undefined)
   assert.equal(merged[0].checkedUntil, 900)
+})
+
+test('checkedAfter never goes back before the alarm was set', () => {
+  // Set on Saturday (500); the newest bar is Friday's last one (300), which reached the price.
+  const a = alarm({ createdAt: 500 })
+  const bars = [{ time: 300, high: 231, low: 226 }]
+  assert.equal(checkedAfter(a, 300), 500)
+  assert.equal(hit({ ...a, checkedUntil: checkedAfter(a, 300) }, bars), null)
+  assert.equal(checkedAfter(alarm({ checkedUntil: 600 }), 900), 900)
 })

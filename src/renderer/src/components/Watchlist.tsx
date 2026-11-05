@@ -127,10 +127,13 @@ export default function Watchlist() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
       // Backspace while typing edits the text, it does not navigate.
-      if (e.key === 'Backspace' && inside.current && !el.closest('input, textarea, [contenteditable="true"]')) closeFolder()
+      if (e.key !== 'Backspace' || !inside.current || el.closest('input, textarea, [contenteditable="true"]')) return
+      // Caught before the chart's listener, which would delete a drawing still selected there.
+      e.stopPropagation()
+      closeFolder()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [open])
   const drag = useRef<{ symbol: string; from: string } | null>(null)
   const setName = useStore((s) => s.setName)

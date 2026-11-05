@@ -1,5 +1,6 @@
 import { BrainCircuit, Check, Circle, Loader2, Settings2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { create } from 'zustand'
 import { decisionOf, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
 import { compareWithChronos, readWeighting, type ChronosSkip, type ChronosSnapshot } from '../../../shared/chronosLink'
 import { dailyForecast } from '../services/dailyForecast'
@@ -135,6 +136,13 @@ interface Running {
   tokensOut: number
 }
 
+// A run outlives the panel: a tab or language switch rebuilds the chart and this panel while the paid run goes on.
+// `cancelled` is set by "Abbrechen" and checked before the agents start (main has nothing to stop while the forecast runs).
+const useRun = create<{ running: Running | null; cancelled: boolean; error: string }>(() => ({ running: null, cancelled: false, error: '' }))
+const setRunning = (next: Running | null | ((r: Running | null) => Running | null)) =>
+  useRun.setState((s) => ({ running: typeof next === 'function' ? next(s.running) : next }))
+const setError = (error: string) => useRun.setState({ error })
+
 /** Side panel of the comprehensive analysis with TradingAgents: start a run, follow it, read saved results. */
 export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, onSetup, onLevels }: {
   /** Hidden panels stay mounted, so a running analysis keeps its progress while the panel is closed. */
@@ -154,15 +162,16 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
   const [keys, setKeys] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState<Saved[]>([])
   const [shownId, setShownId] = useState<string | null>(null)
-  const [running, setRunning] = useState<Running | null>(null)
-  const [error, setError] = useState('')
+  const running = useRun((s) => s.running)
+  const error = useRun((s) => s.error)
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('decision')
   const [showLevels, setShowLevels] = useState(true)
   const [, tick] = useState(0)
   // The forecast model is not downloaded yet: ask before a 480 MB download starts with the analysis.
   const [askModel, setAskModel] = useState(false)
-  // Set by "Abbrechen"; checked before the agents start, since main has nothing to stop while the forecast runs.
-  const cancelled = useRef(false)
+  // The symbol shown now, for a run that ends after the user moved on.
+  const symbolRef = useRef(symbol)
+  symbolRef.current = symbol
   const finnhubKey = useStore((s) => s.finnhubKey)
   const calibrate = useStore((s) => s.forecastRun.calibrate)
   const provider = providerById(config.provider)
@@ -174,10 +183,16 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
     window.api.agents.status().then(setStatus)
     window.api.agents.keys().then(setKeys)
   }, [config, open, setupOpen])
+  // Read again when a run ends, so its result shows up even if this panel was rebuilt meanwhile.
+  const idle = !running
+  useEffect(() => setShownId(null), [symbol])
   useEffect(() => {
-    setShownId(null)
-    window.api.agents.results(symbol).then(setSaved)
-  }, [symbol])
+    let live = true
+    window.api.agents.results(symbol).then((list) => live && setSaved(list))
+    return () => {
+      live = false
+    }
+  }, [symbol, idle])
   useEffect(() => {
     if (!running) return
     const id = setInterval(() => tick((n) => n + 1), 1000)
@@ -202,7 +217,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
     setAskModel(false)
     setError('')
     const runSymbol = symbol
-    cancelled.current = false
+    useRun.setState({ cancelled: false })
     setRunning({ symbol: runSymbol, started: Date.now(), stage: 0, node: '', tool: '', calls: 0, tokensIn: 0, tokensOut: 0, prep: 'candles' })
     // The first forecast downloads the model; its percent shows while the daily forecast is prepared.
     const stopProgress = window.api.onForecastProgress((pct) => setRunning((r) => (r?.prep ? { ...r, pct } : r)))
@@ -227,7 +242,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
           ? { skipped: 'declined' }
           : await dailyForecast(runSymbol, { finnhubKey, calibrate, onStage: (prep) => setRunning((r) => r && { ...r, prep }) })
       // Cancelled while the forecast was prepared: the paid run must not start.
-      if (cancelled.current) throw new Error(t('Abgebrochen'))
+      if (useRun.getState().cancelled) throw new Error(t('Abgebrochen'))
       setRunning((r) => r && { ...r, prep: undefined, pct: undefined })
       const result = await window.api.agents.run({
         symbol: runSymbol,
@@ -239,8 +254,8 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
         chronos,
         ...(config.provider === 'ollama' && { ollamaUrl: config.ollamaUrl })
       })
-      if (result.symbol === symbol) {
-        setSaved((list) => [result, ...list])
+      // The list itself is read again once the run has ended (above).
+      if (result.symbol === symbolRef.current) {
         setShownId(result.id)
         setTab('decision')
       }
@@ -321,7 +336,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
             </p>
             <button
               onClick={() => {
-                cancelled.current = true
+                useRun.setState({ cancelled: true })
                 void window.api.agents.cancel()
               }}
               className="mt-3 rounded-lg px-3 py-1.5 text-muted ring-1 ring-line hover:text-down"

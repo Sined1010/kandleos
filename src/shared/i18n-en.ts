@@ -908,5 +908,6 @@ export const EN: Record<string, string> = {
   'Kurs-Alarme': 'Price alarms',
   'Sofort-Alarme': 'Instant alarms',
   'Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku.': 'Check price alarms every 15 seconds instead of about every 15 minutes. While alarms are armed, Android shows a permanent notification for it; this uses more battery.',
-  'Gespeicherter Stand, keine neuen Kurse: {error}': 'Stored data, no new prices: {error}'
+  'Gespeicherter Stand, keine neuen Kurse: {error}': 'Stored data, no new prices: {error}',
+  'Die Sicherung wäre größer als 50 MB (zu viele gespeicherte Analysen).': 'The backup would be larger than 50 MB (too many saved analyses).'
 }

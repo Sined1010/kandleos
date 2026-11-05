@@ -3,7 +3,7 @@ import { alpacaCandles, alpacaName, alpacaQuotes, alpacaSearch } from './alpaca'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
-import { aggregate, aggregateMonths } from '../shared/candles'
+import { aggregate, aggregateMonths, snapLast } from '../shared/candles'
 import { firstWhole, sectionWindow } from '../shared/history'
 import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
 import {
@@ -235,7 +235,8 @@ async function yahooCandles(symbol: string, tf: Timeframe, extended = false, bef
         : periodIndex(live.time, 1, zone) === periodIndex(prev.time, 1, zone)
     if (samePeriod) out.pop()
   }
-  return { candles: out, currency: r.meta?.currency ?? '', timezone, provider: 'yahoo' }
+  const candles = before === undefined && interval.endsWith('m') ? snapLast(out, parseInt(interval) * 60) : out
+  return { candles, currency: r.meta?.currency ?? '', timezone, provider: 'yahoo' }
 }
 
 export async function stockCandles(

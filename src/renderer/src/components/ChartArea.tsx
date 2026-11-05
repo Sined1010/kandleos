@@ -461,7 +461,12 @@ export default function ChartArea() {
     }
   }, [api, symbol, timeframe])
 
-  const toggleForecast = () => (fc.state === 'shown' ? setFc({ state: 'idle' }) : runForecast())
+  const toggleForecast = () => {
+    if (fc.state !== 'shown') return void runForecast()
+    // Also stops the check still running for it.
+    fcRun.current++
+    setFc({ state: 'idle' })
+  }
 
   const archiveContext = (auto: boolean): ArchiveContext => ({
     symbol,
@@ -543,7 +548,8 @@ export default function ChartArea() {
   /** Computes the forecast; `quiet` keeps the shown one (and the view) until the new one is ready. */
   const runForecast = async (quiet = false) => {
     if (!api) return
-    const bars = dataRef.current
+    // A copy: live ticks keep changing the chart's bars while the model runs.
+    const bars = dataRef.current.slice()
     const run = ++fcRun.current
     if (!quiet) setFc({ state: 'loading' })
     const stop = quiet

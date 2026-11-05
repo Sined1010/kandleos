@@ -28,6 +28,13 @@ export function hit(a: Alarm, bars: { time: number; high: number; low: number }[
   return bar ? { time: bar.time, price: a.price } : null
 }
 
+/**
+ * Where the next check starts after looking at bars up to `newest` (the newest bar may still move, so it is
+ * looked at again). Never moves back: bars from before the alarm was set (Friday's last bar, seen on Saturday)
+ * must not count.
+ */
+export const checkedAfter = (a: Alarm, newest: number): number => Math.max(a.checkedUntil ?? a.createdAt, newest)
+
 export interface NativeTrigger {
   id: string
   triggeredAt: number

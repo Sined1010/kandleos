@@ -1,7 +1,7 @@
 // Window side of the forecast archive: hands shown forecasts to main and settles finished ones with the same
 // candle loaders the chart uses (Binance here, stocks through main).
-import { givenUp, roundSig, settleEntry, type ArchiveEntry } from '../../../shared/archive'
-import { TF_SECONDS, type CandleProvider, type Timeframe } from '../../../shared/types'
+import { givenUp, roundSig, settleBefore, settleEntry, type ArchiveEntry } from '../../../shared/archive'
+import type { CandleProvider, Timeframe } from '../../../shared/types'
 import type { ForecastResult } from '../components/ForecastInfo'
 import { useStore } from '../store/useStore'
 import { loadCandles } from './marketData'
@@ -54,9 +54,8 @@ export async function settleDue(symbol?: string): Promise<void> {
     const failed = new Set<CandleProvider>()
     for (const e of due) {
       if (failed.has(e.provider)) continue
-      const step = TF_SECONDS[e.timeframe]
       // The section just before this time ends with the last target bar.
-      const before = e.times[e.times.length - 1] + 2 * step
+      const before = settleBefore(e, Date.now() / 1000)
       let candles
       try {
         candles = (await loadCandles(e.symbol, e.timeframe, useStore.getState().finnhubKey, e.extended, { before, provider: e.provider })).candles

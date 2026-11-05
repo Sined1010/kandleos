@@ -21,8 +21,8 @@ test('SYMBOL_RE: tickers, indices, futures and pairs pass; dot names and path pa
 })
 
 test('stockRoute: Alpaca keeps US symbols, the Yahoo extra takes indices, futures, currencies and foreign listings', () => {
-  for (const s of ['AAPL', 'BRK-B', 'SPY']) assert.equal(stockRoute('alpaca', true, s), 'alpaca', s)
-  for (const s of ['^GDAXI', 'GC=F', 'EURUSD=X', 'SAP.DE']) {
+  for (const s of ['AAPL', 'BRK-B', 'BRK.B', 'SPY']) assert.equal(stockRoute('alpaca', true, s), 'alpaca', s)
+  for (const s of ['^GDAXI', 'GC=F', 'EURUSD=X', 'SAP.DE', 'BMW.F', 'VOD.L', '7203.T', 'ABC.V']) {
     assert.equal(stockRoute('alpaca', true, s), 'yahoo', s)
     assert.equal(stockRoute('alpaca', false, s), 'alpaca', s) // without the extra Alpaca answers (with "not listed")
   }

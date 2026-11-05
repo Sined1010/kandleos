@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aggregate, aggregateMonths, logicalToTime, mergeTick, timeToLogical } from './candles.ts'
+import { aggregate, aggregateMonths, logicalToTime, mergeTick, snapLast, timeToLogical } from './candles.ts'
 
 test('timeToLogical / logicalToTime round-trip inside, between and beyond bars', () => {
   const times = [100, 160, 400, 460] // gap between 160 and 400
@@ -87,4 +87,16 @@ test('drawing points right of the last candle follow the trading calendar, not n
   // That time maps back to the same place, and after-hours candles added later (19:45 UTC onward) leave it
   // right of every bar instead of pulling it into the evening.
   assert.equal(timeToLogical(axis, wed, 900), times.length - 1 + 10)
+})
+
+test('snapLast puts Yahoo\'s "now" point on the bar grid or into the bar it falls in', () => {
+  const bar = (time: number, close: number) => ({ time, open: close, high: close, low: close, close, volume: 5 })
+  // 5m bars at 14:05 and 14:10, "now" point at 14:14:30 → folded into 14:10.
+  const folded = snapLast([bar(300, 1), bar(600, 2), { ...bar(870, 3), volume: 0 }], 300)
+  assert.deepEqual(folded, [bar(300, 1), { ...bar(600, 2), high: 3, close: 3 }])
+  // A point past the next grid line moves onto it (14:16:10 → 14:15).
+  assert.deepEqual(snapLast([bar(300, 1), bar(970, 2)], 300).map((c) => c.time), [300, 900])
+  // Already on the grid: unchanged.
+  const on = [bar(300, 1), bar(600, 2)]
+  assert.equal(snapLast(on, 300), on)
 })

@@ -116,6 +116,13 @@ const inside = (real: number, q: number[], lo: number, hi: number) => real >= q[
 export const givenUp = (e: Pick<ArchiveEntry, 'times' | 'timeframe'>, now: number): boolean =>
   now - (e.times[e.times.length - 1] + TF_SECONDS[e.timeframe]) > GIVE_UP
 
+/**
+ * End of the section that settling asks for: just past the last target bar, but never in the future, which main
+ * refuses (for 3-month bars "two bars on" lies half a year ahead).
+ */
+export const settleBefore = (e: Pick<ArchiveEntry, 'times' | 'timeframe'>, now: number): number =>
+  Math.min(e.times[e.times.length - 1] + 2 * TF_SECONDS[e.timeframe], Math.floor(now))
+
 /** Compares an archived forecast with the real bars; 'pending' until they are all there (or given up on). */
 export function settleEntry(e: ArchiveEntry, candles: Candle[], now: number): Settlement | 'pending' | 'unsettleable' {
   const end = e.times[e.times.length - 1]

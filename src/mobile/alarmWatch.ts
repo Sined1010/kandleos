@@ -1,5 +1,5 @@
 import { App as CapApp } from '@capacitor/app'
-import { hit, type Alarm } from '../shared/alarms'
+import { checkedAfter, hit, type Alarm } from '../shared/alarms'
 import { t } from '../shared/i18n'
 import { formatPrice } from '../renderer/src/lib/format'
 import { loadCandles } from '../renderer/src/services/marketData'
@@ -53,7 +53,7 @@ async function catchUp(): Promise<void> {
       else if (candles.length) {
         // The newest bar may still move, so it is looked at again next time.
         const last = candles[candles.length - 1].time
-        useStore.setState((st) => ({ alarms: st.alarms.map((x) => (x.id === a.id ? { ...x, checkedUntil: last } : x)) }))
+        useStore.setState((st) => ({ alarms: st.alarms.map((x) => (x.id === a.id ? { ...x, checkedUntil: checkedAfter(x, last) } : x)) }))
       }
     } catch {
       // offline or source error: tried again on the next return to the app

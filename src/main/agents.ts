@@ -309,8 +309,10 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
       let error = ''
       let done: { rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats']; structured?: unknown } | null = null
       let buffer = ''
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf8')
+      // Decoded as one stream: a character split between two chunks would otherwise turn into "�".
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', (chunk: string) => {
+        buffer += chunk
         let nl: number
         while ((nl = buffer.indexOf('\n')) >= 0) {
           const line = buffer.slice(0, nl)
@@ -409,7 +411,9 @@ export async function listAnalyses(symbol: unknown): Promise<SavedAnalysis[]> {
   if (typeof symbol !== 'string' || !SYMBOL_RE.test(symbol)) return []
   try {
     const files = (await readdir(resultsDir(symbol))).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, 20)
-    return Promise.all(files.map(async (f) => JSON.parse(await readFile(join(resultsDir(symbol), f), 'utf8'))))
+    // A damaged file (cut off by a crash while saving) is left out instead of hiding all the others.
+    const read = (f: string) => readFile(join(resultsDir(symbol), f), 'utf8').then(JSON.parse).catch(() => null)
+    return (await Promise.all(files.map(read))).filter(Boolean)
   } catch {
     return []
   }

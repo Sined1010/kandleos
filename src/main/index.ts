@@ -84,8 +84,14 @@ ipcMain.handle('backup:apply', async (e, password) => {
   storeLocked = true
   await writeQueue
   if (store) {
-    await writeFile(storeFile() + '.tmp', store, 'utf8')
-    await rename(storeFile() + '.tmp', storeFile())
+    try {
+      await writeFile(storeFile() + '.tmp', store, 'utf8')
+      await rename(storeFile() + '.tmp', storeFile())
+    } catch (err) {
+      // No reload comes, so the page must be able to save again.
+      storeLocked = false
+      throw err
+    }
   }
   // The new page reads the imported store (and keys) on start.
   e.sender.once('did-finish-load', () => (storeLocked = false))
@@ -213,6 +219,8 @@ else {
   })
 }
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+// A running analysis must not outlive the app (on Linux nothing else ends it, and it keeps calling paid models).
+app.on('will-quit', cancelAgents)
 
 // Finish the last store write before exiting, so a change made right before closing is not lost.
 let flushed = false

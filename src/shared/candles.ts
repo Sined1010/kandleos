@@ -76,3 +76,18 @@ export function mergeTick(last: Candle, price: number, time: number, seconds: nu
   const t = months ? periodStart(period, months, zone) : last.time + Math.floor((time - last.time) / seconds) * seconds
   return { time: t, open: price, high: price, low: price, close: price, volume: 0 }
 }
+
+/**
+ * Yahoo ends intraday data with an extra point stamped "now" (14:14:30 on 5m bars). Live ticks are laid on a
+ * grid anchored at the last bar, so that point is moved onto the grid of the bar before it, or folded into
+ * that bar when it falls inside it.
+ */
+export function snapLast(candles: Candle[], seconds: number): Candle[] {
+  const [prev, live] = candles.slice(-2)
+  if (!live) return candles
+  const time = prev.time + Math.floor((live.time - prev.time) / seconds) * seconds
+  if (time === live.time) return candles
+  const head = candles.slice(0, -2)
+  if (time > prev.time) return [...head, prev, { ...live, time }]
+  return [...head, { ...prev, high: Math.max(prev.high, live.high), low: Math.min(prev.low, live.low), close: live.close }]
+}
