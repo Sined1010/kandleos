@@ -59,8 +59,9 @@ linux:
   extraFiles:
     - from: linux/install.sh
       to: install.sh
-    - from: resources/icon.png
-      to: icon.png
+    # The SVG, not icon.png: an extraFiles source is left out of app.asar, where the main process loads icon.png.
+    - from: resources/icon.svg
+      to: icon.svg
   icon: resources/icon.png
   category: Office
   syncDesktopName: true # window <-> launcher icon association (WM_CLASS / Wayland app_id)
