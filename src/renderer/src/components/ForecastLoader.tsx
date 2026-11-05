@@ -66,9 +66,13 @@ export default function ForecastLoader({ chart, series, time, price, right, bott
       if (!el) return
       const x = chart.timeScale().timeToCoordinate(at.current.time as Time)
       const y = series.priceToCoordinate(at.current.price)
-      // Pulled left when the space right of the last candle is narrower than the loader.
-      const left = x === null ? 0 : Math.min(x + GAP, chart.timeScale().width() - WIDTH)
-      const pos = x === null || y === null ? '' : `translate(${Math.round(left)}px,${Math.round(y + LIFT - HEIGHT)}px)`
+      const width = chart.timeScale().width()
+      // Pulled left when the space right of the last candle is narrower than the loader; hidden once the candle
+      // has scrolled out to the right, so it does not float over older candles.
+      const pos =
+        x !== null && y !== null && x <= width
+          ? `translate(${Math.round(Math.min(x + GAP, width - WIDTH))}px,${Math.round(y + LIFT - HEIGHT)}px)`
+          : ''
       if (pos === shown) return
       shown = pos
       el.style.visibility = pos ? '' : 'hidden'
