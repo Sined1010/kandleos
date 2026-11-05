@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { agentsTicker, decisionOf, keyEnvFor, parseDecision, parseStructured, stageOf, structuredFromBridge } from './agents.ts'
+import { agentsTicker, decisionOf, doneFromBridge, keyEnvFor, parseDecision, parseStructured, stageOf, structuredFromBridge } from './agents.ts'
 
 // Shapes as TradingAgents 0.7.1 renders them (agents/schemas.py), German body text, English labels.
 const DECISION = `**Rating**: Overweight
@@ -106,4 +106,19 @@ test('stageOf and keyEnvFor map graph nodes and stored keys', () => {
   assert.equal(keyEnvFor('evil'), null)
   assert.equal(keyEnvFor('constructor'), null)
   assert.equal(keyEnvFor('toString'), null)
+})
+
+test('doneFromBridge keeps only string reports with short keys and finite counts', () => {
+  assert.deepEqual(
+    doneFromBridge({
+      event: 'done',
+      id: '../../evil',
+      rating: 'Buy',
+      reports: { decision: 'ok', market: 42, 'a/b': 'x' },
+      stats: { calls: 3, tokensIn: -1, tokensOut: 'many' },
+      structured: { decision: { rating: 'Buy' } }
+    }),
+    { rating: 'Buy', reports: { decision: 'ok' }, stats: { calls: 3, tokensIn: 0, tokensOut: 0 }, structured: { decision: { rating: 'Buy' } } }
+  )
+  assert.deepEqual(doneFromBridge('nope'), { rating: '', reports: {}, stats: { calls: 0, tokensIn: 0, tokensOut: 0 }, structured: undefined })
 })

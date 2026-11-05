@@ -148,22 +148,26 @@ function createWindow(): void {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      webviewTag: false
+      webviewTag: false,
+      // DevTools would reach window.api (e.g. keyGet) with Ctrl+Shift+I; only for development.
+      devTools: !app.isPackaged
     }
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }
   })
-  if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  if (DEV_URL) win.loadURL(DEV_URL)
   else win.loadFile(indexFile())
 }
 
+// The dev server (electron-vite); a packaged app ignores the variable, so it cannot be pointed at another page.
+const DEV_URL = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
 const indexFile = (): string => join(__dirname, '../renderer/index.html')
 // The window may only ever show KandleOS itself: no navigation to other pages, no embedded webviews.
 // Only its own index.html, not any file:// page: a local HTML file would get window.api (keys, store).
 function isAppUrl(url: string): boolean {
-  if (process.env.ELECTRON_RENDERER_URL) return url.startsWith(process.env.ELECTRON_RENDERER_URL)
+  if (DEV_URL) return url.startsWith(DEV_URL)
   try {
     return url.startsWith('file:') && resolve(fileURLToPath(url)) === resolve(indexFile())
   } catch {

@@ -6,7 +6,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { agentsTicker, ANALYSTS, keyEnvFor, PROVIDERS, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
+import { agentsTicker, ANALYSTS, doneFromBridge, keyEnvFor, PROVIDERS, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
 import { chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
@@ -286,7 +286,7 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
   const date = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
   const workDir = join(base(), 'work')
   await mkdir(workDir, { recursive: true })
-  const env: NodeJS.ProcessEnv = { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }
+  const env: NodeJS.ProcessEnv = { ...process.env }
   if (keyEnv) env[keyEnv] = keys[req.provider]
   if (keys.fred) env.FRED_API_KEY = keys.fred
   if (req.provider === 'ollama' && req.ollamaUrl) env.OLLAMA_BASE_URL = req.ollamaUrl.replace(/\/?$/, '').replace(/(\/v1)?$/, '/v1')
@@ -294,7 +294,9 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
 
   const result = await new Promise<{ rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats']; structured?: unknown }>(
     (resolve, reject) => {
-      const child = spawn(venvPython(), [runner()], { env, cwd: workDir, windowsHide: true })
+      // -I: no PYTHON* variables, user site or script folder on the path, so nothing outside the venv loads;
+      // -X utf8 replaces PYTHONUTF8, which -I ignores.
+      const child = spawn(venvPython(), ['-I', '-X', 'utf8', runner()], { env, cwd: workDir, windowsHide: true })
       current = child
       const stderr: string[] = []
       let error = ''
@@ -310,7 +312,7 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
           buffer = buffer.slice(nl + 1)
           try {
             const msg = JSON.parse(line)
-            if (msg.event === 'done') done = msg
+            if (msg.event === 'done') done = doneFromBridge(msg)
             else if (msg.event === 'error') error = msg.message
             else if (msg.event === 'step' || msg.event === 'tool') onEvent(msg)
           } catch {

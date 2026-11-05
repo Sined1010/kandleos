@@ -190,6 +190,26 @@ export function structuredFromBridge(v: unknown): Structured | undefined {
   })
 }
 
+const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0)
+
+/** The bridge's "done" line, field by field: only strings as reports (short keys), numbers as stats. */
+export function doneFromBridge(v: unknown): {
+  rating: string
+  reports: Record<string, string>
+  stats: { calls: number; tokensIn: number; tokensOut: number }
+  structured?: unknown
+} {
+  const d = isObj(v) ? v : {}
+  const reports = isObj(d.reports) ? d.reports : {}
+  const stats = isObj(d.stats) ? d.stats : {}
+  return {
+    rating: typeof d.rating === 'string' ? d.rating : '',
+    reports: Object.fromEntries(Object.entries(reports).filter((e): e is [string, string] => /^\w{1,40}$/.test(e[0]) && typeof e[1] === 'string')),
+    stats: { calls: count(stats.calls), tokensIn: count(stats.tokensIn), tokensOut: count(stats.tokensOut) },
+    structured: d.structured
+  }
+}
+
 /** The decision of a saved analysis: structured values where TradingAgents gave them, the text otherwise. */
 export function decisionOf(reports: Record<string, string>, rating: string, structured?: Structured): Decision {
   const d = parseDecision(reports.decision ?? '', reports.trader ?? '', rating)

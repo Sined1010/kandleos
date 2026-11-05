@@ -89,7 +89,9 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
 
 async function getJson(url: string, headers: Record<string, string> = {}): Promise<any> {
   // Yahoo rejects requests without a browser-like user agent.
-  const res = await http(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, timeoutMs: 10_000 })
+  // A redirect keeps custom headers, so with the Finnhub key it is not followed (the 3xx fails below).
+  const redirect = headers['X-Finnhub-Token'] ? 'manual' : undefined
+  const res = await http(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, redirect, timeoutMs: 10_000 })
   if (res.status === 404) throw new Error(t('Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben'))
   if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`)
   return res.json()
@@ -311,7 +313,7 @@ export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
   const [, key] = checkArgs('AAPL', keyArg)
   if (!key) return t('Ungültiges Key-Format')
   try {
-    const res = await http('https://finnhub.io/api/v1/quote?symbol=AAPL', { headers: finnhubAuth(key), timeoutMs: 10_000 })
+    const res = await http('https://finnhub.io/api/v1/quote?symbol=AAPL', { headers: finnhubAuth(key), redirect: 'manual', timeoutMs: 10_000 })
     if (res.status === 401 || res.status === 403) return t('API-Key ungültig')
     if (res.status === 429) return 'Rate-Limit erreicht (max. 60 Anfragen/Minute)'
     return res.ok ? null : `Finnhub HTTP ${res.status}`

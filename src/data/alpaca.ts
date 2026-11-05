@@ -53,6 +53,8 @@ async function request(url: string, k: Keys | null = keys()): Promise<any> {
   if (!k) throw new Error(t('Kein Alpaca-Key hinterlegt. In den Einstellungen eintragen.'))
   const res = await http(url, {
     headers: { 'APCA-API-KEY-ID': k.id, 'APCA-API-SECRET-KEY': k.secret },
+    // Redirects keep custom headers: never follow one with the keys (the 3xx fails below).
+    redirect: 'manual',
     timeoutMs: 15_000
   })
   if (res.status === 401 || res.status === 403) throw new Error(t('Alpaca: API-Key ungültig'))
