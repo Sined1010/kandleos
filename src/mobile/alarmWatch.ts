@@ -10,7 +10,7 @@ import { KandleNative, type NativeAlarm } from './native'
 const now = () => Math.floor(Date.now() / 1000)
 const armed = () => useStore.getState().alarms.filter((a) => a.triggeredAt === undefined)
 /** Android wants an int id per notification; one per alarm, so a repeat replaces instead of stacking. */
-const notificationId = (id: string) => parseInt(id.replace(/-/g, '').slice(0, 7), 16)
+export const notificationId = (id: string) => parseInt(id.replace(/-/g, '').slice(0, 7), 16)
 
 const titleOf = (a: Alarm) =>
   t('{name} hat {price} erreicht', { name: useStore.getState().names[a.symbol] ?? a.symbol, price: formatPrice(a.price) })

@@ -6,6 +6,9 @@
     <string name="custom_url_scheme">io.github.sined1010.kandleos</string>
     <string name="channel_alarms">Price alarms</string>
     <string name="channel_watching">Instant alarms</string>
-    <string name="watching_title">KandleOS is watching %1$d prices</string>
+    <plurals name="watching_title">
+        <item quantity="one">KandleOS is watching %1$d price</item>
+        <item quantity="other">KandleOS is watching %1$d prices</item>
+    </plurals>
     <string name="alarm_body">Price alarm from KandleOS</string>
 </resources>

@@ -9,6 +9,7 @@ export interface KandleNativePlugin {
   secureRemove(o: { name: string }): Promise<void>
   /** Android notification; the same id replaces an older one. */
   showNotification(o: { id: number; title: string; body: string }): Promise<void>
+  cancelNotification(o: { id: number }): Promise<void>
   /** Asks for the notification permission once (Android 13+). */
   requestNotify(): Promise<{ granted: boolean }>
   /** Hands the armed alarms (with their source) to the background check; empty stops it. */
@@ -33,6 +34,7 @@ class KandleNativeWeb extends WebPlugin implements KandleNativePlugin {
   async showNotification({ title, body }: { id: number; title: string; body: string }) {
     console.info('[notification]', title, body)
   }
+  async cancelNotification() {}
   async requestNotify() {
     return { granted: true }
   }

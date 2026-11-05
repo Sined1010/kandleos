@@ -11,6 +11,8 @@ import com.getcapacitor.annotation.PermissionCallback;
 
 import android.Manifest;
 
+import androidx.core.app.NotificationManagerCompat;
+
 import com.getcapacitor.JSArray;
 import org.json.JSONArray;
 import android.os.Build;
@@ -64,6 +66,15 @@ public class KandleNativePlugin extends Plugin {
         String body = call.getString("body", "");
         if (id == null || title == null) { call.reject("id or title missing"); return; }
         Notifier.show(getContext(), id, title, body);
+        call.resolve();
+    }
+
+    /** Removes a notification; a re-armed alarm would otherwise fire silently into its old one (setOnlyAlertOnce). */
+    @PluginMethod
+    public void cancelNotification(PluginCall call) {
+        Integer id = call.getInt("id");
+        if (id == null) { call.reject("id missing"); return; }
+        NotificationManagerCompat.from(getContext()).cancel(id);
         call.resolve();
     }
 

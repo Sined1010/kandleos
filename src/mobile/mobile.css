@@ -12,6 +12,10 @@ body,
   -webkit-user-select: none;
   touch-action: manipulation;
 }
+/* Phones show their own scroll hint while scrolling; the slim desktop bars (index.css) stay hidden. */
+::-webkit-scrollbar {
+  display: none;
+}
 input,
 textarea {
   user-select: text;

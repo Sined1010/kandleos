@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Follows the phone's language, not the in-app switch (src/shared/i18n.ts). -->
+<resources>
+    <string name="channel_alarms">Kurs-Alarme</string>
+    <string name="channel_watching">Sofort-Alarme</string>
+    <plurals name="watching_title">
+        <item quantity="one">KandleOS beobachtet %1$d Kurs</item>
+        <item quantity="other">KandleOS beobachtet %1$d Kurse</item>
+    </plurals>
+    <string name="alarm_body">Kurs-Alarm von KandleOS</string>
+</resources>

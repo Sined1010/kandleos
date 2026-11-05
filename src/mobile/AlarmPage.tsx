@@ -5,6 +5,7 @@ import { locale, t } from '../shared/i18n'
 import { formatPrice } from '../renderer/src/lib/format'
 import { useQuotes, useStore } from '../renderer/src/store/useStore'
 import { planAlarm } from './alarmPlan'
+import { notificationId } from './alarmWatch'
 import { KandleNative } from './native'
 
 /** Price alarms: set one for `symbol`, and see, re-arm or delete all of them. */
@@ -69,7 +70,13 @@ export default function AlarmPage({ symbol }: { symbol: string }) {
               </p>
             </div>
             {a.triggeredAt && (
-              <button onClick={() => useStore.getState().rearmAlarm(a.id)} aria-label={t('Wieder scharf schalten')} className="mobile-icon">
+              <button
+                onClick={async () => {
+                  // The old "reached" notification goes first, or the next hit would update it without a sound.
+                  await KandleNative.cancelNotification({ id: notificationId(a.id) }).catch(() => {})
+                  useStore.getState().rearmAlarm(a.id)
+                }}
+                aria-label={t('Wieder scharf schalten')} className="mobile-icon">
                 <RotateCcw size={18} />
               </button>
             )}

@@ -78,7 +78,7 @@ public class AlarmService extends Service {
         }
         return new NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_alarm)
-                .setContentTitle(getString(R.string.watching_title, n))
+                .setContentTitle(getResources().getQuantityString(R.plurals.watching_title, n, n))
                 .setOngoing(true)
                 .setContentIntent(Notifier.openApp(this))
                 .build();
