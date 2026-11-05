@@ -768,7 +768,8 @@ export default function ChartArea() {
         horzLine: { color: THEME.brandFrom + '99', labelBackgroundColor: THEME.brandFrom }
       },
       rightPriceScale: { borderColor: LINE },
-      timeScale: { borderColor: LINE, rightOffset: 10, tickMarkFormatter: tickMark },
+      // 0.3 px per bar (default 0.5): about 1,100 bars on a phone, 4,000 on a wide window.
+      timeScale: { borderColor: LINE, rightOffset: 10, minBarSpacing: 0.3, tickMarkFormatter: tickMark },
       localization: { locale: locale() }
     })
     const candles = chart.addSeries(CandlestickSeries, {

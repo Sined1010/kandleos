@@ -4,6 +4,6 @@ rem (ANDROID_HOME or android\local.properties with sdk.dir).
 cd /d "%~dp0.."
 call npm.cmd run android:sync || exit /b 1
 cd android
-call gradlew.bat assembleDebug || exit /b 1
+call .\gradlew.bat assembleDebug || exit /b 1
 echo.
 echo APK: %CD%\app\build\outputs\apk\debug\app-debug.apk

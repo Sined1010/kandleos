@@ -93,14 +93,15 @@ export default function MobileApp() {
         </div>
         <ChartTabs />
       </header>
-      {/* The low sheet (grip + search) covers the bottom 96 px; the chart ends above it. */}
-      <main className={`relative min-h-0 flex-1 ${drawing ? '' : 'mb-24'}`}>
+      {/* The low sheet (grip + search) and the drawing tools both cover the bottom 96 px; the chart ends above
+          them and keeps its size when drawing starts. */}
+      <main className="relative mb-24 min-h-0 flex-1">
         <ChartArea key={activeTab} />
       </main>
-      {/* While drawing, the tools take the sheet's place. */}
-      {drawing ? (
-        <DrawTools />
-      ) : (
+      {/* While drawing, the tools take the sheet's place; the sheet stays mounted (hidden), so leaving drawing
+          does not rebuild the whole watchlist. */}
+      {drawing && <DrawTools />}
+      <div hidden={drawing}>
         <WatchSheet
           pos={sheet}
           onPos={setSheet}
@@ -114,7 +115,7 @@ export default function MobileApp() {
             }
           ]}
         />
-      )}
+      </div>
       {menu && (
         <ActionMenu
           title="KandleOS"

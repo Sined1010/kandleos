@@ -89,8 +89,9 @@ public class KandleNativePlugin extends Plugin {
         boolean any = store.armed().length() > 0;
         if (any) AlarmWorker.schedule(getContext());
         else AlarmWorker.cancel(getContext());
-        if (any && instant) AlarmService.start(getContext());
-        else AlarmService.stop(getContext());
+        // Only the service stops itself, after its startForeground (stopping it from here before that crashes
+        // the app on Android 9+). A running service is started again so it rereads the list and may end.
+        if ((any && instant) || AlarmService.running) AlarmService.start(getContext());
         call.resolve();
     }
 

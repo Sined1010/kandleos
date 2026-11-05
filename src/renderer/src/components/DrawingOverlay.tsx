@@ -19,7 +19,7 @@ import {
 } from '../lib/geometry'
 import { THEME } from '../lib/theme'
 import { IS_MOBILE } from '../lib/platform'
-import { aimAt } from '../lib/touchAim'
+import { aimAt, pinchRange, type PinchStart } from '../lib/touchAim'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import { Crosshair, Trash2 } from 'lucide-react'
 import { drawingsKey, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
@@ -124,6 +124,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const [hover, setHover] = useState<Point | null>(null)
   // Phone: where the crosshair is (chart px).
   const [aim, setAim] = useState<{ x: number; y: number } | null>(null)
+  // Phone: fingers on the overlay (x in chart px) and the view when a second one came down.
+  const pinch = useRef<{ fingers: Map<number, number>; start?: PinchStart }>({ fingers: new Map() })
   // Edits are previewed locally and committed on mouseup, so the store file is written once per drag.
   const [drag, setDrag] = useState<DragState | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -280,12 +282,38 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
 
   // Phone: the finger moves a crosshair that sits above it (touchAim); the round button places the point.
+  // Two fingers zoom the time axis instead (the overlay takes all touches while a tool is active).
   const onAim = (e: React.PointerEvent) => {
     if (!IS_MOBILE || tool === 'cursor') return
     const r = svgRef.current!.getBoundingClientRect()
+    const p = pinch.current
+    if (e.type === 'pointerdown') {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      p.fingers.set(e.pointerId, e.clientX - r.left)
+    } else if (p.fingers.has(e.pointerId)) p.fingers.set(e.pointerId, e.clientX - r.left)
+    if (p.fingers.size >= 2) {
+      const [x1, x2] = [...p.fingers.values()]
+      const gap = Math.max(20, Math.abs(x1 - x2))
+      const mid = (x1 + x2) / 2
+      const scale = chart.timeScale()
+      if (!p.start) {
+        const v = scale.getVisibleLogicalRange()
+        if (v) p.start = { gap, mid, from: v.from, to: v.to }
+        return
+      }
+      scale.setVisibleLogicalRange(pinchRange(p.start, gap, mid, r.width))
+      return
+    }
+    // A finger left over from a pinch does not move the crosshair.
+    if (p.start) return
     const a = aimAt({ x: e.clientX - r.left, y: e.clientY - r.top }, { width: r.width, height: r.height })
     setAim(a)
     if (draft.length) setHover(pointAt({ clientX: r.left + a.x, clientY: r.top + a.y }))
+  }
+  const endFinger = (e: React.PointerEvent) => {
+    const p = pinch.current
+    p.fingers.delete(e.pointerId)
+    if (!p.fingers.size) p.start = undefined
   }
   const placeAim = () => {
     if (!aim) return
@@ -651,7 +679,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
 
   const preview = tool !== 'cursor' && draft.length > 0 && hover ? build(tool, 'draft', [...draft, hover]) : null
   const styled = tool === 'cursor' && !drag && !editing ? drawings.find((d) => d.id === selectedId) : undefined
-  const swatch = 'h-5 w-5 rounded-full ring-offset-2 ring-offset-panel'
+  // Finger-sized swatches on the phone.
+  const swatch = `${IS_MOBILE ? 'h-8 w-8' : 'h-5 w-5'} rounded-full ring-offset-2 ring-offset-panel`
   return (
     <>
       <svg
@@ -668,6 +697,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         onMouseMove={onMove}
         onPointerDown={onAim}
         onPointerMove={onAim}
+        onPointerUp={endFinger}
+        onPointerCancel={endFinger}
       >
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
         {preview && render(preview, true)}
@@ -715,11 +746,11 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         // Bottom centre like the click hint, which only shows while a tool is active. Own mousedown, so the
         // chart underneath does not clear the selection.
         <div
-          className="pointer-events-auto absolute bottom-12 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-lg bg-panel/90 px-2 py-1.5 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur"
+          className={`pointer-events-auto absolute bottom-12 left-1/2 z-10 flex -translate-x-1/2 items-center rounded-lg bg-panel/90 text-xs ${IS_MOBILE ? 'w-max max-w-[calc(100vw-16px)] flex-wrap justify-center gap-2 px-3 py-2.5' : 'gap-1.5 px-2 py-1.5'} text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur`}
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <div role="group" aria-label={t('Farbe')} className="flex items-center gap-1.5">
+          <div role="group" aria-label={t('Farbe')} className={`flex items-center ${IS_MOBILE ? 'gap-2.5' : 'gap-1.5'}`}>
             {palette().map(({ color, name }) => {
               const active = (styled.color ?? null) === color
               return (
@@ -738,8 +769,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           </div>
           {IS_MOBILE && (
             // No Delete key on the phone.
-            <button onClick={() => removeDrawing(styled.id)} aria-label={t('Zeichnung löschen')} className="ml-1 border-l border-line pl-2 text-down">
-              <Trash2 size={18} />
+            <button onClick={() => removeDrawing(styled.id)} aria-label={t('Zeichnung löschen')} className="ml-1 flex h-9 w-9 items-center justify-center border-l border-line pl-2 text-down">
+              <Trash2 size={22} />
             </button>
           )}
           {styled.type === 'text' && (
@@ -752,7 +783,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
                     aria-pressed={active}
                     title={t('Textgröße')}
                     onClick={() => updateDrawing({ ...styled, size: n === TEXT_SIZE ? undefined : n })}
-                    className={`min-w-6 rounded px-1 py-0.5 tabular-nums ${active ? 'bg-brand text-white' : 'text-muted hover:bg-line hover:text-white'}`}
+                    className={`${IS_MOBILE ? 'min-w-9 py-1.5 text-sm' : 'min-w-6 py-0.5'} rounded px-1 tabular-nums ${active ? 'bg-brand text-white' : 'text-muted hover:bg-line hover:text-white'}`}
                   >
                     {n}
                   </button>

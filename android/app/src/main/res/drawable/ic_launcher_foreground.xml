@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "K" of three candlesticks from resources/icon.svg (512 units). Android shows the middle 72 of the
+     108dp layer, so the 512 square is scaled to 72dp: viewport 768 = 512 * 108 / 72, shifted by 128. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="768"
+    android:viewportHeight="768">
+    <group
+        android:translateX="128"
+        android:translateY="128">
+        <!-- stem -->
+        <path
+            android:pathData="M154,92L154,420"
+            android:strokeWidth="14"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M137,148h34a16,16 0 0 1 16,16v184a16,16 0 0 1 -16,16h-34a16,16 0 0 1 -16,-16v-184a16,16 0 0 1 16,-16z" />
+        <!-- upper arm -->
+        <path
+            android:pathData="M208,252L378,84"
+            android:strokeWidth="14"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round" />
+        <group
+            android:pivotX="284"
+            android:pivotY="177"
+            android:rotation="45.6">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="M267,113h34a14,14 0 0 1 14,14v100a14,14 0 0 1 -14,14h-34a14,14 0 0 1 -14,-14v-100a14,14 0 0 1 14,-14z" />
+        </group>
+        <!-- lower arm -->
+        <path
+            android:pathData="M208,262L378,428"
+            android:strokeWidth="14"
+            android:strokeColor="#FFD9F4FB"
+            android:strokeLineCap="round" />
+        <group
+            android:pivotX="286"
+            android:pivotY="339"
+            android:rotation="-45.7">
+            <path
+                android:fillColor="#FFD9F4FB"
+                android:pathData="M269,283h34a14,14 0 0 1 14,14v84a14,14 0 0 1 -14,14h-34a14,14 0 0 1 -14,-14v-84a14,14 0 0 1 14,-14z" />
+        </group>
+    </group>
+</vector>

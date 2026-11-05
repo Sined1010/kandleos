@@ -18,6 +18,8 @@ textarea {
   -webkit-user-select: text;
 }
 .mobile-app {
+  /* Height of the gesture/navigation bar; the bottom panels add it below their content. */
+  --sab: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
   /* System bars: env() where the WebView reports insets, Capacitor's variables otherwise. */
   padding-top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
   padding-bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
@@ -47,4 +49,23 @@ textarea {
   .mobile-app main {
     margin-bottom: 0 !important;
   }
+}
+/* Start window and settings as phone pages (PAGE in lib/platform.ts): readable text, finger-sized controls. */
+.mobile-page .text-xs {
+  font-size: 0.875rem;
+  line-height: 1.4rem;
+}
+.mobile-page input[type='checkbox'],
+.mobile-page input[type='radio'] {
+  height: 20px;
+  width: 20px;
+  flex-shrink: 0;
+}
+.mobile-page input[type='text'],
+.mobile-page input[type='password'] {
+  min-height: 44px;
+  font-size: 16px;
+}
+.mobile-page label {
+  padding-block: 4px;
 }

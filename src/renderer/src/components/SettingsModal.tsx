@@ -7,7 +7,7 @@ import BackupSection from './BackupSection'
 import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 import { RELEASES_URL } from './UpdateBadge'
-import { IS_MOBILE } from '../lib/platform'
+import { IS_MOBILE, PAGE } from '../lib/platform'
 
 /** Phone: price alarms every 15 s with a permanent notification (more battery) instead of about every 15 min. */
 function InstantAlarms() {
@@ -52,21 +52,21 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className={PAGE?.backdrop ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'} onClick={onClose}>
       <form
         onSubmit={save}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="max-h-[90vh] w-[480px] overflow-y-auto rounded-xl border border-line bg-panel/95 backdrop-blur p-5 shadow-2xl"
+        className={PAGE?.dialog ?? 'max-h-[90vh] w-[480px] overflow-y-auto rounded-xl border border-line bg-panel/95 backdrop-blur p-5 shadow-2xl'}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className={`${PAGE?.head ?? 'mb-4'} flex items-center justify-between`}>
           <h2 id="settings-title" className="text-base font-semibold text-white">
             {t('Einstellungen')}
           </h2>
-          <button type="button" onClick={onClose} className="text-muted hover:text-white" aria-label={t('Schließen')}>
-            <X size={18} />
+          <button type="button" onClick={onClose} className={IS_MOBILE ? 'mobile-icon -mr-2' : 'text-muted hover:text-white'} aria-label={t('Schließen')}>
+            <X size={IS_MOBILE ? 22 : 18} />
           </button>
         </div>
 
@@ -149,20 +149,23 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
         {!IS_MOBILE && <BackupSection />}
 
-        <div className="mt-5 flex items-center justify-end gap-2">
+        <div className={PAGE?.foot ?? 'mt-5 flex items-center justify-end gap-2'}>
           {/* Shown next to the disabled button, so it is clear what is still missing. */}
           {(!valid || source.missing) && (
             <p className="mr-auto text-xs text-muted" role="status">
               {valid ? source.missing : t('Der Finnhub-Key darf nur Buchstaben und Ziffern enthalten.')}
             </p>
           )}
-          <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
-            {t('Abbrechen')}
-          </button>
+          {/* The phone closes with × or the back gesture. */}
+          {!IS_MOBILE && (
+            <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
+              {t('Abbrechen')}
+            </button>
+          )}
           <button
             type="submit"
             disabled={!valid || !source.ready || source.busy}
-            className="rounded-lg bg-brand font-medium text-white shadow-glow hover:brightness-110 px-3 py-1.5 disabled:opacity-40 disabled:shadow-none"
+            className={`${PAGE?.button ?? 'rounded-lg px-3 py-1.5'} bg-brand font-medium text-white shadow-glow hover:brightness-110 disabled:opacity-40 disabled:shadow-none`}
           >
             {t('Speichern')}
           </button>

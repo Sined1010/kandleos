@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, GripVertical, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, GripVertical, ListChecks, Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { t } from '../shared/i18n'
 import { isCrypto } from '../shared/types'
@@ -9,6 +9,7 @@ import { useSymbolNames } from '../renderer/src/components/Watchlist'
 import { formatChange, formatPrice } from '../renderer/src/lib/format'
 import { MAX_TABS, useQuotes, useStore } from '../renderer/src/store/useStore'
 import ActionMenu, { type ActionItem } from './ActionMenu'
+import AskDialog, { type Ask } from './AskDialog'
 import Layer from './Layer'
 import Sheet from './Sheet'
 import type { SheetPos } from './sheetSnap'
@@ -25,6 +26,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
   const s = useStore.getState()
   const [menu, setMenu] = useState<Menu | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [ask, setAsk] = useState<Ask | null>(null)
   const [drag, setDrag] = useState<{ symbol: string; from: string; drop: Drop | null } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   useSymbolNames()
@@ -33,7 +35,6 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
     s.setSymbol(symbol)
     onPos('low')
   }
-  const ask = (label: string, current = '') => window.prompt(label, current)?.trim() ?? null
 
   const rowMenu = (symbol: string, folderId: string): Menu => {
     const others = folders.filter((f) => f.id !== folderId)
@@ -53,10 +54,14 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
         ...(extraItems?.(symbol) ?? []),
         {
           label: t('Umbenennen'),
-          onPick: () => {
-            const n = ask(t('Anzeigename'), s.names[symbol] ?? symbol)
-            if (n !== null) s.setName(symbol, n === symbol ? '' : n)
-          }
+          onPick: () =>
+            setAsk({
+              title: t('Anzeigename'),
+              value: s.names[symbol] ?? symbol,
+              ok: t('Speichern'),
+              allowEmpty: true,
+              onOk: (n) => s.setName(symbol, n === symbol ? '' : n)
+            })
         },
         {
           label: t('Verschieben nach …'),
@@ -77,10 +82,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
     items: [
       {
         label: t('Umbenennen'),
-        onPick: () => {
-          const n = ask(t('Ordnername'), name)
-          if (n) s.renameFolder(id, n)
-        }
+        onPick: () => setAsk({ title: t('Ordnername'), value: name, ok: t('Speichern'), onOk: (n) => s.renameFolder(id, n) })
       },
       {
         label: t('Ordner löschen'),
@@ -90,19 +92,37 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
     ]
   })
 
+  const newFolder = (then?: (id: string) => void) =>
+    setAsk({
+      title: t('Neuer Ordner'),
+      ok: t('Anlegen'),
+      onOk: (n) => {
+        const id = s.addFolder(n)
+        then?.(id)
+      }
+    })
+  const addTo = (symbol: string, id: string) => {
+    s.addToFolder(id, symbol)
+    open(symbol)
+  }
+  // A found value: look at it, or add it; the folders only come after "add to watchlist".
   const picked = (symbol: string) =>
     setMenu({
-      title: symbol,
+      title: s.names[symbol] ?? symbol,
       items: [
-        { label: t('Nur ansehen'), onPick: () => open(symbol) },
-        ...folders.map((f) => ({
-          label: t('Zu „{name}“ hinzufügen', { name: f.name }),
-          disabled: f.symbols.includes(symbol),
-          onPick: () => {
-            s.addToFolder(f.id, symbol)
-            open(symbol)
-          }
-        }))
+        { label: t('Ansehen'), onPick: () => open(symbol) },
+        {
+          label: t('Zur Watchlist hinzufügen …'),
+          disabled: folders.length > 0 && folders.every((f) => f.symbols.includes(symbol)),
+          onPick: () =>
+            setMenu({
+              title: t('Zur Watchlist hinzufügen …'),
+              items: [
+                ...folders.map((f) => ({ label: f.name, disabled: f.symbols.includes(symbol), onPick: () => addTo(symbol, f.id) })),
+                { label: t('Neuer Ordner …'), onPick: () => newFolder((id) => addTo(symbol, id)) }
+              ]
+            })
+        }
       ]
     })
 
@@ -120,13 +140,17 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
         pos={pos}
         onPos={onPos}
         head={
-          <div className="px-3 pb-2" onFocus={() => pos === 'low' && onPos('full')}>
+          <div className="px-3 pb-1" onFocus={() => pos === 'low' && onPos('full')}>
             <SymbolSearch
               compact
               placeholder={t('Wert suchen …')}
               onPick={picked}
               inputClassName="w-full rounded-xl bg-bg px-3 py-2.5 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
             />
+            {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. */}
+            <p className="flex items-center gap-1.5 px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
+              <ListChecks size={14} aria-hidden /> Watchlist
+            </p>
           </div>
         }
       >
@@ -170,10 +194,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
             </section>
           ))}
           <button
-            onClick={() => {
-              const n = ask(t('Ordnername'))
-              if (n) s.addFolder(n)
-            }}
+            onClick={() => newFolder()}
             className="mx-3 mt-2 flex min-h-12 items-center gap-2 text-muted active:text-white"
           >
             <Plus size={16} /> {t('Neuer Ordner')}
@@ -181,6 +202,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
         </div>
       </Sheet>
       {menu && <ActionMenu title={menu.title} items={menu.items} onClose={() => setMenu(null)} />}
+      {ask && <AskDialog ask={ask} onClose={() => setAsk(null)} />}
       {info && (
         <Layer id="info" title={s.names[info] ?? info} onClose={() => setInfo(null)}>
           <InfoPanel symbol={info} />
@@ -232,6 +254,7 @@ function Row(p: {
       </div>
       <button
         aria-label={t('Verschieben')}
+        data-grip
         className="flex h-14 w-11 shrink-0 touch-none items-center justify-center text-muted"
         onPointerDown={p.onGrip}
         onPointerMove={p.onGripMove}

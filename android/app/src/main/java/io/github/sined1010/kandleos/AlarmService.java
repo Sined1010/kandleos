@@ -35,8 +35,13 @@ public class AlarmService extends Service {
         }
     }
 
-    static void stop(Context c) {
-        c.stopService(new Intent(c, AlarmService.class));
+    /** Set while the service exists; the plugin then sends it the new alarm list instead of stopping it. */
+    static volatile boolean running;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        running = true;
     }
 
     @Override
@@ -50,11 +55,15 @@ public class AlarmService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (n == 0 || !new AlarmStore(this).instant()) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         if (loop == null) {
             loop = Executors.newSingleThreadScheduledExecutor();
             loop.scheduleWithFixedDelay(() -> {
                 int left = AlarmStore.checkAll(this);
-                if (left == 0) stopSelf();
+                if (left == 0 || !new AlarmStore(this).instant()) stopSelf();
                 else getSystemService(NotificationManager.class).notify(ID, watching(left));
             }, 0, 15, TimeUnit.SECONDS);
         }
@@ -77,6 +86,7 @@ public class AlarmService extends Service {
 
     @Override
     public void onDestroy() {
+        running = false;
         if (loop != null) loop.shutdownNow();
         super.onDestroy();
     }

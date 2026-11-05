@@ -22,6 +22,8 @@ public final class AlarmFetch {
 
     static List<AlarmCheck.Bar> bars(Context c, String source, String symbol, long fromSec) throws Exception {
         String sym = URLEncoder.encode(symbol, "UTF-8");
+        // Yahoo: only the bars since the last check (at most 5 days), not 5 days every 15 s.
+        long now = System.currentTimeMillis() / 1000;
         switch (source) {
             case "binance": {
                 JSONArray a = new JSONArray(get("https://api.binance.com/api/v3/klines?symbol=" + sym
@@ -36,7 +38,7 @@ public final class AlarmFetch {
             case "yahoo": {
                 // Yahoo rejects requests without a browser-like user agent (as in src/data/stocks.ts).
                 JSONObject r = new JSONObject(get("https://query1.finance.yahoo.com/v8/finance/chart/" + sym
-                        + "?interval=5m&range=5d&includePrePost=true", headers("User-Agent", "Mozilla/5.0")))
+                        + "?interval=5m&includePrePost=true&period1=" + Math.max(fromSec, now - 5 * 86400) + "&period2=" + now, headers("User-Agent", "Mozilla/5.0")))
                         .getJSONObject("chart").getJSONArray("result").getJSONObject(0);
                 JSONArray ts = r.optJSONArray("timestamp");
                 JSONObject q = r.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0);

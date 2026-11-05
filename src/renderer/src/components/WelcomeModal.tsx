@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { t } from '../../../shared/i18n'
 import { useStore } from '../store/useStore'
 import LanguageSwitch from './LanguageSwitch'
-import { IS_MOBILE } from '../lib/platform'
+import { IS_MOBILE, PAGE } from '../lib/platform'
 
 /**
  * First start (and when reopened from the settings): language, prices and the disclaimer, confirmed in one step.
@@ -32,14 +32,14 @@ export default function WelcomeModal({ onOpenAbout }: { onOpenAbout: () => void 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className={PAGE?.backdrop ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="welcome-title"
-        className="max-h-[90vh] w-[560px] overflow-y-auto rounded-xl border border-line bg-panel/95 p-5 text-xs leading-relaxed text-slate-300 shadow-2xl backdrop-blur"
+        className={PAGE?.dialog ?? 'max-h-[90vh] w-[560px] overflow-y-auto rounded-xl border border-line bg-panel/95 p-5 text-xs leading-relaxed text-slate-300 shadow-2xl backdrop-blur'}
       >
-        <h2 id="welcome-title" className="text-base font-semibold text-white">
+        <h2 id="welcome-title" className={`${PAGE?.head ?? ''} text-base font-semibold text-white`}>
           {t('Willkommen bei KandleOS')}{' '}
           <span className="text-xs font-normal text-muted">Version {__APP_VERSION__}</span>
         </h2>
@@ -105,7 +105,7 @@ export default function WelcomeModal({ onOpenAbout }: { onOpenAbout: () => void 
           </button>
         </p>
 
-        <div className="mt-5 flex items-center justify-end gap-3">
+        <div className={PAGE?.foot ?? 'mt-5 flex items-center justify-end gap-3'}>
           {!alpaca && !ack && (
             <p className="text-muted" role="status">
               {t('Bitte bestätigen, dass du Yahoo Finance nur privat nutzt.')}
@@ -114,7 +114,7 @@ export default function WelcomeModal({ onOpenAbout }: { onOpenAbout: () => void 
           <button
             onClick={start}
             disabled={!alpaca && !ack}
-            className="shrink-0 rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white shadow-glow hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
+            className={`${PAGE?.button ?? 'rounded-lg px-4 py-1.5 text-sm'} shrink-0 bg-brand font-medium text-white shadow-glow hover:brightness-110 disabled:opacity-40 disabled:shadow-none`}
           >
             {t('Verstanden, los geht’s')}
           </button>

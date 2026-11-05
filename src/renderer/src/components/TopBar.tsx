@@ -2,6 +2,7 @@ import { Activity, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Se
 import { useState } from 'react'
 import { locale, msg, t } from '../../../shared/i18n'
 import { isCrypto, tfLabel, type StockSource, type Timeframe } from '../../../shared/types'
+import { IS_MOBILE } from '../lib/platform'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
 import CompanyInfoButton from './CompanyInfo'
@@ -85,6 +86,7 @@ export function TimeframePicker() {
   const timeframe = useStore((s) => s.timeframe)
   const setTimeframe = useStore((s) => s.setTimeframe)
   const [open, setOpen] = useState(false)
+  const [menuTop, setMenuTop] = useState(0)
   const pick = (tf: Timeframe) => {
     setTimeframe(tf)
     setOpen(false)
@@ -99,19 +101,28 @@ export function TimeframePicker() {
         </button>
       ))}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => {
+          setMenuTop(e.currentTarget.getBoundingClientRect().bottom + 4)
+          setOpen((o) => !o)
+        }}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={t('Alle Kerzengrößen')}
         title={t('Alle Kerzengrößen')}
-        className={`${btn(other)} flex items-center gap-0.5 ${other ? '' : 'px-1'}`}
+        className={`${btn(other)} flex items-center gap-0.5 ${other ? '' : IS_MOBILE ? 'px-2.5' : 'px-1'}`}
       >
         {other && tfLabel(timeframe)}
-        <ChevronDown size={14} />
+        <ChevronDown size={IS_MOBILE ? 18 : 14} />
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
+          <div className={`fixed inset-0 ${IS_MOBILE ? 'z-40' : 'z-10'}`} onClick={() => setOpen(false)} />
+          <div
+            role="menu"
+            // The phone's picker sits in a sideways-scrolling strip, which would clip a menu hanging below it.
+            className={`${IS_MOBILE ? 'fixed right-2 z-50 max-h-[70vh] w-52 overflow-y-auto' : 'absolute right-0 top-full z-20 mt-1 w-44'} rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50`}
+            style={IS_MOBILE ? { top: menuTop } : undefined}
+          >
             {GROUPS.map(([title, items]) => (
               <div key={title}>
                 <p className="px-3 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wider text-muted">{t(title)}</p>
@@ -121,7 +132,7 @@ export function TimeframePicker() {
                     role="menuitemradio"
                     aria-checked={tf === timeframe}
                     onClick={() => pick(tf)}
-                    className={`flex w-full items-center px-3 py-1 text-left text-sm hover:bg-bg ${tf === timeframe ? 'text-accent' : 'text-white'}`}
+                    className={`flex w-full items-center px-3 ${IS_MOBILE ? 'py-2.5 text-base' : 'py-1 text-sm'} text-left hover:bg-bg ${tf === timeframe ? 'text-accent' : 'text-white'}`}
                   >
                     {t(name)}
                     <span className="ml-auto text-xs text-muted/60">{tfLabel(tf)}</span>
