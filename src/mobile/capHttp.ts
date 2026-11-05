@@ -1,6 +1,9 @@
 import { CapacitorHttp } from '@capacitor/core'
 import type { Http } from '../data/http'
+import { t } from '../shared/i18n'
 import { cookiePairs } from './cookies'
+
+const NO_NET = /unable to resolve host|no address associated|failed to connect|network is unreachable|connection abort/i
 
 /** Stock requests on the phone: native HTTP, so User-Agent/Cookie headers work and CORS does not apply. */
 export const capHttp: Http = async (url, init) => {
@@ -16,9 +19,11 @@ export const capHttp: Http = async (url, init) => {
       responseType: 'text'
     })
   } catch (e) {
+    const msg = (e as Error).message
+    // Android's own wording ("Unable to resolve host …") means nothing to the user.
+    const err = new Error(NO_NET.test(msg) ? t('Keine Internetverbindung') : msg)
     // data/alpaca.ts tells a timeout apart by its name, as with fetch's AbortSignal.timeout.
-    const err = new Error((e as Error).message)
-    if (/timeout|timed out/i.test(err.message)) err.name = 'TimeoutError'
+    if (/timeout|timed out/i.test(msg)) err.name = 'TimeoutError'
     throw err
   }
   const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '')

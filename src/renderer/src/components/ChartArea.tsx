@@ -287,12 +287,20 @@ export default function ChartArea() {
       }
     const kept = IS_MOBILE ? cachedCandles(symbol, timeframe) : null
     if (kept?.candles.length) show(kept, false)
-    loadCandles(symbol, timeframe, finnhubKey, extended)
-      .then((d) => {
-        show(d)
-        if (d.stale && active) setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
-      })
-      .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
+    // Only the phone gets stored candles (stale) back; it keeps asking until fresh ones arrive.
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const load = (first: boolean) =>
+      loadCandles(symbol, timeframe, finnhubKey, extended)
+        .then((d) => {
+          if (!active) return
+          if (!d.stale) return show(d)
+          // Shown again on every try, the stored copy would reset the view each time.
+          if (first) show(d)
+          setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
+          retry = setTimeout(() => load(false), 15_000)
+        })
+        .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
+    load(true)
 
     const stop = isCrypto(symbol)
       ? watchCandles(symbol, timeframe, push)
@@ -308,6 +316,7 @@ export default function ChartArea() {
         })
     return () => {
       active = false
+      clearTimeout(retry)
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])

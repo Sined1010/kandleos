@@ -913,4 +913,5 @@ export const EN: Record<string, string> = {
   'Zur Watchlist hinzufügen …': 'Add to watchlist …',
   'Neuer Ordner …': 'New folder …',
   'Anlegen': 'Create',
+  'Keine Internetverbindung': 'No internet connection',
 }

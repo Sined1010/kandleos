@@ -80,7 +80,12 @@ export default function AlarmPage({ symbol }: { symbol: string }) {
                 <RotateCcw size={18} />
               </button>
             )}
-            <button onClick={() => useStore.getState().removeAlarm(a.id)} aria-label={t('Alarm löschen')} className="mobile-icon text-down">
+            <button
+              onClick={() => {
+                void KandleNative.cancelNotification({ id: notificationId(a.id) }).catch(() => {})
+                useStore.getState().removeAlarm(a.id)
+              }}
+              aria-label={t('Alarm löschen')} className="mobile-icon text-down">
               <Trash2 size={18} />
             </button>
           </div>
