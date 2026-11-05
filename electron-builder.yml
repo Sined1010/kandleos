@@ -35,6 +35,8 @@ win:
   icon: resources/icon.png
   # onnxruntime-node ships native libraries for every OS; keep only this target's (saves ~150 MB).
   files:
+    # A list of only "!" patterns makes electron-builder add "**/*" (the whole project folder); this keeps it to out/.
+    - out/**
     - '!node_modules/onnxruntime-node/bin/napi-v*/{linux,darwin}/**'
     - '!node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**'
 nsis:
@@ -49,6 +51,7 @@ linux:
   # tar.gz can also be built on Windows; it ships install.sh + icon for a per-user install.
   target: [AppImage, deb, tar.gz]
   files:
+    - out/** # see win.files
     - '!node_modules/onnxruntime-node/bin/napi-v*/{win32,darwin}/**'
     - '!node_modules/onnxruntime-node/bin/napi-v*/linux/arm64/**'
     # GPU providers (~270 MB), fetched by onnxruntime's install script when building on Linux; the forecast runs on the CPU.
