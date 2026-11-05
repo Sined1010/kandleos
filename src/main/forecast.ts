@@ -7,6 +7,7 @@ import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { InferenceSession } from 'onnxruntime-node'
 import { t } from '../shared/i18n'
+import { groupBatches } from '../shared/forecast'
 import { FORECAST_MIN_BARS } from '../shared/types'
 
 // Chronos-2 (amazon/chronos-2, Apache-2.0) as fp32 ONNX export by sktime: 2048 bars in, 64 steps x 21 quantiles out.
@@ -18,8 +19,8 @@ const MODEL = {
 const CONTEXT = 2048
 // The quantile levels behind each step's 21 values are listed in shared/forecast.ts (QUANTILES).
 const LEVELS = 21
-// Live close and wick series plus up to ten backtests (the "Rückblick-Tiefe" setting), with a little room.
-const MAX_SERIES = 16
+// Up to 30 backtests plus the live close and wick series, with room; the model runs them 16 at a time.
+const MAX_SERIES = 64
 
 const modelFile = (): string => join(app.getPath('userData'), 'models', 'chronos2-ctx2048-h64.onnx')
 
@@ -88,22 +89,40 @@ export async function forecast(
   for (const closes of seriesArg)
     if (!Array.isArray(closes) || closes.length < FORECAST_MIN_BARS || !closes.every((v) => Number.isFinite(v)))
       throw new Error(t('Zu wenige Kursdaten für eine Prognose (mindestens {min} Kerzen)', { min: FORECAST_MIN_BARS }))
-  const series = (seriesArg as number[][]).map((c) => c.slice(-CONTEXT))
+  let batches: number[][]
+  try {
+    batches = groupBatches(groups as number[])
+  } catch {
+    throw new Error(t('Ungültige Prognose-Gruppen'))
+  }
+  const all = (seriesArg as number[][]).map((c) => c.slice(-CONTEXT))
   const s = await getSession(onProgress)
   const ort = await import('onnxruntime-node')
-  // Shorter histories are left-padded with NaN, which the model treats as missing.
-  const context = new Float32Array(series.length * CONTEXT).fill(NaN)
-  series.forEach((closes, b) => context.set(closes, (b + 1) * CONTEXT - closes.length))
-  const out = await s.run({
-    context: new ort.Tensor('float32', context, [series.length, CONTEXT]),
-    group_ids: new ort.Tensor('int64', BigInt64Array.from(groups as number[], (g) => BigInt(g)), [series.length])
-  })
-  const q = out.quantiles.data as Float32Array
-  const steps = q.length / series.length / LEVELS
-  // The model can output slightly crossing quantiles; sorted once here, bands, median and backtests all see a valid order.
-  return series.map((_, b) =>
-    Array.from({ length: steps }, (_, i) =>
-      Array.from(q.subarray((b * steps + i) * LEVELS, (b * steps + i + 1) * LEVELS)).sort((x, y) => x - y)
-    )
-  )
+  const out: number[][][] = new Array(all.length)
+  for (const idx of batches) {
+    const series = idx.map((i) => all[i])
+    // Group ids only need to match within one call.
+    const ids = new Map<number, number>()
+    const local = idx.map((i) => {
+      const g = (groups as number[])[i]
+      if (!ids.has(g)) ids.set(g, ids.size)
+      return ids.get(g)!
+    })
+    // Shorter histories are left-padded with NaN, which the model treats as missing.
+    const context = new Float32Array(series.length * CONTEXT).fill(NaN)
+    series.forEach((closes, b) => context.set(closes, (b + 1) * CONTEXT - closes.length))
+    const res = await s.run({
+      context: new ort.Tensor('float32', context, [series.length, CONTEXT]),
+      group_ids: new ort.Tensor('int64', BigInt64Array.from(local, (g) => BigInt(g)), [series.length])
+    })
+    const q = res.quantiles.data as Float32Array
+    const steps = q.length / series.length / LEVELS
+    // The model can output slightly crossing quantiles; sorted once here, bands, median and backtests all see a valid order.
+    idx.forEach((orig, b) => {
+      out[orig] = Array.from({ length: steps }, (_, i) =>
+        Array.from(q.subarray((b * steps + i) * LEVELS, (b * steps + i + 1) * LEVELS)).sort((x, y) => x - y)
+      )
+    })
+  }
+  return out
 }

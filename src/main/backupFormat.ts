@@ -36,6 +36,11 @@ export interface Backup {
   store: { state: Record<string, unknown>; version: number } | null
   analyses: SavedAnalysis[]
   keys: SealedKeys | null
+  /**
+   * Forecast archive: its lines as one text and the summary. Missing in older files; its content is checked when
+   * main imports it (archiveFile.ts), so here only the shape counts.
+   */
+  archive?: { archive: string; summary: unknown }
 }
 
 // Fixed cost: an imported file cannot pick parameters that make deriving the key hang.
@@ -174,6 +179,7 @@ export function parseBackup(text: string): Backup {
     exportedAt: str(v.exportedAt, 40) ? v.exportedAt : '',
     store: store as Backup['store'],
     analyses: v.analyses.map(checkAnalysis).filter((a): a is SavedAnalysis => a !== null),
-    keys: keys as SealedKeys | null
+    keys: keys as SealedKeys | null,
+    ...(isObject(v.archive) && typeof v.archive.archive === 'string' && { archive: { archive: v.archive.archive, summary: v.archive.summary } })
   }
 }

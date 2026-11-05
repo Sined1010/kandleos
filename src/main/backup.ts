@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, type WebContents } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { allAnalyses, readKeys, saveAnalysis, writeKeys } from './agents'
 import { alpacaKeys, saveAlpacaKeys } from './alpaca'
+import { archive } from './archive'
 import { MAX_BACKUP_BYTES, MIN_PASSWORD, openKeys, parseBackup, sealKeys, type Backup, type BackupKeys } from './backupFormat'
 import { finnhubKey, saveFinnhubKey } from './stocks'
 import { t } from '../shared/i18n'
@@ -34,8 +35,12 @@ export async function exportBackup(wc: WebContents, store: string | null, opts: 
     exportedAt: new Date().toISOString(),
     store: store ? JSON.parse(store) : null,
     analyses: (await allAnalyses()) as Backup['analyses'],
-    keys: keys && Object.keys(keys).length ? sealKeys(keys, password as string) : null
+    keys: keys && Object.keys(keys).length ? sealKeys(keys, password as string) : null,
+    archive: await archive().exportData()
   }
+  // The archive's raw lines are capped at 20 MB, but saved analyses share the file's limit: if both together are
+  // too much, only the summary goes in, so the file can still be imported.
+  if (JSON.stringify(backup, null, 1).length > MAX_BACKUP_BYTES) backup.archive!.archive = ''
   const day = backup.exportedAt.slice(0, 10)
   const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(wc)!, {
     title: t('Daten exportieren'),
@@ -98,5 +103,7 @@ export async function applyBackup(password: unknown): Promise<string | null> {
   if (keys?.alpaca) await saveAlpacaKeys(keys.alpaca)
   if (keys?.agents) await writeKeys({ ...readKeys(), ...keys.agents })
   for (const a of backup.analyses) await saveAnalysis(a)
+  // A backup with an archive replaces it; one from before the archive leaves the current one alone.
+  if (backup.archive) await archive().importData(backup.archive)
   return backup.store ? JSON.stringify(backup.store) : null
 }

@@ -1,24 +1,30 @@
-import { ArrowUp, BrainCircuit, ChevronDown, ChevronRight, Info, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { ArrowUp, BrainCircuit, ChevronDown, ChevronRight, Gauge, Info, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { forecastCandles, probabilityAbove, Q, trend, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
 import { useStore, type ForecastView } from '../store/useStore'
+import type { Timeframe } from '../../../shared/types'
+import { useSummary } from './ForecastQuality'
 
 export interface ForecastResult {
   /** Bar times of the forecast steps. */
   times: number[]
-  /** Per step the 21 quantile values. */
+  /** Per step the 21 quantile values as shown (calibrated if switched on). */
   steps: number[][]
+  /** The same as the model gave them, uncalibrated (kept in the archive). */
+  raw: number[][]
   /** Median forecast wick lengths above and below the candle body per step, for forecast candles. */
   upperWicks: number[]
   lowerWicks: number[]
   /** Last close the forecast starts from, and its bar time. */
   base: number
   baseTime: number
-  /** Backtest against the real past, null when the history is too short for one. */
-  check: BacktestResult | null
+  /** Backtest against the real past, null when the history is too short for one; 'pending' while it runs. */
+  check: BacktestResult | null | 'pending'
+  /** Backtests being computed while `check` is pending, once the history for them is loaded. */
+  checkTotal?: number
   /** Factor the ranges were calibrated by (see bandScale), null when not calibrated. */
   bandScale: number | null
   /** The latest backtest's median over the real bars after its cutoff (starting at the cutoff close). */
@@ -101,18 +107,24 @@ const HEADLINE = {
 }
 
 /** Card under the forecast button: the forecast in plain words, with the backtest below; folds to its headline. */
-export function ForecastSummary({ result, intraday, showCheck }: {
+export function ForecastSummary({ result, intraday, showCheck, symbol, timeframe, onDetails }: {
   result: ForecastResult
   intraday: boolean
   /** Backtest switched on in the settings. */
   showCheck: boolean
+  symbol: string
+  timeframe: Timeframe
+  /** Opens the "Prognose-Qualität" panel. */
+  onDetails: () => void
 }) {
   // Starts folded each time a forecast is shown.
   const [open, setOpen] = useState(false)
   const [help, setHelp] = useState(false)
+  const row = useSummary(symbol, timeframe, result.steps.length, open)
   const end = result.steps[result.steps.length - 1]
   const up = probabilityAbove(end, result.base)
-  const worse = showCheck && result.check !== null && result.check.error > result.check.naiveError
+  const check = result.check === 'pending' ? null : result.check
+  const worse = showCheck && check !== null && check.error > check.naiveError
   const date = new Date(result.times[result.times.length - 1] * 1000).toLocaleString(locale(), {
     dateStyle: 'medium',
     ...(intraday && { timeStyle: 'short' })
@@ -157,9 +169,26 @@ export function ForecastSummary({ result, intraday, showCheck }: {
           )}
           {showCheck && (
             <div className="mt-2 border-t border-line pt-1">
-              <ForecastCheck check={result.check} scale={result.bandScale} />
+              <ForecastCheck check={result.check} total={result.checkTotal} scale={result.bandScale} />
             </div>
           )}
+          <div className="mt-1 text-muted">
+            <span className="text-slate-300">{t('Bilanz deiner Prognosen:')}</span>{' '}
+            {row
+              ? t('{n} abgerechnet, {k} unabhängig · im 80 %-Bereich {p}', {
+                  n: row.settled,
+                  k: row.independent,
+                  p: pct(row.sum.shown.in80 / row.settled, 0)
+                })
+              : t('noch keine abgerechnet')}
+          </div>
+          <button
+            onClick={onDetails}
+            className="mt-1.5 inline-flex items-center gap-1 rounded bg-line/60 px-2 py-0.5 text-slate-200 hover:bg-line hover:text-white"
+          >
+            <Gauge size={13} />
+            {t('Details …')}
+          </button>
           <div className="mt-2 flex items-center justify-between gap-2 text-muted">
             <span>{t('Keine Anlageberatung')}</span>
             <button
@@ -178,7 +207,20 @@ export function ForecastSummary({ result, intraday, showCheck }: {
 }
 
 /** One-line summary of how well the model forecast this chart's own recent past. */
-export function ForecastCheck({ check, scale }: { check: BacktestResult | null; scale: number | null }) {
+export function ForecastCheck({ check, total, scale }: {
+  check: BacktestResult | null | 'pending'
+  /** Backtests being computed, once known. */
+  total?: number
+  scale: number | null
+}) {
+  if (check === 'pending')
+    return (
+      <div className="mt-1 animate-pulse text-muted">
+        <span className="text-slate-300">{t('Rückblick:')}</span>{' '}
+        {total ? t('prüfe {n} frühere Prognosen …', { n: total }) : t('lade Historie für die Prüfung …')}
+        {useStore.getState().forecastRun.calibrate && <span className="text-amber-200"> · {t('Bänder werden kalibriert …')}</span>}
+      </div>
+    )
   if (!check)
     return (
       <div className="mt-1 text-muted" title={t('Für einen Rückblick muss vor dem Prognosezeitraum noch genug Historie liegen.')}>
@@ -282,9 +324,10 @@ const HELP: [string, [string, string][]][] = [
     msg('Berechnung'),
     [
       [msg('Prognose-Länge'), msg('Wie viele Kerzen in die Zukunft prognostiziert werden. Je weiter, desto unsicherer. Auto nimmt bis zu 64, je nach vorhandener Historie.')],
-      [msg('Rückblick'), msg('Das Modell prognostiziert ab früheren Zeitpunkten und wird mit dem echten Verlauf verglichen. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mehr Rückblicke sind aussagekräftiger, rechnen aber länger.')],
+      [msg('Rückblick'), msg('Das Modell prognostiziert ab bis zu 30 früheren Zeitpunkten, jeder mit mindestens 512 Kerzen Vorgeschichte, und wird mit dem echten Verlauf verglichen; dafür lädt die App bei Bedarf ältere Kerzen nach. Die Prognose erscheint sofort, die Prüfung ein paar Sekunden später. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mit 3 Rückblicken schwanken die Werte allein durch Zufall um rund ±24 Prozentpunkte, mit 30 um rund ±5.')],
       [msg('Bänder kalibrieren'), msg('Streckt oder staucht die Bereiche so, dass im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Der Median bleibt gleich.')],
-      [msg('Automatisch aktualisieren'), msg('Rechnet die Prognose neu, sobald eine neue Kerze beginnt.')]
+      [msg('Automatisch aktualisieren'), msg('Rechnet die Prognose neu, sobald eine neue Kerze beginnt. Die Prüfung von vorher bleibt dabei stehen.')],
+      [msg('Prognosen archivieren'), msg('Jede angezeigte Prognose wird lokal gespeichert (höchstens eine je Kerze) und nach Ablauf ihres Zeitraums mit dem echten Kurs verglichen. Daraus entsteht die Bilanz – eine Prüfung, die nicht auf Rückrechnung beruht.')]
     ]
   ],
   [
@@ -294,7 +337,10 @@ const HELP: [string, [string, string][]][] = [
       [msg('Im 80 %-Bereich'), msg('Anteil der echten Kurse innerhalb des 80 %-Fächers. Gut sind etwa 80 %; deutlich weniger heißt, die Bereiche sind zu schmal, deutlich mehr, sie sind zu breit.')],
       [msg('Richtung'), msg('Wie oft der Median am Ende richtig über oder unter dem Startkurs lag. Etwa die Hälfte entspricht dem Zufall.')],
       [msg('Gegenüber „unverändert“'), msg('Backtest mit festem Kurs: Ab einem früheren Zeitpunkt wird die KI-Prognose mit der einfachsten Schätzung verglichen, dass der Kurs gleich bleibt. Beispiel: Stand der Kurs damals bei 100 €, lautet die einfache Schätzung für jede folgende Kerze 100 €. Orange: Die einfache Schätzung lag näher am echten Verlauf, die KI-Prognose hat bei diesem Chart also womöglich nichts gebracht. Ohne Farbe: Die KI lag näher, das macht sie aber noch nicht verlässlich.')],
-      [msg('Bänder ×… kalibriert'), msg('Faktor, um den die Bereiche gestreckt (über 1) oder gestaucht (unter 1) wurden. Die übrigen Rückblick-Werte gelten für das unkalibrierte Modell.')]
+      [msg('Bänder ×… kalibriert'), msg('Faktor, um den die Bereiche gestreckt (über 1) oder gestaucht (unter 1) wurden. Die übrigen Rückblick-Werte gelten für das unkalibrierte Modell.')],
+      [msg('Kalibrierung geprüft'), msg('Ehrliche Prüfung der Kalibrierung: Der Faktor wird nur aus der älteren Hälfte der Rückblicke berechnet und an der jüngeren Hälfte getestet. Erst ab 10 Rückblicken.')],
+      [msg('Stimmt „Chance ↑“?'), msg('Sagte die KI zum Beispiel 70 % Chance auf einen höheren Kurs, sollte der Kurs in etwa 70 % solcher Fälle auch gestiegen sein. Unter 5 Fällen steht „zu wenige“.')],
+      [msg('Bilanz / unabhängig'), msg('Abgerechnete Prognosen aus dem Archiv. Unabhängig sind die, deren Zeiträume sich nicht überschneiden – nur sie zählen als eigene Belege. Unter 10 unabhängigen ist die Bilanz ein erster Eindruck.')]
     ]
   ],
   [
@@ -442,9 +488,8 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
           value={run.backtestRuns}
           options={[
             [0, t('Aus')],
-            [3, '3'],
-            [5, '5'],
-            [10, '10']
+            [10, '10'],
+            [30, '30']
           ]}
           onChange={(backtestRuns) => setRun({ backtestRuns })}
         />
@@ -462,8 +507,8 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
             <span className="text-slate-200">{t('Bänder kalibrieren')}</span>
             <span className="block text-[11px] leading-snug text-muted">
               {run.backtestRuns
-                ? t('Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 10 Rückblicken am verlässlichsten.')
-                : t('Braucht den Rückblick (3, 5 oder 10).')}
+                ? t('Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 30 Rückblicken am verlässlichsten.')
+                : t('Braucht den Rückblick (10 oder 30).')}
             </span>
           </span>
         </label>
@@ -479,6 +524,28 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
             <span className="block text-[11px] text-muted">{t('Neu berechnen, sobald eine neue Kerze beginnt')}</span>
           </span>
         </label>
+        <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-bg">
+          <input
+            type="checkbox"
+            checked={run.archive}
+            onChange={(e) => setRun({ archive: e.target.checked })}
+            className="mt-0.5 accent-accent"
+          />
+          <span>
+            <span className="text-slate-200">{t('Prognosen archivieren')}</span>
+            <span className="block text-[11px] leading-snug text-muted">
+              {t('Speichert jede Prognose lokal und vergleicht sie später mit dem echten Kurs.')}
+            </span>
+          </span>
+        </label>
+        <button
+          onClick={() => {
+            if (confirm(t('Alle archivierten Prognosen und die Bilanz löschen?'))) void window.api.archive.clear()
+          }}
+          className="ml-6 rounded px-1 py-0.5 text-[11px] text-muted underline-offset-2 hover:text-white hover:underline"
+        >
+          {t('Archiv löschen')}
+        </button>
         {/* Separates the Chronos-2 settings above from the TradingAgents analysis below. */}
         <div className="mx-1 mt-2 h-px bg-line" />
         <p className={heading}>{t('Erweitert · optional')}</p>

@@ -633,10 +633,10 @@ export const EN: Record<string, string> = {
     'Replaces the watchlist, drawings and settings on this computer. KandleOS then reloads.',
   'Bänder kalibrieren':
     'Calibrate ranges',
-  'Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 10 Rückblicken am verlässlichsten.':
-    'Make the ranges as wide as they would have needed to be in the backtests; the median stays the same. Most reliable with 10 backtests.',
-  'Braucht den Rückblick (3, 5 oder 10).':
-    'Needs the backtest (3, 5 or 10).',
+  'Bereiche so breit machen, wie sie im Rückblick hätten sein müssen; der Median bleibt gleich. Mit 30 Rückblicken am verlässlichsten.':
+    'Make the ranges as wide as they would have needed to be in the backtests; the median stays the same. Most reliable with 30 backtests.',
+  'Braucht den Rückblick (10 oder 30).':
+    'Needs the backtest (10 or 30).',
   'Bänder ×{f} kalibriert':
     'ranges calibrated ×{f}',
   'Bänder kalibriert: Die Unsicherheitsbereiche sind um den Faktor {f} gestreckt (über 1) oder gestaucht (unter 1), damit im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Die Werte oben gelten für das unkalibrierte Modell.':
@@ -689,12 +689,12 @@ export const EN: Record<string, string> = {
     'Box with the median, the ranges and the probability that the price ends up above the current price.',
   'Wie viele Kerzen in die Zukunft prognostiziert werden. Je weiter, desto unsicherer. Auto nimmt bis zu 64, je nach vorhandener Historie.':
     'How many candles into the future are forecast. The further, the less certain. Auto uses up to 64, depending on the available history.',
-  'Das Modell prognostiziert ab früheren Zeitpunkten und wird mit dem echten Verlauf verglichen. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mehr Rückblicke sind aussagekräftiger, rechnen aber länger.':
-    'The model forecasts from earlier points in time and is compared with what really happened. The most recent of these forecasts is dotted grey in the chart. More backtests are more meaningful but take longer.',
+  'Das Modell prognostiziert ab bis zu 30 früheren Zeitpunkten, jeder mit mindestens 512 Kerzen Vorgeschichte, und wird mit dem echten Verlauf verglichen; dafür lädt die App bei Bedarf ältere Kerzen nach. Die Prognose erscheint sofort, die Prüfung ein paar Sekunden später. Die jüngste dieser Prognosen ist grau gepunktet im Chart. Mit 3 Rückblicken schwanken die Werte allein durch Zufall um rund ±24 Prozentpunkte, mit 30 um rund ±5.':
+    'The model forecasts from up to 30 earlier points in time, each with at least 512 candles of history, and is compared with what really happened; for that the app loads older candles when needed. The forecast appears right away, the check a few seconds later. The most recent of these forecasts is dotted grey in the chart. With 3 backtests the figures swing by about ±24 percentage points by chance alone, with 30 by about ±5.',
   'Streckt oder staucht die Bereiche so, dass im Rückblick 80 % der echten Kurse im 80 %-Bereich lagen. Der Median bleibt gleich.':
     'Widens or narrows the ranges so that in the backtest 80 % of the real prices lay within the 80 % range. The median stays the same.',
-  'Rechnet die Prognose neu, sobald eine neue Kerze beginnt.':
-    'Recalculates the forecast as soon as a new candle starts.',
+  'Rechnet die Prognose neu, sobald eine neue Kerze beginnt. Die Prüfung von vorher bleibt dabei stehen.':
+    'Recalculates the forecast as soon as a new candle starts. The earlier check stays in place.',
   'Werte im Rückblick':
     'Backtest values',
   'Ø Abweichung':
@@ -794,5 +794,50 @@ export const EN: Record<string, string> = {
   'Ältere Kerzen konnten nicht geladen werden': 'Could not load older candles',
   'Zeichnungen seit dem Speichern gehen verloren. „{name}“ wieder laden?': 'Drawings made since saving will be lost. Load “{name}” again?',
   'Chance': 'Chance',
-  'Schluss': 'Close'
+  'Schluss': 'Close',
+  'prüfe {n} frühere Prognosen …': 'checking {n} earlier forecasts …',
+  'lade Historie für die Prüfung …': 'loading history for the check …',
+  'Bänder werden kalibriert …': 'calibrating ranges …',
+  'Prognosen archivieren': 'Archive forecasts',
+  'Speichert jede Prognose lokal und vergleicht sie später mit dem echten Kurs.': 'Keeps every forecast on this computer and later compares it with the real price.',
+  'Jede angezeigte Prognose wird lokal gespeichert (höchstens eine je Kerze) und nach Ablauf ihres Zeitraums mit dem echten Kurs verglichen. Daraus entsteht die Bilanz – eine Prüfung, die nicht auf Rückrechnung beruht.': 'Every forecast shown is stored on this computer (at most one per candle) and compared with the real price once its period is over. That builds the record – a check that does not rely on looking back.',
+  'Kalibrierung geprüft': 'Calibration checked',
+  'Ehrliche Prüfung der Kalibrierung: Der Faktor wird nur aus der älteren Hälfte der Rückblicke berechnet und an der jüngeren Hälfte getestet. Erst ab 10 Rückblicken.': 'An honest check of the calibration: the factor is computed from the older half of the backtests only and tested on the newer half. From 10 backtests on.',
+  'Stimmt „Chance ↑“?': 'Does “Chance ↑” hold?',
+  'Sagte die KI zum Beispiel 70 % Chance auf einen höheren Kurs, sollte der Kurs in etwa 70 % solcher Fälle auch gestiegen sein. Unter 5 Fällen steht „zu wenige“.': 'If the AI gave, say, a 70 % chance of a higher price, the price should have risen in about 70 % of such cases. Below 5 cases it reads “too few”.',
+  'Bilanz / unabhängig': 'Record / independent',
+  'Abgerechnete Prognosen aus dem Archiv. Unabhängig sind die, deren Zeiträume sich nicht überschneiden – nur sie zählen als eigene Belege. Unter 10 unabhängigen ist die Bilanz ein erster Eindruck.': 'Settled forecasts from the archive. Independent are those whose periods do not overlap – only they count as separate evidence. Below 10 independent ones the record is a first impression.',
+  'Bilanz deiner Prognosen:': 'Record of your forecasts:',
+  '{n} abgerechnet, {k} unabhängig · im 80 %-Bereich {p}': '{n} settled, {k} independent · in 80 % range {p}',
+  'noch keine abgerechnet': 'none settled yet',
+  'Details …': 'Details …',
+  'Alle archivierten Prognosen und die Bilanz löschen?': 'Delete all archived forecasts and the record?',
+  'Archiv löschen': 'Clear archive',
+  'Soll: {p}': 'Target: {p}',
+  'unter 40 %': 'below 40 %',
+  '40–60 %': '40–60 %',
+  'über 60 %': 'above 60 %',
+  'KI sagte': 'AI said',
+  'Ø Chance': 'avg. chance',
+  'Kurs stieg': 'price rose',
+  'Fälle': 'cases',
+  'zu wenige': 'too few',
+  'Prüfe frühere Prognosen …': 'Checking earlier forecasts …',
+  '{n} frühere Prognosen über je {steps} Kerzen, jede mit dem echten Verlauf danach verglichen.': '{n} earlier forecasts of {steps} candles each, every one compared with what really followed.',
+  'Wie oft lag der echte Kurs im Bereich?': 'How often was the real price inside the range?',
+  '80 %-Bereich an den jüngeren {n} Rückblicken: ohne Kalibrierung {raw}, kalibriert {calibrated} (Faktor {f}, nur aus den älteren berechnet).': '80 % range on the newer {n} backtests: uncalibrated {raw}, calibrated {calibrated} (factor {f}, computed from the older ones only).',
+  'Wird ab 10 Rückblicken geprüft.': 'Checked from 10 backtests on.',
+  'Genauigkeit': 'Accuracy',
+  'Ø Abweichung {error} · Richtung {hits}/{runs} richtig': 'avg. error {error} · direction {hits}/{runs} right',
+  'Noch keine Prognose für {label} abgerechnet. Das geschieht, sobald ihr Zeitraum vorbei ist – beim Öffnen des Werts oder beim App-Start.': 'No forecast for {label} settled yet. That happens once its period is over – when the symbol is opened or the app starts.',
+  'Archivieren ist ausgeschaltet (Prognose-Einstellungen).': 'Archiving is switched off (forecast settings).',
+  '{n} deiner Prognosen abgerechnet, davon {k} unabhängig (Zeiträume ohne Überschneidung).': '{n} of your forecasts settled, {k} of them independent (periods without overlap).',
+  'Noch zu wenige für eine sichere Aussage.': 'Still too few for a firm conclusion.',
+  'Wie oft lag der echte Kurs im Bereich (wie angezeigt)?': 'How often was the real price inside the range (as shown)?',
+  'Ohne Kalibrierung: 80 %-Bereich {p}': 'Uncalibrated: 80 % range {p}',
+  'Ø Abweichung {error} · Richtung {p} richtig': 'avg. error {error} · direction {p} right',
+  'Prognose-Qualität': 'Forecast quality',
+  'Bilanz': 'Record',
+  'Erst eine KI-Prognose berechnen.': 'Compute an AI forecast first.',
+  '{n} Schritte': '{n} steps'
 }

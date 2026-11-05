@@ -44,6 +44,15 @@ test('a backup is parsed only when it looks like one', () => {
     assert.throws(() => parseBackup(bad), bad.slice(0, 60))
 })
 
+test('the forecast archive is optional and dropped when it is not text', () => {
+  assert.equal(parseBackup(backup()).archive, undefined)
+  const ok = parseBackup(backup({ archive: { archive: '{"entry":{}}\n', summary: {} } }))
+  assert.equal(ok.archive?.archive, '{"entry":{}}\n')
+  const bad = parseBackup(backup({ archive: { archive: 42, summary: {} } }))
+  assert.equal(bad.archive, undefined)
+  assert.equal(bad.app, 'KandleOS')
+})
+
 test('imported key blobs cannot choose expensive key-derivation settings', () => {
   const sealed = sealKeys(keys, 'richtig-langes-passwort')
   assert.equal(parseBackup(backup({ keys: sealed })).keys?.data, sealed.data)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { backtest, backtestCutoffs, bandScale, forecastCandles, probabilityAbove, Q, QUANTILES, scaleBands, trend } from './forecast.ts'
+import { backtest, bandScale, checkCutoffs, forecastCandles, groupBatches, historyNeeded, probabilityAbove, Q, QUANTILES, scaleBands, trend } from './forecast.ts'
 
 // A step whose quantile values equal 100 + 100 × level: 101 at 1 %, 150 at the median, 199 at 99 %.
 const step = QUANTILES.map((l) => 100 + 100 * l)
@@ -21,10 +21,26 @@ test('trend calls 40 to 60 % flat and only clearer chances a direction', () => {
   assert.deepEqual([0.39, 0.4, 0.5, 0.6, 0.61].map(trend), ['down', 'flat', 'flat', 'flat', 'up'])
 })
 
-test('backtestCutoffs steps back one horizon at a time while enough history is left', () => {
-  assert.deepEqual(backtestCutoffs(1000, 64), [936, 872, 808])
-  assert.deepEqual(backtestCutoffs(42, 5), [37, 32])
-  assert.deepEqual(backtestCutoffs(35, 8), [])
+test('checkCutoffs steps back one horizon at a time while 512 bars of history are left', () => {
+  const c = checkCutoffs(2600, 64, 30)
+  assert.equal(c.length, 30)
+  assert.equal(c[0], 2536)
+  assert.equal(c[29], 680)
+  const page = checkCutoffs(1000, 64, 30)
+  assert.equal(page.length, 7)
+  assert.equal(page[6], 552)
+  assert.deepEqual(checkCutoffs(400, 64, 30), [])
+  assert.equal(historyNeeded(64, 30), 2432)
+})
+
+test('groupBatches packs whole groups into batches of at most 16 series', () => {
+  // Close, two wicks as one group, then 30 backtests each on its own.
+  const groups = [0, 1, 1, ...Array.from({ length: 30 }, (_, k) => 2 + k)]
+  const b = groupBatches(groups)
+  assert.ok(b.every((x) => x.length <= 16))
+  assert.deepEqual(b.flat(), groups.map((_, i) => i))
+  assert.ok(b.some((x) => x.includes(1) && x.includes(2))) // the wick group stays together
+  assert.throws(() => groupBatches(Array(17).fill(0)))
 })
 
 test('backtest measures deviation, range hits and direction against the real closes', () => {
@@ -40,6 +56,30 @@ test('backtest measures deviation, range hits and direction against the real clo
   assert.equal(r.inside80, 1)
   assert.equal(r.inside50, 2 / 3) // 103 lies outside the 50 % range
   assert.equal(r.direction, 1) // both the forecast and the real close end above the 100 at the cutoff
+})
+
+// Closes that wobble around 100 and per backtest a forecast with median 100 and an 80 % range of 98..102.
+const wobble = Array.from({ length: 200 }, (_, i) => 100 + 6 * Math.sin(i))
+const narrow = (steps: number) => Array.from({ length: steps }, () => QUANTILES.map((l) => 100 + (l - 0.5) * 5))
+const cutoffsOf = (runs: number, steps: number) => Array.from({ length: runs }, (_, k) => 190 - (k + 1) * steps)
+
+test('backtest adds the 90 % range and three chance groups that hold every run', () => {
+  const closes = Array.from({ length: 40 }, (_, i) => 100 + i)
+  const exact = (c: number) => Array.from({ length: 5 }, (_, i) => QUANTILES.map((l) => closes[c + i] * (1 + (l - 0.5) * 0.4)))
+  const r = backtest(closes, [30, 20, 10], [exact(30), exact(20), exact(10)], 5)
+  assert.equal(r.inside50, 1)
+  assert.equal(r.inside80, 1)
+  assert.equal(r.inside90, 1)
+  assert.equal(r.chance.length, 3)
+  assert.equal(r.chance.reduce((s, g) => s + g.cases, 0), 3)
+})
+
+test('backtest checks the calibration on the newer half with a factor from the older half', () => {
+  const r = backtest(wobble, cutoffsOf(12, 5), Array.from({ length: 12 }, () => narrow(5)), 5)
+  assert.ok(r.calibration, 'calibration checked')
+  assert.ok(r.calibration.factor > 1, `factor ${r.calibration.factor}`)
+  assert.ok(r.calibration.calibrated > r.calibration.raw, JSON.stringify(r.calibration))
+  assert.equal(backtest(wobble, cutoffsOf(9, 5), Array.from({ length: 9 }, () => narrow(5)), 5).calibration, null)
 })
 
 test('bandScale widens ranges that were too narrow and narrows ranges that were too wide', () => {

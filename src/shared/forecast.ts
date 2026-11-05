@@ -1,5 +1,4 @@
 // Reading Chronos-2 output: each forecast step holds 21 quantiles of the predicted close.
-import { FORECAST_MIN_BARS } from './types.ts'
 
 /** Quantile level of each of the 21 values per step. */
 export const QUANTILES = [
@@ -29,15 +28,48 @@ export function trend(up: number): 'up' | 'down' | 'flat' {
   return up > 0.6 ? 'up' : up < 0.4 ? 'down' : 'flat'
 }
 
+/** History a backtest needs before its cutoff: with less, Chronos-2 forecasts measurably worse (test 4.11.). */
+export const MIN_CONTEXT = 512
+
 /**
- * Where backtests start: forecasts made `steps`, 2×`steps`, ... bars before the end, so each one can be
- * compared with the bars that really followed. Only cutoffs with enough history for the model count.
+ * Where backtests start: forecasts made `steps`, 2×`steps`, ... bars before the end (newest first), so each one
+ * can be compared with the bars that really followed and none overlaps another.
  */
-export function backtestCutoffs(bars: number, steps: number, max = 3): number[] {
+export function checkCutoffs(bars: number, steps: number, max: number): number[] {
   const out: number[] = []
-  for (let k = 1; k <= max && bars - k * steps >= FORECAST_MIN_BARS; k++) out.push(bars - k * steps)
+  for (let k = 1; k <= max && bars - k * steps >= MIN_CONTEXT; k++) out.push(bars - k * steps)
   return out
 }
+
+/** Bars needed for `runs` backtests of `steps` each. */
+export const historyNeeded = (steps: number, runs: number): number => runs * steps + MIN_CONTEXT
+
+/** Series indexes in model calls of at most `size`; series sharing a group id always go into the same call. */
+export function groupBatches(groups: number[], size = 16): number[][] {
+  const byGroup = new Map<number, number[]>()
+  groups.forEach((g, i) => byGroup.set(g, [...(byGroup.get(g) ?? []), i]))
+  const out: number[][] = []
+  for (const members of byGroup.values()) {
+    if (members.length > size) throw new Error('group larger than one model call')
+    const last = out[out.length - 1]
+    if (last && last.length + members.length <= size) last.push(...members)
+    else out.push([...members])
+  }
+  return out
+}
+
+/** "KI sagte x %": runs whose chance of a higher close at the last step fell into [from, to). */
+export interface ChanceGroup {
+  from: number
+  to: number
+  cases: number
+  /** Mean chance the model gave, and the share of runs that really ended higher. */
+  said: number
+  rose: number
+}
+
+// Same thresholds as trend(): below 40 % "eher fallend", above 60 % "eher steigend".
+const CHANCE_EDGES: [number, number][] = [[0, 0.4], [0.4, 0.6], [0.6, 1]]
 
 export interface BacktestResult {
   runs: number
@@ -49,8 +81,30 @@ export interface BacktestResult {
   /** Share of real closes inside the 80 % and 50 % ranges (ideally about 0.8 and 0.5). */
   inside80: number
   inside50: number
+  inside90: number
   /** Runs whose median got the direction from the cutoff to the end of the horizon right. */
   direction: number
+  /** Did "Chance ↑" hold? Always three groups (below 40 %, 40–60 %, above 60 %). */
+  chance: ChanceGroup[]
+  /**
+   * Share of real closes in the 80 % range of the newer half of the runs, as the model gave it and stretched by a
+   * factor from the older half; null below 10 runs.
+   */
+  calibration: { raw: number; calibrated: number; factor: number } | null
+}
+
+/** Share of real closes within the 80 % range over the given runs. */
+function inside80(closes: number[], cutoffs: number[], forecasts: number[][][], steps: number): number {
+  let n = 0
+  let hits = 0
+  cutoffs.forEach((c, r) => {
+    for (let i = 0; i < steps; i++) {
+      const real = closes[c + i]
+      if (real >= forecasts[r][i][Q.p10] && real <= forecasts[r][i][Q.p90]) hits++
+      n++
+    }
+  })
+  return n ? hits / n : 0
 }
 
 /** Compares backtest forecasts (one per cutoff, as from backtestCutoffs) with the closes that followed. */
@@ -59,8 +113,10 @@ export function backtest(closes: number[], cutoffs: number[], forecasts: number[
   let naiveError = 0
   let in80 = 0
   let in50 = 0
+  let in90 = 0
   let direction = 0
   let n = 0
+  const chance = CHANCE_EDGES.map(([from, to]) => ({ from, to, cases: 0, said: 0, rose: 0 }))
   cutoffs.forEach((c, r) => {
     const f = forecasts[r]
     const base = closes[c - 1]
@@ -71,11 +127,42 @@ export function backtest(closes: number[], cutoffs: number[], forecasts: number[
       naiveError += Math.abs(base - real) / real
       if (real >= q[Q.p10] && real <= q[Q.p90]) in80++
       if (real >= q[Q.p25] && real <= q[Q.p75]) in50++
+      if (real >= q[Q.p05] && real <= q[Q.p95]) in90++
       n++
     }
-    if (Math.sign(f[steps - 1][Q.median] - base) === Math.sign(closes[c + steps - 1] - base)) direction++
+    const end = closes[c + steps - 1]
+    if (Math.sign(f[steps - 1][Q.median] - base) === Math.sign(end - base)) direction++
+    const up = probabilityAbove(f[steps - 1], base)
+    // Exactly 40 or 60 % count as no clear view, as in trend().
+    const g = chance[up < 0.4 ? 0 : up <= 0.6 ? 1 : 2]
+    g.cases++
+    g.said += up
+    g.rose += end > base ? 1 : 0
   })
-  return { runs: cutoffs.length, steps, error: error / n, naiveError: naiveError / n, inside80: in80 / n, inside50: in50 / n, direction }
+  for (const g of chance) if (g.cases) [g.said, g.rose] = [g.said / g.cases, g.rose / g.cases]
+  // Cutoffs come newest first: the older half sets the factor, the newer half checks it.
+  const half = Math.floor(cutoffs.length / 2)
+  const newer = { c: cutoffs.slice(0, half), f: forecasts.slice(0, half) }
+  const factor = cutoffs.length >= 10 ? bandScale(closes, cutoffs.slice(half), forecasts.slice(half), steps) : 0
+  const calibration = factor
+    ? {
+        raw: inside80(closes, newer.c, newer.f, steps),
+        calibrated: inside80(closes, newer.c, newer.f.map((s) => scaleBands(s, factor)), steps),
+        factor
+      }
+    : null
+  return {
+    runs: cutoffs.length,
+    steps,
+    error: error / n,
+    naiveError: naiveError / n,
+    inside80: in80 / n,
+    inside50: in50 / n,
+    inside90: in90 / n,
+    direction,
+    chance,
+    calibration
+  }
 }
 
 /**

@@ -50,11 +50,13 @@ export interface ForecastRun {
    * Number of earlier forecasts compared with what really happened (accuracy line and the latest one drawn
    * grey over the real bars); 0 switches the backtest off and saves computing it.
    */
-  backtestRuns: 0 | 3 | 5 | 10
+  backtestRuns: 0 | 10 | 30
   /** Stretch or shrink the ranges so that in the backtests 80 % of the real closes lay in the 80 % range. */
   calibrate: boolean
   /** Recompute a shown forecast whenever a new candle begins. */
   autoUpdate: boolean
+  /** Keep every shown forecast in the local archive and settle it against the real closes later. */
+  archive: boolean
 }
 
 /** Choices for the analysis with TradingAgents; the API keys themselves live encrypted in the main process. */
@@ -267,7 +269,7 @@ export const useStore = create<State>()(
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
       forecastView: { style: 'line', band50: true, band80: true, band90: true, hover: true },
       setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
-      forecastRun: { horizon: 'auto', backtestRuns: 3, calibrate: false, autoUpdate: false },
+      forecastRun: { horizon: 'auto', backtestRuns: 30, calibrate: false, autoUpdate: false, archive: true },
       setForecastRun: (patch) => set((s) => ({ forecastRun: { ...s.forecastRun, ...patch } })),
       agentsConfig: {
         provider: 'anthropic',
@@ -372,7 +374,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'kandleos',
-      version: 4,
+      version: 5,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -399,6 +401,11 @@ export const useStore = create<State>()(
           p.drawings = Object.fromEntries(
             (p.tabs as ChartTab[]).flatMap((t) => Object.entries(old).map(([sym, list]) => [`${t.id}:${sym}`, list]))
           )
+        }
+        // v4 offered 3, 5 or 10 backtests; those were too few to trust, so a backtest that was on becomes 30.
+        if (version < 5) {
+          const run = p.forecastRun as Partial<ForecastRun> | undefined
+          if (run && [3, 5, 10].includes(run.backtestRuns as number)) run.backtestRuns = 30
         }
         return p as unknown as State
       },

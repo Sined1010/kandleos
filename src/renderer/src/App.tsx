@@ -9,6 +9,7 @@ import TopBar from './components/TopBar'
 import { checkForUpdate } from './components/UpdateBadge'
 import Watchlist from './components/Watchlist'
 import WelcomeModal from './components/WelcomeModal'
+import { settleDue } from './services/archive'
 import { watchQuotes } from './services/marketData'
 import { setFeedStatus, setQuote, useStore } from './store/useStore'
 
@@ -37,6 +38,11 @@ export default function App() {
   useEffect(() => {
     if (updateCheck) void checkForUpdate()
   }, [updateCheck])
+  // Settle finished forecasts of every symbol once, after the first chart had time to load.
+  useEffect(() => {
+    const timer = setTimeout(() => void settleDue(), 10_000)
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
     // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.

@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from 'react'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
 import { HISTORY_LIMIT, mayLoadOlder, OLDER_RETRY_MS, prependOlder } from '../../../shared/history'
-import { backtest, backtestCutoffs, bandScale, forecastCandles, Q, scaleBands } from '../../../shared/forecast'
+import { backtest, bandScale, checkCutoffs, forecastCandles, historyNeeded, Q, scaleBands, type BacktestResult } from '../../../shared/forecast'
 import type { Decision } from '../../../shared/agents'
 import { locale, msg, t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
@@ -41,6 +41,8 @@ import { sessionLine } from '../lib/sessionLine'
 import { loadCandles, watchCandles } from '../services/marketData'
 import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
+import ForecastQuality from './ForecastQuality'
+import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
 import FullscreenButton from './FullscreenButton'
@@ -130,6 +132,9 @@ export default function ChartArea() {
   // Comprehensive analysis with TradingAgents (opened from the KI-Prognose menu): side panel, its setup
   // dialog and the levels of the analysis shown.
   const [agentsOpen, setAgentsOpen] = useState(false)
+  // "Prognose-Qualität" panel (from the forecast card); it takes the same right edge as the analysis panel.
+  const [qualityOpen, setQualityOpen] = useState(false)
+  const sideOpen = agentsOpen || qualityOpen
   const [agentsSetup, setAgentsSetup] = useState(false)
   const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
@@ -148,21 +153,24 @@ export default function ChartArea() {
     if (h && h !== 'loading') hintTimer.current = setTimeout(() => setOlderHint(null), 4000)
   }
 
-  const loadOlder = () => {
+  /** Puts the next older section in front; also used by the forecast check, which needs more history. */
+  const fetchOlder = (): Promise<'added' | 'end' | 'limit' | 'error' | 'busy'> => {
     const o = older.current
     const bars = dataRef.current
-    if (!api || !mayLoadOlder(o, Date.now()) || !bars.length) return
+    if (!api || !bars.length || o.done) return Promise.resolve(o.done ? 'end' : 'error')
+    if (!mayLoadOlder(o, Date.now())) return Promise.resolve(o.busy ? 'busy' : 'error')
     const gen = o.gen
     o.busy = true
     hint('loading')
-    loadCandles(symbol, timeframe, finnhubKey, extended, { before: bars[0].time, provider: o.provider })
-      .then(({ candles }) => {
-        if (gen !== older.current.gen) return
+    return loadCandles(symbol, timeframe, finnhubKey, extended, { before: bars[0].time, provider: o.provider })
+      .then(({ candles }): 'added' | 'end' | 'limit' | 'error' => {
+        if (gen !== older.current.gen) return 'error'
         const merged = prependOlder(dataRef.current, candles)
         const added = merged.length - dataRef.current.length
         if (added <= 0) {
           o.done = true
-          return hint('end')
+          hint('end')
+          return 'end'
         }
         // Keep the view where it was: logical indexes shift by the number of bars put in front.
         const view = api.chart.timeScale().getVisibleLogicalRange()
@@ -173,16 +181,19 @@ export default function ChartArea() {
         setData([...merged])
         o.done = merged.length >= HISTORY_LIMIT
         hint(o.done ? 'limit' : null)
+        return o.done ? 'limit' : 'added'
       })
-      .catch(() => {
-        if (gen !== older.current.gen) return
+      .catch((): 'error' => {
+        if (gen !== older.current.gen) return 'error'
         o.retryAt = Date.now() + OLDER_RETRY_MS
         hint('error')
+        return 'error'
       })
       .finally(() => {
         if (gen === older.current.gen) o.busy = false
       })
   }
+  const loadOlder = () => void fetchOlder()
   // The range subscription is made once; it always calls the current loadOlder.
   const loadOlderRef = useRef(loadOlder)
   loadOlderRef.current = loadOlder
@@ -435,11 +446,89 @@ export default function ChartArea() {
   useEffect(() => {
     return () => {
       fcRun.current++
+      lastCheck.current = null
       setFc({ state: 'idle' })
     }
   }, [api, symbol, timeframe])
 
   const toggleForecast = () => (fc.state === 'shown' ? setFc({ state: 'idle' }) : runForecast())
+
+  const archiveContext = (auto: boolean): ArchiveContext => ({
+    symbol,
+    timeframe,
+    provider: older.current.provider,
+    extended,
+    timeZone: timezoneRef.current,
+    auto
+  })
+
+  // Settle this symbol's finished forecasts when it is opened.
+  useEffect(() => {
+    void settleDue(symbol)
+  }, [symbol])
+
+  // The last check of this chart and its calibration factor, reused by the automatic refresh.
+  const lastCheck = useRef<{ check: BacktestResult | null; scale: number | null; path: ForecastResult['backtestPath'] } | null>(null)
+
+  /**
+   * Backtests after the forecast is shown: loads older bars until `runs` backtests with enough history fit,
+   * then compares them with what really followed. A forecast made stale meanwhile drops the result.
+   */
+  const runCheck = async (run: number, shown: ForecastResult, n: number, runs: number, calibrate: boolean) => {
+    const { raw } = shown
+    const update = (patch: Partial<ForecastResult>) =>
+      setFc((f) => (run === fcRun.current && f.result ? { ...f, result: { ...f.result, ...patch } } : f))
+    // With calibration the forecast is archived once its factor is known (or without one if the check fails).
+    const archiveNow = (scale: number | null) => calibrate && archiveForecast({ ...shown, bandScale: scale }, archiveContext(false))
+    // The bars can be reloaded without a new forecast (extended hours, source or key changed); this check's
+    // fetchOlder still carries the old settings then, so it must stop before it touches the new bars.
+    const gen = older.current.gen
+    const stale = () => run !== fcRun.current || gen !== older.current.gen
+    const drop = () => run === fcRun.current && update({ check: null, checkTotal: undefined })
+    try {
+      for (let tries = 0; dataRef.current.length < historyNeeded(n, runs) && tries < 40; tries++) {
+        if (stale()) return drop()
+        const r = await fetchOlder()
+        if (stale()) return drop()
+        // The user scrolling left is loading a section already; wait for it instead of stopping.
+        if (r === 'busy') await new Promise((ok) => setTimeout(ok, 300))
+        else if (r !== 'added') break
+      }
+      if (stale()) return drop()
+      const bars = dataRef.current
+      const closes = bars.map((c) => c.close)
+      const cutoffs = checkCutoffs(bars.length, n, runs)
+      if (!cutoffs.length) {
+        lastCheck.current = { check: null, scale: null, path: null }
+        archiveNow(null)
+        return update({ check: null })
+      }
+      update({ checkTotal: cutoffs.length })
+      const past = await window.api.forecast(
+        cutoffs.map((c) => closes.slice(0, c)),
+        cutoffs.map((_, k) => k)
+      )
+      if (stale()) return drop()
+      const check = backtest(closes, cutoffs, past, n)
+      // Calibration only stretches the ranges around the median; the backtest line keeps the raw model's accuracy.
+      const scale = calibrate ? bandScale(closes, cutoffs, past, n) : null
+      const c = cutoffs[0]
+      // The latest backtest's median over the real bars that followed its cutoff.
+      const path = [
+        { time: bars[c - 1].time, value: closes[c - 1] },
+        ...past[0].slice(0, n).map((q, i) => ({ time: bars[c + i].time, value: q[Q.median] }))
+      ]
+      lastCheck.current = { check, scale, path }
+      update({ check, checkTotal: undefined, bandScale: scale, steps: scale === null ? raw : scaleBands(raw, scale), backtestPath: path })
+      archiveNow(scale)
+    } catch {
+      // A failed check leaves the forecast as it is.
+      if (run === fcRun.current) {
+        update({ check: null, checkTotal: undefined })
+        archiveNow(null)
+      }
+    }
+  }
 
   /** Computes the forecast; `quiet` keeps the shown one (and the view) until the new one is ready. */
   const runForecast = async (quiet = false) => {
@@ -458,44 +547,37 @@ export default function ChartArea() {
       const lower = bars.map((c) => Math.min(c.open, c.close) - c.low)
       const { horizon, backtestRuns, calibrate } = useStore.getState().forecastRun
       const n = forecastSteps(timeframe, bars.length, horizon === 'auto' ? 64 : horizon)
-      const cutoffs = backtestCutoffs(bars.length, n, backtestRuns)
-      // One model call: the close on its own (grouping it with the wicks made it measurably worse in
-      // backtests), the two wick series as a group of their own, and the close at each backtest cutoff.
-      const [live, liveUpper, liveLower, ...past] = await window.api.forecast(
-        [closes, upper, lower, ...cutoffs.map((c) => closes.slice(0, c))],
-        [0, 1, 1, ...cutoffs.map((_, k) => 2 + k)]
-      )
+      // The close on its own (grouping it with the wicks made it measurably worse in backtests) and the two
+      // wick series as a group of their own; the backtests follow once the forecast is shown.
+      const [live, liveUpper, liveLower] = await window.api.forecast([closes, upper, lower], [0, 1, 1])
       if (run !== fcRun.current) return
       const median = (q: number[][]) => q.slice(0, n).map((v) => v[Q.median])
       const last = bars[bars.length - 1]
-      const c = cutoffs[0]
-      // Calibration only stretches the ranges around the median; the backtest line keeps the raw model's accuracy.
-      const scale = calibrate && cutoffs.length ? bandScale(closes, cutoffs, past, n) : null
-      setFc({
-        state: 'shown',
-        result: {
-          times: futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe]),
-          steps: scale === null ? live.slice(0, n) : scaleBands(live.slice(0, n), scale),
-          bandScale: scale,
-          upperWicks: median(liveUpper),
-          lowerWicks: median(liveLower),
-          base: last.close,
-          baseTime: last.time,
-          check: cutoffs.length ? backtest(closes, cutoffs, past, n) : null,
-          // The latest backtest's median over the real bars that followed its cutoff.
-          backtestPath:
-            c === undefined
-              ? null
-              : [
-                  { time: times[c - 1], value: closes[c - 1] },
-                  ...median(past[0]).map((value, i) => ({ time: times[c + i], value }))
-                ]
-        }
-      })
+      const raw = live.slice(0, n)
+      // The automatic refresh keeps the last check, so the ranges do not change with every new candle.
+      const reuse = quiet && backtestRuns ? lastCheck.current : null
+      const scale = reuse && calibrate ? reuse.scale : null
+      const result: ForecastResult = {
+        times: futureTimes(times, TF_SECONDS[timeframe], n, timezoneRef.current, TF_MONTHS[timeframe]),
+        raw,
+        steps: scale === null ? raw : scaleBands(raw, scale),
+        bandScale: scale,
+        upperWicks: median(liveUpper),
+        lowerWicks: median(liveLower),
+        base: last.close,
+        baseTime: last.time,
+        check: !backtestRuns ? null : reuse ? reuse.check : 'pending',
+        backtestPath: reuse?.path ?? null
+      }
+      setFc({ state: 'shown', result })
+      // Archived as shown: with calibration that waits for the check's factor.
+      const awaitFactor = calibrate && backtestRuns > 0 && !reuse
+      if (!awaitFactor) archiveForecast(result, archiveContext(quiet))
       // Widen the view so the whole forecast is visible; the left edge stays where the user put it.
       const view = api.chart.timeScale().getVisibleLogicalRange()
       if (!quiet && view && view.to < bars.length + n)
         api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
+      if (backtestRuns && !reuse) void runCheck(run, result, n, backtestRuns, calibrate)
     } catch (e) {
       const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
       // A failed refresh keeps the forecast already shown.
@@ -686,13 +768,13 @@ export default function ChartArea() {
       <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
         {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
-        <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: agentsOpen ? AGENTS_WIDTH : 0 }} />
+        <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: sideOpen ? AGENTS_WIDTH : 0 }} />
         {api && currency && (
           // In the empty corner below the price axis (the chart library has no axis title; tick labels fill the axis itself).
           <span
             className="absolute bottom-0 z-10 flex items-center justify-center text-[11px] font-medium text-slate-300"
             style={{
-              right: agentsOpen ? AGENTS_WIDTH : 0,
+              right: sideOpen ? AGENTS_WIDTH : 0,
               width: api.chart.priceScale('right').width(),
               height: api.chart.timeScale().height()
             }}
@@ -706,7 +788,7 @@ export default function ChartArea() {
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
-          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 547 : 215) }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 547 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -723,7 +805,7 @@ export default function ChartArea() {
             with its display settings right next to it and the summary card to its left. */}
         <div
           className="absolute top-2 z-30 flex items-start gap-2"
-          style={{ right: (agentsOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {fc.result && (
@@ -731,6 +813,12 @@ export default function ChartArea() {
               result={fc.result}
               intraday={TF_SECONDS[timeframe] < 86400}
               showCheck={forecastRun.backtestRuns > 0}
+              symbol={symbol}
+              timeframe={timeframe}
+              onDetails={() => {
+                setAgentsOpen(false)
+                setQualityOpen(true)
+              }}
             />
           )}
           <div className="relative flex">
@@ -777,7 +865,15 @@ export default function ChartArea() {
             >
               <SlidersHorizontal size={15} />
             </button>
-            {fcMenu && <ForecastSettings onClose={() => setFcMenu(false)} onOpenAnalysis={() => setAgentsOpen(true)} />}
+            {fcMenu && (
+              <ForecastSettings
+                onClose={() => setFcMenu(false)}
+                onOpenAnalysis={() => {
+                  setQualityOpen(false)
+                  setAgentsOpen(true)
+                }}
+              />
+            )}
           </div>
         </div>
         {fc.result && fcHover && (
@@ -811,6 +907,13 @@ export default function ChartArea() {
           onClose={() => setAgentsOpen(false)}
           onSetup={() => setAgentsSetup(true)}
           onLevels={setAgentLevels}
+        />
+        <ForecastQuality
+          open={qualityOpen}
+          symbol={symbol}
+          timeframe={timeframe}
+          result={fc.result ?? null}
+          onClose={() => setQualityOpen(false)}
         />
       </div>
       {agentsSetup && <AgentsSetup onClose={() => setAgentsSetup(false)} />}

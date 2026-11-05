@@ -18,6 +18,7 @@ import icon from '../../resources/icon.png?asset'
 import { setLang } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
+import { archive } from './archive'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
@@ -103,6 +104,12 @@ ipcMain.handle('forecast:run', (e, series, groups) => {
     if (pct !== last && !e.sender.isDestroyed()) e.sender.send('forecast:progress', (last = pct))
   })
 })
+// Forecast archive (see archiveFile.ts); every input is checked there.
+ipcMain.handle('archive:add', (_e, entry) => archive().add(entry))
+ipcMain.handle('archive:due', (_e, symbol) => archive().due(typeof symbol === 'string' ? symbol : undefined))
+ipcMain.handle('archive:settle', (_e, id, result) => archive().settle(id, result))
+ipcMain.handle('archive:summary', (_e, key) => archive().summary(key))
+ipcMain.handle('archive:clear', () => archive().clear())
 // Comprehensive analysis with TradingAgents (see agents.ts). Keys only go in, never back out to the window.
 ipcMain.handle('agents:status', () => agentsStatus())
 ipcMain.handle('agents:install', (e) =>

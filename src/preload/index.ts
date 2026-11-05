@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
 import type { BackupSummary } from '../main/backup'
+import type { ArchiveEntry, Settlement, SummaryRow } from '../shared/archive'
 import type { CandleData, CompanyInfo, OlderRequest, Quote, SearchResult, Timeframe } from '../shared/types'
 
 /** Subscribes to a main-process event channel; returns the unsubscribe function. */
@@ -58,6 +59,17 @@ const api = {
    */
   forecast: (series: number[][], groups?: number[]): Promise<number[][][]> =>
     ipcRenderer.invoke('forecast:run', series, groups),
+  /** Archive of shown forecasts, settled later against the real closes (main checks every input). */
+  archive: {
+    /** Resolves to false when a forecast for that candle (or an overlapping automatic one) is already there. */
+    add: (entry: ArchiveEntry): Promise<boolean> => ipcRenderer.invoke('archive:add', entry),
+    /** Unsettled forecasts whose last bar has closed, oldest first; all symbols without an argument. */
+    due: (symbol?: string): Promise<ArchiveEntry[]> => ipcRenderer.invoke('archive:due', symbol),
+    settle: (id: string, result: Settlement | 'unsettleable'): Promise<void> => ipcRenderer.invoke('archive:settle', id, result),
+    /** Running totals; with a key (summaryKey) only that row. */
+    summary: (key?: string): Promise<Record<string, SummaryRow>> => ipcRenderer.invoke('archive:summary', key),
+    clear: (): Promise<void> => ipcRenderer.invoke('archive:clear')
+  },
   /** Model download progress in percent; returns an unsubscribe function. */
   onForecastProgress: (cb: (pct: number) => void): (() => void) => listen('forecast:progress', cb),
   /** Comprehensive analysis with TradingAgents: setup, keys (stored encrypted, only their presence comes back), runs. */
