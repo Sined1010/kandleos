@@ -254,11 +254,18 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       dragRef.current = null
       setDrag(null)
     }
+    // The system took the touch (e.g. a back gesture): drop the drag, the drawing stays where it was.
+    const onCancel = () => {
+      dragRef.current = null
+      setDrag(null)
+    }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
     }
     // Handlers read the live drag via dragRef; the axis only changes on new bars, which is harmless mid-drag.
   }, [dragging])

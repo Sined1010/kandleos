@@ -718,16 +718,17 @@ export default function ChartArea() {
     }
   }, [api, agentLevels])
 
-  // US stocks outside the regular session: the pre-/after-market price in amber, or with those candles shown the regular close.
+  // US stocks outside the regular session: the pre-/after-market price, or with those candles shown the regular close.
+  // Orange (sunrise) and indigo (moon) as the watchlist icons, long dashes: the forecast line is yellow and short-dashed.
   const session = sessionLine(quote, extended)
   useEffect(() => {
     if (!api || !session) return
     const close = session.kind === 'close'
     const line = api.candles.createPriceLine({
       price: session.price,
-      color: close ? '#5d6375' : '#fbbf24',
+      color: close ? '#5d6375' : session.kind === 'pre' ? '#fb923c' : '#a5b4fc',
       title: t(SESSION_TITLE[session.kind]),
-      lineStyle: close ? LineStyle.Dotted : LineStyle.Dashed,
+      lineStyle: close ? LineStyle.Dotted : LineStyle.LargeDashed,
       lineWidth: 1,
       axisLabelVisible: true
     })

@@ -32,6 +32,7 @@ export async function createMobileApi(): Promise<Api> {
   setHttp(capHttp)
   // storeGet and keyGet are synchronous on the desktop (sendSync); here their values are read up front.
   let store = await readStore(appFiles)
+  let storeWarned = false
   let finnhub = (await secret('finnhub')) ?? ''
   let alpaca: AlpacaKeys | null = null
   try {
@@ -52,7 +53,15 @@ export async function createMobileApi(): Promise<Api> {
     storeGet: () => store,
     storeSet: async (data) => {
       store = data
-      await writeAtomic(appFiles, data)
+      // Every write holds the whole store, so the next one that works repairs the file; tell the user once meanwhile.
+      try {
+        await writeAtomic(appFiles, data)
+        storeWarned = false
+      } catch (e) {
+        if (storeWarned) return
+        storeWarned = true
+        alert(t('Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?', { error: (e as Error).message }))
+      }
     },
     setLanguage: () => {},
     setStockSource: (source, yahooExtra = false) => setStockSource(source, yahooExtra),

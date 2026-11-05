@@ -916,4 +916,6 @@ export const EN: Record<string, string> = {
   'Neuer Ordner …': 'New folder …',
   'Anlegen': 'Create',
   'Keine Internetverbindung': 'No internet connection',
+  'Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?':
+    'Changes could not be saved ({error}). Is the phone storage full?',
 }
