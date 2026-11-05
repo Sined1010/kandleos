@@ -7,6 +7,27 @@ import BackupSection from './BackupSection'
 import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 import { RELEASES_URL } from './UpdateBadge'
+import { IS_MOBILE } from '../lib/platform'
+
+/** Phone: price alarms every 15 s with a permanent notification (more battery) instead of about every 15 min. */
+function InstantAlarms() {
+  const on = useStore((s) => s.instantAlarms)
+  return (
+    <label className="mb-5 flex cursor-pointer items-start gap-2 text-xs text-muted">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => useStore.setState({ instantAlarms: e.target.checked })}
+        className="mt-0.5 accent-accent"
+      />
+      <span>
+        <span className="text-slate-200">{t('Sofort-Alarme')}</span>
+        {' – '}
+        {t('Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku.')}
+      </span>
+    </label>
+  )
+}
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
@@ -66,7 +87,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {t('Startfenster erneut zeigen')}
         </button>
 
-        {/* Applies at once, like the language. */}
+        {/* Applies at once, like the language. The phone gets updates through Obtainium. */}
+        {!IS_MOBILE && (<>
         <label className="mb-1 flex cursor-pointer items-start gap-2 text-xs text-muted">
           <input
             type="checkbox"
@@ -94,6 +116,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <> · {t('Du hast die neueste Version.')}</>
             ))}
         </p>
+        </>)}
+
+        {IS_MOBILE && <InstantAlarms />}
 
         <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>
         <StockSourcePicker form={source} />
@@ -117,10 +142,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           .
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          {t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Für einen anderen Rechner unten bei „Daten sichern“ mitexportieren oder dort neu eintragen.')}
+          {IS_MOBILE
+            ? t('Der Key wird verschlüsselt im Schlüsselspeicher des Handys gespeichert.')
+            : t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Für einen anderen Rechner unten bei „Daten sichern“ mitexportieren oder dort neu eintragen.')}
         </p>
 
-        <BackupSection />
+        {!IS_MOBILE && <BackupSection />}
 
         <div className="mt-5 flex items-center justify-end gap-2">
           {/* Shown next to the disabled button, so it is clear what is still missing. */}

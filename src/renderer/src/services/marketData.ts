@@ -85,7 +85,36 @@ function socket(
   }
 }
 
+/** Keeps the last charts on the phone (src/mobile/candleCache.ts); the desktop never sets one. */
+interface CandleCacheLike {
+  put(symbol: string, tf: Timeframe, c: CandleData): Promise<void>
+  get(symbol: string, tf: Timeframe): CandleData | null
+}
+let cache: CandleCacheLike | null = null
+export const setCandleCache = (c: CandleCacheLike): void => void (cache = c)
+export const cachedCandles = (symbol: string, tf: Timeframe): CandleData | null => cache?.get(symbol, tf) ?? null
+
 export async function loadCandles(
+  symbol: string,
+  tf: Timeframe,
+  finnhubKey: string,
+  extended = false,
+  older?: OlderRequest
+): Promise<CandleData> {
+  if (!cache || older) return fetchCandles(symbol, tf, finnhubKey, extended, older)
+  try {
+    const data = await fetchCandles(symbol, tf, finnhubKey, extended)
+    cache.put(symbol, tf, data).catch(() => {})
+    return data
+  } catch (e) {
+    // Offline or source error: the last stored candles rather than an empty chart, marked with the reason.
+    const kept = cache.get(symbol, tf)
+    if (kept) return { ...kept, stale: (e as Error).message || 'offline' }
+    throw e
+  }
+}
+
+async function fetchCandles(
   symbol: string,
   tf: Timeframe,
   finnhubKey: string,

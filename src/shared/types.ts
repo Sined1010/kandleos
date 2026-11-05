@@ -121,6 +121,8 @@ export interface CandleData {
   timezone?: string
   /** Source that answered; older sections are asked from the same one, so bars stay stamped alike. */
   provider?: CandleProvider
+  /** Phone only: the source failed, these are the stored candles; the error message says why. */
+  stale?: string
 }
 
 export type CandleProvider = 'binance' | 'alpaca' | 'yahoo' | 'finnhub'

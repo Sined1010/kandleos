@@ -10,31 +10,18 @@ import { checkForUpdate } from './components/UpdateBadge'
 import Watchlist from './components/Watchlist'
 import WelcomeModal from './components/WelcomeModal'
 import { settleDue } from './services/archive'
-import { watchQuotes } from './services/marketData'
-import { setFeedStatus, setQuote, useStore } from './store/useStore'
+import { useQuoteFeed } from './services/quoteFeed'
+import { useStore } from './store/useStore'
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const disclaimerAccepted = useStore((s) => s.disclaimerAccepted)
-  const symbol = useStore((s) => s.symbol)
-  const folders = useStore((s) => s.folders)
-  const finnhubKey = useStore((s) => s.finnhubKey)
   const language = useStore((s) => s.language)
   const stockSource = useStore((s) => s.stockSource)
-  const yahooExtra = useStore((s) => s.yahooExtra)
   const activeTab = useStore((s) => s.activeTab)
   const updateCheck = useStore((s) => s.updateCheck)
-  // The chart symbol joins the quote feed so stock charts get live ticks even when it is not on the watchlist.
-  // Sorted: the feed depends on which symbols are watched, not on their order, so reordering the watchlist
-  // keeps the Finnhub and Binance connections open instead of reconnecting.
-  const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol])].sort().join(',')
-
-  useEffect(
-    () => watchQuotes(feed.split(','), finnhubKey, stockSource, setQuote, setFeedStatus),
-    // yahooExtra: main routes by it, so the first poll after switching must see it.
-    [feed, finnhubKey, stockSource, yahooExtra]
-  )
+  useQuoteFeed()
   useEffect(() => {
     if (updateCheck) void checkForUpdate()
   }, [updateCheck])

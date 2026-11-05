@@ -5,6 +5,7 @@ import { tfLabel } from '../../../shared/types'
 import { findByName, groupCharts, isDirty, linkedChart, loadTarget, toolCounts } from '../lib/charts'
 import { drawingsKey, MAX_TABS, useStore, type Drawing, type SavedChart } from '../store/useStore'
 import { TOOLS } from './DrawingToolbar'
+import { IS_MOBILE } from '../lib/platform'
 
 /** "1× Elliott impulse 0-1-2-3-4-5, 3× Trend line": the toolbar's labels without their click hints, in toolbar order. */
 export function toolSummary(drawings: Drawing[]): string {
@@ -21,7 +22,6 @@ export default function SavedCharts() {
   const tab = useStore((s) => s.tabs.find((x) => x.id === s.activeTab))
   const timeframe = useStore((s) => s.timeframe)
   const drawings = useStore((s) => s.drawings[drawingsKey(s)])
-  const saveChart = useStore((s) => s.saveChart)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const linked = tab && linkedChart(tab, charts)
@@ -34,7 +34,6 @@ export default function SavedCharts() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const item = 'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-bg'
   return (
     <div className="relative">
       <button
@@ -55,12 +54,30 @@ export default function SavedCharts() {
           {/* Above the chart's forecast button (z-30), which the menu reaches across. */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div data-menu className="absolute left-0 top-full z-50 mt-1 w-80 rounded-lg border border-line bg-panel/95 p-2 text-sm shadow-2xl shadow-black/50 backdrop-blur">
+            <SavedChartsPanel onDone={() => setOpen(false)} onSaveAs={() => setSaving(true)} />
+          </div>
+        </>
+      )}
+      {saving && <SaveDialog onClose={() => setSaving(false)} />}
+    </div>
+  )
+}
+
+/** Save, save as and the list of saved charts (desktop popover, phone full screen). */
+export function SavedChartsPanel({ onDone, onSaveAs }: { onDone: () => void; onSaveAs: () => void }) {
+  const charts = useStore((s) => s.charts)
+  const tab = useStore((s) => s.tabs.find((x) => x.id === s.activeTab))
+  const saveChart = useStore((s) => s.saveChart)
+  const linked = tab && linkedChart(tab, charts)
+  const item = 'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-bg'
+  return (
+    <>
             {linked && (
               <button
                 className={item}
                 onClick={() => {
                   saveChart(linked.name, linked.id)
-                  setOpen(false)
+                  onDone()
                 }}
               >
                 <span className="text-white">{t('Speichern')}</span>
@@ -70,19 +87,15 @@ export default function SavedCharts() {
             <button
               className={item}
               onClick={() => {
-                setOpen(false)
-                setSaving(true)
+                onDone()
+                onSaveAs()
               }}
             >
               <span className="text-white">{t('Speichern unter …')}</span>
             </button>
             <div className="my-1.5 border-t border-line" />
-            <ChartList onDone={() => setOpen(false)} />
-          </div>
-        </>
-      )}
-      {saving && <SaveDialog onClose={() => setSaving(false)} />}
-    </div>
+            <ChartList onDone={onDone} />
+    </>
   )
 }
 
@@ -217,7 +230,7 @@ function ChartList({ onDone }: { onDone: () => void }) {
                         </span>
                       </button>
                     )}
-                    <span className="hidden gap-1 group-focus-within/row:flex group-hover/row:flex">
+                    <span className={`${IS_MOBILE ? 'flex' : 'hidden'} gap-1 group-focus-within/row:flex group-hover/row:flex`}>
                       <button
                         onClick={() => setRenaming(c.id)}
                         className="rounded p-0.5 text-muted hover:text-white"
@@ -264,7 +277,7 @@ function ChartList({ onDone }: { onDone: () => void }) {
 }
 
 /** "Save as …": a name, and what gets saved; the same name for the same symbol asks before overwriting. */
-function SaveDialog({ onClose }: { onClose: () => void }) {
+export function SaveDialog({ onClose }: { onClose: () => void }) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
   const names = useStore((s) => s.names)

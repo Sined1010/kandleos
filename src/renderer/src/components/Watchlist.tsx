@@ -67,6 +67,27 @@ function FolderNameInput({ folder: f, onDone, className }: { folder: Folder; onD
   )
 }
 
+/** Fills in readable names for symbols that have none yet (new symbols, or after a reset); shared with the phone. */
+export function useSymbolNames(): RefObject<Set<string>> {
+  const folders = useStore((s) => s.folders)
+  const names = useStore((s) => s.names)
+  const setName = useStore((s) => s.setName)
+  // Symbols already looked up this session, so a symbol Yahoo does not know is not asked for again.
+  const looked = useRef(new Set<string>())
+  useEffect(() => {
+    for (const s of new Set(folders.flatMap((f) => f.symbols))) {
+      if (names[s] || looked.current.has(s)) continue
+      looked.current.add(s)
+      window.api
+        .symbolName(s)
+        // A name typed by the user while the lookup ran wins.
+        .then((n) => n && !useStore.getState().names[s] && setName(s, n))
+        .catch(() => {})
+    }
+  }, [folders, names, setName])
+  return looked
+}
+
 export default function Watchlist() {
   const folders = useStore((s) => s.folders)
   const addFolder = useStore((s) => s.addFolder)
@@ -112,23 +133,8 @@ export default function Watchlist() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
   const drag = useRef<{ symbol: string; from: string } | null>(null)
-  const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
-  // Symbols already looked up this session, so a symbol Yahoo does not know is not asked for again.
-  const looked = useRef(new Set<string>())
-
-  // Fill in readable names for symbols that have none yet (new symbols, or after a reset).
-  useEffect(() => {
-    for (const s of new Set(folders.flatMap((f) => f.symbols))) {
-      if (names[s] || looked.current.has(s)) continue
-      looked.current.add(s)
-      window.api
-        .symbolName(s)
-        // A name typed by the user while the lookup ran wins.
-        .then((n) => n && !useStore.getState().names[s] && setName(s, n))
-        .catch(() => {})
-    }
-  }, [folders, names, setName])
+  const looked = useSymbolNames()
 
   const resetName = (s: string) => {
     looked.current.delete(s)

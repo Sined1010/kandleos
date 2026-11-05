@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+/* Both builds scan both trees: the phone build (src/mobile) reuses these components. */
+@source '..';
+@source '../../mobile';
 
 /* Colours follow the app icon: an indigo-to-cyan gradient on deep, slightly indigo-tinted night blue.
    Keep in sync with lib/theme.ts, which feeds the same values to the chart canvas. */

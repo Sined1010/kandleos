@@ -3,3 +3,11 @@ out
 dist
 KandleOS.desktop
 release
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/release
+*.jks
+*.keystore
+out-mobile

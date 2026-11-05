@@ -31,6 +31,7 @@ import {
   TF_SECONDS,
   tfLabel,
   type Candle,
+  type CandleData,
   type CandleProvider
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
@@ -38,7 +39,8 @@ import { THEME } from '../lib/theme'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { sessionLine } from '../lib/sessionLine'
-import { loadCandles, watchCandles } from '../services/marketData'
+import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
+import { IS_MOBILE } from '../lib/platform'
 import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
 import ForecastQuality from './ForecastQuality'
@@ -245,8 +247,8 @@ export default function ChartArea() {
       setData([...arr])
     }
 
-    loadCandles(symbol, timeframe, finnhubKey, extended)
-      .then(({ candles: bars, currency, timezone, provider }) => {
+    // fresh: from the source; otherwise the phone's stored copy, shown at once until fresh candles arrive.
+    const show = ({ candles: bars, currency, timezone, provider }: CandleData, fresh = true) => {
         if (!active) return
         if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
         const last = bars[bars.length - 1].close
@@ -272,6 +274,7 @@ export default function ChartArea() {
         setExchangeZone(timezone)
         setStatus(null)
         older.current.provider = provider
+        if (!fresh) return
         // The chart applies the new view on its next frame and reports the previous chart's view before it;
         // its frame was requested first, so by this one only the new view counts.
         requestAnimationFrame(() => {
@@ -280,6 +283,13 @@ export default function ChartArea() {
           // A short history may already show its left edge.
           if (shownFrom < OLDER_MARGIN) loadOlderRef.current()
         })
+      }
+    const kept = IS_MOBILE ? cachedCandles(symbol, timeframe) : null
+    if (kept?.candles.length) show(kept, false)
+    loadCandles(symbol, timeframe, finnhubKey, extended)
+      .then((d) => {
+        show(d)
+        if (d.stale && active) setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
       })
       .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
 
@@ -708,6 +718,16 @@ export default function ChartArea() {
     // Primitives, so the 15 s quote refresh does not rebuild an unchanged line.
   }, [api, session?.price, session?.kind])
 
+  // Armed price alarms of this symbol as dashed lines (set on the phone).
+  const alarmPrices = useStore((s) => s.alarms.filter((a) => a.symbol === symbol && a.triggeredAt === undefined).map((a) => a.price).join(','))
+  useEffect(() => {
+    if (!api || !alarmPrices) return
+    const lines = alarmPrices.split(',').map((p) =>
+      api.candles.createPriceLine({ price: Number(p), color: '#a78bfa', title: '⏰', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true })
+    )
+    return () => lines.forEach((l) => api.candles.removePriceLine(l))
+  }, [api, alarmPrices])
+
   // Value box for the forecast step under the crosshair.
   useEffect(() => {
     const result = fc.result
@@ -765,7 +785,7 @@ export default function ChartArea() {
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="relative min-h-0 flex-1" onMouseDown={() => select(null)}>
+      <div className="relative min-h-0 flex-1" onPointerDown={() => select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
         {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
         <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: sideOpen ? AGENTS_WIDTH : 0 }} />
@@ -788,7 +808,7 @@ export default function ChartArea() {
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
-          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (fc.result ? 547 : 215) }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 0 : fc.result ? 547 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -804,9 +824,10 @@ export default function ChartArea() {
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
             with its display settings right next to it and the summary card to its left. */}
         <div
-          className="absolute top-2 z-30 flex items-start gap-2"
+          // The forecast needs the PC; on the phone it comes with Abschnitt 3.
+          className={`absolute top-2 z-30 flex items-start gap-2 ${IS_MOBILE ? 'hidden' : ''}`}
           style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {fc.result && (
             <ForecastSummary
@@ -889,7 +910,10 @@ export default function ChartArea() {
           />
         )}
         {status && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">{status}</div>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted">
+            {/* Over candles (the phone's stored copy) the message needs a background to stay readable. */}
+            {data.length ? <span className="rounded-md border border-line bg-panel/90 px-2 py-1 text-xs backdrop-blur">{status}</span> : status}
+          </div>
         )}
         {olderHint && !status && (
           <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded-md border border-line bg-panel/80 px-2 py-1 text-xs text-muted backdrop-blur">
@@ -915,7 +939,7 @@ export default function ChartArea() {
       </div>
       {agentsSetup && <AgentsSetup onClose={() => setAgentsSetup(false)} />}
       <div className="flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
-        <div className="flex gap-0.5" role="group" aria-label={t('Zeitraum')}>
+        <div className="flex gap-0.5 overflow-x-auto" role="group" aria-label={t('Zeitraum')}>
           {RANGES.map((r) => (
             <button
               key={r.id}
@@ -945,7 +969,7 @@ export default function ChartArea() {
           <Moon size={11} />
           {t('Vor-/Nachbörse')}
         </button>
-        <FullscreenButton />
+        {!IS_MOBILE && <FullscreenButton />}
       </div>
     </div>
   )

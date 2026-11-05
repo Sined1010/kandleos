@@ -16,9 +16,21 @@
     "test": "node --test \"src/**/*.test.ts\"",
     "licenses": "node scripts/third-party-licenses.mjs",
     "dist:win": "npm run licenses && npm run build && electron-builder --win",
-    "dist:linux": "npm run licenses && npm run build && electron-builder --linux"
+    "dist:linux": "npm run licenses && npm run build && electron-builder --linux",
+    "build:mobile": "vite build --config vite.mobile.config.ts",
+    "dev:mobile": "vite --config vite.mobile.config.ts",
+    "android:sync": "npm run build:mobile && cap sync android"
   },
   "devDependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/cli": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

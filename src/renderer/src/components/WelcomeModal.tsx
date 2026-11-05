@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { t } from '../../../shared/i18n'
 import { useStore } from '../store/useStore'
 import LanguageSwitch from './LanguageSwitch'
+import { IS_MOBILE } from '../lib/platform'
 
 /**
  * First start (and when reopened from the settings): language, prices and the disclaimer, confirmed in one step.
@@ -78,20 +79,25 @@ export default function WelcomeModal({ onOpenAbout }: { onOpenAbout: () => void 
           </>
         )}
 
-        <h3 className={h}>3 · {t('Updates')}</h3>
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={updates}
-            onChange={(e) => setUpdates(e.target.checked)}
-            className="mt-0.5 accent-accent"
-          />
-          <span className="text-slate-200">
-            {t('Einmal täglich bei GitHub nachsehen, ob es eine neue Version gibt. GitHub sieht dabei deine IP-Adresse; heruntergeladen oder installiert wird nichts automatisch.')}
-          </span>
-        </label>
+        {/* The phone gets updates through Obtainium. */}
+        {!IS_MOBILE && (
+          <>
+            <h3 className={h}>3 · {t('Updates')}</h3>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={updates}
+                onChange={(e) => setUpdates(e.target.checked)}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="text-slate-200">
+                {t('Einmal täglich bei GitHub nachsehen, ob es eine neue Version gibt. GitHub sieht dabei deine IP-Adresse; heruntergeladen oder installiert wird nichts automatisch.')}
+              </span>
+            </label>
+          </>
+        )}
 
-        <h3 className={h}>4 · {t('Keine Anlageberatung')}</h3>
+        <h3 className={h}>{IS_MOBILE ? 3 : 4} · {t('Keine Anlageberatung')}</h3>
         <p>
           {t('KandleOS ist ein Werkzeug zur Chartanalyse. Prognosen und Analysen sind keine Anlageberatung und keine Kauf- oder Verkaufsempfehlung. Alle Kurse ohne Gewähr; die Nutzung erfolgt auf eigenes Risiko.')}{' '}
           <button onClick={onOpenAbout} className={link}>

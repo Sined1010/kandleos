@@ -1,7 +1,4 @@
-import { app, safeStorage } from 'electron'
-import { readFileSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { http } from './http'
 import { aggregate } from '../shared/candles'
 import { firstWhole, sectionWindow } from '../shared/history'
 import { t } from '../shared/i18n'
@@ -23,49 +20,40 @@ import {
 const DATA = 'https://data.alpaca.markets/v2'
 const ZONE = 'America/New_York'
 
-// Keys stay in the main process, encrypted for this OS user like the other keys; the window only learns
-// whether they are set.
-const keyFile = (): string => join(app.getPath('userData'), 'alpaca-key.bin')
-const plainKeyFile = (): string => join(app.getPath('userData'), 'alpaca-key.json')
-type Keys = { id: string; secret: string }
+// Where the key pair is kept is up to the host: encrypted files in Electron's main process (main/keys.ts),
+// the Android keystore on the phone. The window only learns whether keys are set.
+export type AlpacaKeys = { id: string; secret: string }
+type Keys = AlpacaKeys
+let load: () => Keys | null = () => null
+let store: (k: Keys | null) => Promise<void> = async () => {}
 let cached: Keys | null | undefined
 
+export function useAlpacaKeyStore(get: () => Keys | null, save: (k: Keys | null) => Promise<void>): void {
+  load = get
+  store = save
+  cached = undefined
+}
+
 function keys(): Keys | null {
-  if (cached !== undefined) return cached
-  try {
-    cached = JSON.parse(safeStorage.decryptString(readFileSync(keyFile())))
-  } catch {
-    try {
-      cached = JSON.parse(readFileSync(plainKeyFile(), 'utf8'))
-    } catch {
-      cached = null
-    }
-  }
-  return cached ?? null
+  if (cached === undefined) cached = load()
+  return cached
 }
 
 export const alpacaHasKeys = (): boolean => !!keys()
 /** For the backup file (backup.ts); never sent to the window. */
 export const alpacaKeys = (): Keys | null => keys()
 
-
 /** Stores (or with null removes) a key pair without checking it with Alpaca. */
 export async function saveAlpacaKeys(k: Keys | null): Promise<void> {
-  await rm(keyFile(), { force: true })
-  await rm(plainKeyFile(), { force: true })
+  await store(k)
   cached = k
-  if (!k) return
-  const json = JSON.stringify(k)
-  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(json))
-  // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
-  else await writeFile(plainKeyFile(), json, { mode: 0o600 })
 }
 
 async function request(url: string, k: Keys | null = keys()): Promise<any> {
   if (!k) throw new Error(t('Kein Alpaca-Key hinterlegt. In den Einstellungen eintragen.'))
-  const res = await fetch(url, {
+  const res = await http(url, {
     headers: { 'APCA-API-KEY-ID': k.id, 'APCA-API-SECRET-KEY': k.secret },
-    signal: AbortSignal.timeout(15_000)
+    timeoutMs: 15_000
   })
   if (res.status === 401 || res.status === 403) throw new Error(t('Alpaca: API-Key ungültig'))
   if (res.status === 429) throw new Error(t('Alpaca: Anfragelimit erreicht, gleich erneut versuchen'))

@@ -6,6 +6,7 @@ import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
+import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -170,6 +171,16 @@ interface State {
   renameChart: (id: string, name: string) => void
   /** Removes it; tabs linked to it lose the link, their drawings stay. */
   deleteChart: (id: string) => void
+  /** Price alarms (shared/alarms.ts); for now set and checked on the phone. */
+  alarms: Alarm[]
+  /** Phone: check alarms every 15 s with a permanent notification instead of every 15 min. */
+  instantAlarms: boolean
+  addAlarm: (a: Alarm) => void
+  removeAlarm: (id: string) => void
+  /** Arms a triggered alarm again, counting only bars from now on. */
+  rearmAlarm: (id: string) => void
+  /** Takes in what the Android background check found (shared/alarms.ts mergeTriggered). */
+  applyNative: (list: NativeTrigger[]) => void
 }
 
 const chartTab = (symbol: string, timeframe: Timeframe, range: RangeId | null): ChartTab => ({
@@ -316,6 +327,8 @@ export const useStore = create<State>()(
         })),
       clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null })),
       charts: [],
+      alarms: [],
+      instantAlarms: false,
       saveChart: (name, overwriteId) => {
         const id = overwriteId ?? crypto.randomUUID()
         set((s) => {
@@ -370,11 +383,23 @@ export const useStore = create<State>()(
         set((s) => ({
           charts: s.charts.filter((c) => c.id !== id),
           tabs: s.tabs.map((t) => (t.chartId === id ? { ...t, chartId: undefined } : t))
-        }))
+        })),
+      addAlarm: (a) => set((s) => ({ alarms: [...s.alarms, a] })),
+      removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
+      rearmAlarm: (id) =>
+        set((s) => ({
+          alarms: s.alarms.map((a) => {
+            if (a.id !== id) return a
+            const { triggeredAt, triggeredPrice, ...armed } = a
+            return { ...armed, checkedUntil: Math.floor(Date.now() / 1000) }
+          })
+        })),
+      applyNative: (list) => set((s) => ({ alarms: mergeTriggered(s.alarms, list) }))
     }),
     {
       name: 'kandleos',
-      version: 5,
+      // v6: alarms (filled in by merge, nothing to convert).
+      version: 6,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -423,7 +448,8 @@ export const useStore = create<State>()(
           forecastRun: { ...current.forecastRun, ...(backtest === false && { backtestRuns: 0 as const }), ...p.forecastRun },
           agentsConfig: { ...current.agentsConfig, ...p.agentsConfig },
           // Files from before saved charts have none.
-          charts: p.charts ?? []
+          charts: p.charts ?? [],
+          alarms: p.alarms ?? []
         }
         // Files from before tabs hold a single chart; it becomes the first tab.
         const tabs = p.tabs?.length
@@ -453,6 +479,8 @@ export const useStore = create<State>()(
         indicators,
         drawings,
         charts,
+        alarms,
+        instantAlarms,
         stockSource,
         yahooExtra,
         disclaimerAccepted,
@@ -481,7 +509,9 @@ export const useStore = create<State>()(
         watchlistView,
         indicators,
         drawings,
-        charts
+        charts,
+        alarms,
+        instantAlarms
       })
     }
   )

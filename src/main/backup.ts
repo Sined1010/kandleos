@@ -3,10 +3,10 @@
 import { app, BrowserWindow, dialog, type WebContents } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { allAnalyses, readKeys, saveAnalysis, writeKeys } from './agents'
-import { alpacaKeys, saveAlpacaKeys } from './alpaca'
+import { alpacaKeys, saveAlpacaKeys } from '../data/alpaca'
 import { archive } from './archive'
 import { MAX_BACKUP_BYTES, MIN_PASSWORD, openKeys, parseBackup, sealKeys, type Backup, type BackupKeys } from './backupFormat'
-import { finnhubKey, saveFinnhubKey } from './stocks'
+import { finnhubKey, saveFinnhubKey } from './keys'
 import { t } from '../shared/i18n'
 
 const FILTERS = [{ name: 'KandleOS', extensions: ['json'] }]

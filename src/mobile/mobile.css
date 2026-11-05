@@ -1,0 +1,50 @@
+/* The phone should feel like an app, not a web page: nothing selectable, no tap flash, no rubber band,
+   no page zoom; the chart does its own touch gestures (lightweight-charts). */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.mobile-app {
+  /* System bars: env() where the WebView reports insets, Capacitor's variables otherwise. */
+  padding-top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
+  padding-bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
+}
+.mobile-app main {
+  touch-action: none;
+}
+.mobile-icon {
+  display: flex;
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--color-muted);
+}
+.mobile-icon:active {
+  background: var(--color-line);
+  color: white;
+}
+/* Landscape: the chart alone. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-chrome {
+    display: none !important;
+  }
+  .mobile-app main {
+    margin-bottom: 0 !important;
+  }
+}

@@ -260,7 +260,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
       className={`absolute inset-y-0 right-0 z-20 w-[400px] flex-col border-l border-line bg-panel/95 text-xs shadow-2xl shadow-black/50 backdrop-blur ${
         open ? 'flex' : 'hidden'
       }`}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       aria-label={t('Umfassende Analyse')}
     >
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>KandleOS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0a0c16" />
+    <!-- Stock prices go through native HTTP (not subject to this policy); only Binance and Finnhub talk from the page. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 wss://ws.finnhub.io; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    />
+  </head>
+  <body style="background: #0a0c16">
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

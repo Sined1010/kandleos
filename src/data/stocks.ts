@@ -1,7 +1,4 @@
-import { app, safeStorage } from 'electron'
-import { readFileSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { http, type HttpRes } from './http'
 import { alpacaCandles, alpacaName, alpacaQuotes, alpacaSearch } from './alpaca'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
@@ -27,33 +24,6 @@ import {
   type StockSource,
   type Timeframe
 } from '../shared/types'
-
-// The Finnhub key lives apart from the portable store file, encrypted for this OS user
-// (DPAPI on Windows, Secret Service/KWallet on Linux).
-const keyFile = (): string => join(app.getPath('userData'), 'finnhub-key.bin')
-const plainKeyFile = (): string => join(app.getPath('userData'), 'finnhub-key.txt')
-
-export function finnhubKey(): string {
-  try {
-    return safeStorage.decryptString(readFileSync(keyFile()))
-  } catch {
-    try {
-      return readFileSync(plainKeyFile(), 'utf8')
-    } catch {
-      return ''
-    }
-  }
-}
-
-/** Stores the key (empty removes it); the caller has checked it against FINNHUB_KEY_RE. */
-export async function saveFinnhubKey(key: string): Promise<void> {
-  await rm(keyFile(), { force: true })
-  await rm(plainKeyFile(), { force: true })
-  if (!key) return
-  if (safeStorage.isEncryptionAvailable()) await writeFile(keyFile(), safeStorage.encryptString(key))
-  // shortcut: without an OS keyring (some Linux setups) the key is plain text readable only by this user; install gnome-keyring/KWallet to get encryption.
-  else await writeFile(plainKeyFile(), key, { mode: 0o600 })
-}
 
 // Chosen by the user on first start or in the settings; the window tells main (see index.ts).
 let source: StockSource | null = null
@@ -119,7 +89,7 @@ const FINNHUB: Record<Timeframe, [resolution: string, days: number]> = {
 
 async function getJson(url: string, headers: Record<string, string> = {}): Promise<any> {
   // Yahoo rejects requests without a browser-like user agent.
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, signal: AbortSignal.timeout(10_000) })
+  const res = await http(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, timeoutMs: 10_000 })
   if (res.status === 404) throw new Error(t('Symbol nicht gefunden – Tipp: Firmenname in die Suche eingeben'))
   if (!res.ok) throw new Error(`${new URL(url).host} HTTP ${res.status}`)
   return res.json()
@@ -135,9 +105,9 @@ async function coinSearch(query: string): Promise<SearchResult[]> {
     .filter(([sym, name]) => sym.startsWith(q) || name.toUpperCase().startsWith(q))
     .map(([sym, name]) => ({ symbol: sym + 'USDT', name, exchange: 'Binance' }))
   if (/^[A-Z0-9]{2,10}$/.test(q) && !COINS[q]) {
-    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${q}USDT`, {
-      signal: AbortSignal.timeout(5000)
-    }).catch(() => null)
+    const res = await http(`https://api.binance.com/api/v3/ticker/price?symbol=${q}USDT`, { timeoutMs: 5000 }).catch(
+      () => null
+    )
     if (res?.ok) out.unshift({ symbol: q + 'USDT', name: q, exchange: 'Binance' })
   }
   return out.slice(0, 5)
@@ -340,10 +310,7 @@ export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
   const [, key] = checkArgs('AAPL', keyArg)
   if (!key) return t('Ungültiges Key-Format')
   try {
-    const res = await fetch('https://finnhub.io/api/v1/quote?symbol=AAPL', {
-      headers: finnhubAuth(key),
-      signal: AbortSignal.timeout(10_000)
-    })
+    const res = await http('https://finnhub.io/api/v1/quote?symbol=AAPL', { headers: finnhubAuth(key), timeoutMs: 10_000 })
     if (res.status === 401 || res.status === 403) return t('API-Key ungültig')
     if (res.status === 429) return 'Rate-Limit erreicht (max. 60 Anfragen/Minute)'
     return res.ok ? null : `Finnhub HTTP ${res.status}`
@@ -493,13 +460,13 @@ async function finnhubInfo(symbol: string, key: string): Promise<CompanyInfo | n
 
 // quoteSummary wants a session cookie and its crumb; both are fetched once and renewed when Yahoo rejects them.
 let yahooSession: Promise<{ cookie: string; crumb: string }> | null = null
-const cookiesOf = (res: Response | null) => res?.headers.getSetCookie().map((c) => c.split(';')[0]) ?? []
+const cookiesOf = (res: HttpRes | null) => res?.setCookies ?? []
 function yahooAuth(): Promise<{ cookie: string; crumb: string }> {
   yahooSession ??= (async () => {
-    const opts = { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) }
+    const opts = { headers: { 'User-Agent': 'Mozilla/5.0' }, timeoutMs: 10_000 }
     // fc.yahoo.com answers 404 but sets the session cookie; failing here is fine, the crumb request sets one too.
-    const jar = cookiesOf(await fetch('https://fc.yahoo.com', { ...opts, redirect: 'manual' }).catch(() => null))
-    const res = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+    const jar = cookiesOf(await http('https://fc.yahoo.com', { ...opts, redirect: 'manual' }).catch(() => null))
+    const res = await http('https://query1.finance.yahoo.com/v1/test/getcrumb', {
       ...opts,
       headers: { ...opts.headers, Cookie: jar.join('; ') }
     })

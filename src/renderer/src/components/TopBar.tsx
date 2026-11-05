@@ -81,7 +81,7 @@ const GROUPS: [title: string, items: [Timeframe, string][]][] = [
 ]
 
 /** Main candle sizes as buttons, the rest in a dropdown; a size picked there shows on the dropdown button. */
-function TimeframePicker() {
+export function TimeframePicker() {
   const timeframe = useStore((s) => s.timeframe)
   const setTimeframe = useStore((s) => s.setTimeframe)
   const [open, setOpen] = useState(false)
@@ -247,7 +247,7 @@ const ROWS: Record<keyof Indicators, { label: string; params: [string, string, n
   atr: { label: 'ATR', params: [['period', msg('Periode')]] }
 }
 
-function IndicatorMenu({ onClose }: { onClose: () => void }) {
+export function IndicatorMenu({ onClose }: { onClose: () => void }) {
   const indicators = useStore((s) => s.indicators)
   const setIndicator = useStore((s) => s.setIndicator)
 

@@ -18,6 +18,10 @@ import {
   sinePrice
 } from '../lib/geometry'
 import { THEME } from '../lib/theme'
+import { IS_MOBILE } from '../lib/platform'
+import { aimAt } from '../lib/touchAim'
+import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import { Crosshair, Trash2 } from 'lucide-react'
 import { drawingsKey, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
@@ -118,6 +122,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   // Clicked points of the drawing in progress, plus the point under the mouse for the preview.
   const [draft, setDraft] = useState<Point[]>([])
   const [hover, setHover] = useState<Point | null>(null)
+  // Phone: where the crosshair is (chart px).
+  const [aim, setAim] = useState<{ x: number; y: number } | null>(null)
   // Edits are previewed locally and committed on mouseup, so the store file is written once per drag.
   const [drag, setDrag] = useState<DragState | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -165,6 +171,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   useEffect(() => {
     setDraft([])
     setHover(null)
+    setAim(null)
   }, [tool, symbol])
 
   useEffect(() => {
@@ -205,7 +212,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     return at && { time: logicalToTime(axis, at.logical, step), price: at.price }
   }
 
-  const startDrag = (e: React.MouseEvent, d: Drawing, handle: Handle) => {
+  const startDrag = (e: React.PointerEvent, d: Drawing, handle: Handle) => {
     e.stopPropagation()
     e.preventDefault()
     select(d.id)
@@ -219,7 +226,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const dragging = drag !== null
   useEffect(() => {
     if (!dragging) return
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const d = dragRef.current
       const at = logicalAt(e)
       if (!d || !at) return
@@ -245,17 +252,20 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       dragRef.current = null
       setDrag(null)
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
     }
     // Handlers read the live drag via dragRef; the axis only changes on new bars, which is harmless mid-drag.
   }, [dragging])
 
   const onClick = (e: React.MouseEvent) => {
-    const p = pointAt(e)
+    // The phone places points with the crosshair button instead (aim below).
+    if (!IS_MOBILE) addPoint(pointAt(e))
+  }
+  const addPoint = (p: Point | null) => {
     if (!p || tool === 'cursor') return
     const pts = [...draft, p]
     if (pts.length < CLICKS[tool]) return setDraft(pts)
@@ -266,7 +276,22 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
 
   const onMove = (e: React.MouseEvent) => {
-    if (draft.length) setHover(pointAt(e))
+    if (draft.length && !IS_MOBILE) setHover(pointAt(e))
+  }
+
+  // Phone: the finger moves a crosshair that sits above it (touchAim); the round button places the point.
+  const onAim = (e: React.PointerEvent) => {
+    if (!IS_MOBILE || tool === 'cursor') return
+    const r = svgRef.current!.getBoundingClientRect()
+    const a = aimAt({ x: e.clientX - r.left, y: e.clientY - r.top }, { width: r.width, height: r.height })
+    setAim(a)
+    if (draft.length) setHover(pointAt({ clientX: r.left + a.x, clientY: r.top + a.y }))
+  }
+  const placeAim = () => {
+    if (!aim) return
+    const r = svgRef.current!.getBoundingClientRect()
+    addPoint(pointAt({ clientX: r.left + aim.x, clientY: r.top + aim.y }))
+    void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {})
   }
 
   const width = chart.timeScale().width()
@@ -287,7 +312,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
             strokeWidth: 10,
             fill: 'none',
             style: { pointerEvents: 'stroke' as const, cursor },
-            onMouseDown: (e: React.MouseEvent) => startDrag(e, d, 'move')
+            onPointerDown: (e: React.PointerEvent) => startDrag(e, d, 'move')
           }
 
     if (d.type === 'hline') {
@@ -334,7 +359,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           stroke={stroke}
           strokeWidth={1.5}
           style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
-          onMouseDown={preview ? undefined : (e) => startDrag(e, d, i)}
+          onPointerDown={preview ? undefined : (e) => startDrag(e, d, i)}
         />
       ))
     if (d.type === 'text') {
@@ -348,7 +373,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               fontSize={d.size ?? TEXT_SIZE}
               fontWeight={600}
               style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move', userSelect: 'none' }}
-              onMouseDown={preview ? undefined : (e) => startDrag(e, d, 'move')}
+              onPointerDown={preview ? undefined : (e) => startDrag(e, d, 'move')}
               onDoubleClick={preview ? undefined : () => setEditing(d.id)}
             >
               {d.text}
@@ -641,10 +666,37 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         }}
         onClick={onClick}
         onMouseMove={onMove}
+        onPointerDown={onAim}
+        onPointerMove={onAim}
       >
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
         {preview && render(preview, true)}
+        {IS_MOBILE && drawingMode && aim && (
+          <g pointerEvents="none">
+            <line x1={0} x2={width} y1={aim.y} y2={aim.y} stroke={THEME.text} strokeDasharray="3 3" />
+            <line x1={aim.x} x2={aim.x} y1={0} y2={height} stroke={THEME.text} strokeDasharray="3 3" />
+            <circle cx={aim.x} cy={aim.y} r={4} fill="none" stroke={COLOR} strokeWidth={1.5} />
+          </g>
+        )}
       </svg>
+      {IS_MOBILE && drawingMode && aim && series.coordinateToPrice(aim.y) !== null && (
+        <span
+          className="pointer-events-none absolute z-20 rounded bg-accent px-1 text-[11px] tabular-nums text-white"
+          style={{ left: width + 2, top: aim.y - 8 }}
+        >
+          {fmt(series.coordinateToPrice(aim.y)!)}
+        </span>
+      )}
+      {IS_MOBILE && drawingMode && (
+        <button
+          onClick={placeAim}
+          disabled={!aim}
+          aria-label={t('Punkt setzen')}
+          className="absolute bottom-16 right-16 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-glow disabled:opacity-40"
+        >
+          <Crosshair size={26} />
+        </button>
+      )}
       {textEdit && editAt && editAt[0] !== null && editAt[1] !== null && (
         <input
           key={textEdit.id}
@@ -665,6 +717,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         <div
           className="pointer-events-auto absolute bottom-12 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-lg bg-panel/90 px-2 py-1.5 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur"
           onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <div role="group" aria-label={t('Farbe')} className="flex items-center gap-1.5">
             {palette().map(({ color, name }) => {
@@ -683,6 +736,12 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               )
             })}
           </div>
+          {IS_MOBILE && (
+            // No Delete key on the phone.
+            <button onClick={() => removeDrawing(styled.id)} aria-label={t('Zeichnung löschen')} className="ml-1 border-l border-line pl-2 text-down">
+              <Trash2 size={18} />
+            </button>
+          )}
           {styled.type === 'text' && (
             <div role="group" aria-label={t('Textgröße')} className="ml-1 flex items-center gap-0.5 border-l border-line pl-2">
               {TEXT_SIZES.map((n) => {
@@ -706,7 +765,9 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       {tool !== 'cursor' && CLICKS[tool] > 1 && (
         // Bottom centre: the top is taken by the legend row.
         <div className="pointer-events-none absolute bottom-12 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-panel/90 px-2.5 py-1 text-xs text-slate-200 shadow-glow ring-1 ring-accent/40 backdrop-blur">
-          {t('Punkt {n} von {total} · Esc bricht ab', { n: draft.length + 1, total: CLICKS[tool] })}
+          {IS_MOBILE
+            ? t('Fadenkreuz schieben · ⊕ setzt Punkt {n} von {total}', { n: draft.length + 1, total: CLICKS[tool] })
+            : t('Punkt {n} von {total} · Esc bricht ab', { n: draft.length + 1, total: CLICKS[tool] })}
         </div>
       )}
     </>

@@ -21,18 +21,19 @@ import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, modelReady } from './forecast'
-import { alpacaHasKeys, setAlpacaKeys } from './alpaca'
+import { alpacaHasKeys, setAlpacaKeys, useAlpacaKeyStore } from '../data/alpaca'
+import { alpacaKeysFromDisk, finnhubKey, saveAlpacaKeysToDisk, saveFinnhubKey } from './keys'
 import {
   companyInfo,
   finnhubCheck,
-  finnhubKey,
-  saveFinnhubKey,
   searchSymbols,
   setStockSource,
   stockCandles,
   stockQuotes,
   symbolName
-} from './stocks'
+} from '../data/stocks'
+
+useAlpacaKeyStore(alpacaKeysFromDisk, saveAlpacaKeysToDisk)
 
 // Pin the data folder: the installed app is named "KandleOS", the source checkout "kandleos", and on Linux
 // those would be two different folders. All data (store, key, single-instance lock) lives here.
