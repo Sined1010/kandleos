@@ -5,7 +5,7 @@ import { decisionOf, providerById, RATINGS, STAGES, stageOf, type Decision, type
 import { compareWithChronos, readWeighting, type ChronosSkip, type ChronosSnapshot } from '../../../shared/chronosLink'
 import { dailyForecast } from '../services/dailyForecast'
 import { locale, msg, t } from '../../../shared/i18n'
-import { formatPrice } from '../lib/format'
+import { formatPrice, ipcError } from '../lib/format'
 import { renderMarkdown } from '../lib/markdown'
 import { useStore } from '../store/useStore'
 import { modelsFor } from './AgentsSetup'
@@ -42,7 +42,7 @@ const HINTS: [RegExp, string][] = [
   [/model.*(not.?found|does not exist)|404/i, msg('Das gewählte Modell gibt es beim Anbieter nicht. Bitte in „Einrichten“ ändern.')]
 ]
 const errorText = (e: unknown) => {
-  const message = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+  const message = ipcError(e)
   const hint = HINTS.find(([re]) => re.test(message))?.[1]
   return hint ? `${t(hint)}
 

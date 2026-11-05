@@ -2,6 +2,7 @@ import { Check, Download, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ANALYSTS, PROVIDERS, providerById, type ProviderId } from '../../../shared/agents'
 import { t } from '../../../shared/i18n'
+import { ipcError } from '../lib/format'
 import { useStore } from '../store/useStore'
 
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
@@ -32,7 +33,7 @@ function KeyField({ name, label, hint, stored, onSaved }: {
       setValue('')
       setError('')
     } catch (e) {
-      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+      setError(ipcError(e))
     }
   }
   return (
@@ -116,7 +117,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
     try {
       setStatus(await window.api.agents.install())
     } catch (e) {
-      setSetupError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+      setSetupError(ipcError(e))
     } finally {
       stop()
       setSetup(null)

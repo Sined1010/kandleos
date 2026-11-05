@@ -5,3 +5,6 @@ export const formatPrice = (p: number): string =>
 
 /** "+1.23%" style change, as in the watchlist. */
 export const formatChange = (pct: number): string => `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
+
+/** Error text from the main process without Electron's "Error invoking remote method 'x': Error: " prefix. */
+export const ipcError = (e: unknown): string => (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')

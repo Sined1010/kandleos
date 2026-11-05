@@ -1,6 +1,7 @@
 import { Building2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { locale, t } from '../../../shared/i18n'
+import { ipcError } from '../lib/format'
 import type { CompanyInfo } from '../../../shared/types'
 import { useStore } from '../store/useStore'
 import { MINOR_UNITS } from './ChartArea'
@@ -52,7 +53,7 @@ export function InfoPanel({ symbol }: { symbol: string }) {
     let active = true
     window.api.companyInfo(symbol, key).then(
       (i) => active && setInfo(i),
-      (e: Error) => active && setError(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+      (e: Error) => active && setError(ipcError(e))
     )
     return () => {
       active = false

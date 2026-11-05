@@ -1,4 +1,4 @@
-import { app, safeStorage } from 'electron'
+import { app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createWriteStream, existsSync, readFileSync } from 'node:fs'
@@ -10,6 +10,7 @@ import { agentsTicker, ANALYSTS, keyEnvFor, PROVIDERS, structuredFromBridge, typ
 import { chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
+import { read as readSecret, save as saveSecret } from './keys'
 
 // TradingAgents runs in its own Python, set up on first use inside the app's data folder: uv (a single
 // binary, pinned with checksums) downloads a managed Python and installs TradingAgents at a pinned commit.
@@ -172,18 +173,13 @@ export async function removeAgents(): Promise<AgentsStatus> {
 }
 
 // API keys: one encrypted file (like the Finnhub key), never handed to the window, only to the Python process.
-const keysFile = (): string => join(base(), 'keys.bin')
-const plainKeysFile = (): string => join(base(), 'keys.json')
+const KEYS = [join('agents', 'keys.bin'), join('agents', 'keys.json')] as const
 
 export function readKeys(): Record<string, string> {
   try {
-    return JSON.parse(safeStorage.decryptString(readFileSync(keysFile())))
+    return JSON.parse(readSecret(...KEYS) ?? '{}')
   } catch {
-    try {
-      return JSON.parse(readFileSync(plainKeysFile(), 'utf8'))
-    } catch {
-      return {}
-    }
+    return {}
   }
 }
 
@@ -205,12 +201,7 @@ export async function setKey(name: unknown, value: unknown): Promise<Record<stri
 /** Replaces all stored keys (names checked by the caller). */
 export async function writeKeys(keys: Record<string, string>): Promise<void> {
   await mkdir(base(), { recursive: true })
-  await rm(keysFile(), { force: true })
-  await rm(plainKeysFile(), { force: true })
-  if (!Object.keys(keys).length) return
-  if (safeStorage.isEncryptionAvailable()) await writeFile(keysFile(), safeStorage.encryptString(JSON.stringify(keys)))
-  // shortcut: without an OS keyring (some Linux setups) the keys are plain text readable only by this user.
-  else await writeFile(plainKeysFile(), JSON.stringify(keys), { mode: 0o600 })
+  await saveSecret(...KEYS, Object.keys(keys).length ? JSON.stringify(keys) : '')
 }
 
 export interface AgentsRequest {

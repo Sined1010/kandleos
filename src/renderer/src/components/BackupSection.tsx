@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { BackupSummary } from '../../../main/backup'
 import { t } from '../../../shared/i18n'
+import { ipcError } from '../lib/format'
 import { useStore } from '../store/useStore'
 
 const MIN_PASSWORD = 8
-const message = (e: unknown) => (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 // The section sits inside the settings form: Enter in a password field must not save and close the settings.
 const noEnter = (e: React.KeyboardEvent) => e.key === 'Enter' && e.preventDefault()
 const input = 'w-full rounded-lg bg-bg px-2 py-1.5 text-sm outline-none ring-1 ring-line focus:ring-accent'
@@ -34,7 +34,7 @@ export default function BackupSection() {
     try {
       await fn()
     } catch (e) {
-      setStatus(message(e))
+      setStatus(ipcError(e))
     } finally {
       setBusy(false)
     }

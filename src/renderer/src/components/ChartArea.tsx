@@ -35,6 +35,7 @@ import {
   type CandleProvider
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
+import { ipcError } from '../lib/format'
 import { THEME } from '../lib/theme'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
@@ -299,7 +300,7 @@ export default function ChartArea() {
           setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
           retry = setTimeout(() => load(false), 15_000)
         })
-        .catch((e: Error) => active && setStatus(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')))
+        .catch((e: Error) => active && setStatus(ipcError(e)))
     load(true)
 
     const stop = isCrypto(symbol)
@@ -605,7 +606,7 @@ export default function ChartArea() {
         api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
       if (backtestRuns && !reuse) void runCheck(run, result, n, backtestRuns, calibrate)
     } catch (e) {
-      const error = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+      const error = ipcError(e)
       // A failed refresh keeps the forecast already shown.
       if (run === fcRun.current && !quiet) setFc({ state: 'error', error })
     } finally {

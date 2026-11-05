@@ -6,9 +6,10 @@ import type { AlpacaKeys } from '../data/alpaca'
 
 // Keys live apart from the portable store file, encrypted for this OS user (DPAPI on Windows, Secret
 // Service/KWallet on Linux). The window only learns whether Alpaca keys are set.
+// Names are relative to userData (the TradingAgents keys use 'agents/…').
 const file = (name: string): string => join(app.getPath('userData'), name)
 
-async function save(encrypted: string, plain: string, value: string): Promise<void> {
+export async function save(encrypted: string, plain: string, value: string): Promise<void> {
   await rm(file(encrypted), { force: true })
   await rm(file(plain), { force: true })
   if (!value) return
@@ -17,7 +18,7 @@ async function save(encrypted: string, plain: string, value: string): Promise<vo
   else await writeFile(file(plain), value, { mode: 0o600 })
 }
 
-function read(encrypted: string, plain: string): string | null {
+export function read(encrypted: string, plain: string): string | null {
   try {
     return safeStorage.decryptString(readFileSync(file(encrypted)))
   } catch {
