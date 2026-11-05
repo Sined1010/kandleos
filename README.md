@@ -4,12 +4,13 @@
 
 <p align="center">
   <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="https://img.shields.io/github/v/release/Sined1010/kandleos" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-6366f1" alt="Platforms: Windows and Linux">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-6366f1" alt="Platforms: Windows, Linux and Android">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Sined1010/kandleos" alt="License: GPL-3.0"></a>
 </p>
 
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
-AI price forecast (Chronos-2) that runs entirely on your computer.
+AI price forecast (Chronos-2) that runs entirely on your computer. An Android app brings charts, watchlist,
+drawings and price alarms to your phone.
 
 ![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary, the values of one forecast step and colored drawings](docs/screenshot.webp)
 
@@ -24,15 +25,21 @@ AI price forecast (Chronos-2) that runs entirely on your computer.
 
 ## Features
 
-- **Charts** with volume, live prices and candle sizes from 1 minute to 12 months, plus pre- and post-market prices and candles
+- **Charts** with volume, live prices and candle sizes from 1 minute to 12 months, plus pre- and post-market prices and candles.
+  Older candles load automatically as you scroll back (up to 10,000), and for US stocks a price line shows the pre-/post-market price
 - **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR, with a legend in the chart showing their values
 - **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
 - **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
 - **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu
 - **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker, company info
 - **AI forecast ([Chronos-2](https://huggingface.co/amazon/chronos-2)):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
-- **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama
+- **Forecast quality:** up to 30 backtests per forecast (older candles are loaded for them) show how often the price stayed inside
+  the 90 % range and whether "higher price" calls were right. A local forecast archive settles your own forecasts once their time
+  has passed and keeps a running track record per symbol and candle size
+- **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama.
+  The market analyst gets the daily Chronos-2 forecast with its track record, and the report compares the agents' decision with it
 - **Back up your data:** export watchlist, drawings, saved charts and settings to one file, API keys only password-encrypted
+- **Android app** with price alarms (in the app, in the background every 15 minutes, or as instant alarms every 15 seconds)
 - English and German interface
 
 ## Download and installation
@@ -61,6 +68,16 @@ For Electron's sandbox the script asks for your `sudo` password once (recommende
 runs without the sandbox and shows a warning.
 
 To uninstall: `bash ~/.local/share/kandleos-app/install.sh --uninstall` (your data in `~/.config/kandleos` is kept).
+
+### Android (8.0 or newer)
+
+The Android app has charts, indicators, the watchlist with folders, drawings and saved charts, plus price alarms
+that also fire in the background. The AI forecast and the TradingAgents analysis are desktop-only for now.
+
+Install `KandleOS-<version>.apk` from the Releases page, or let [Obtainium](https://github.com/ImranR98/Obtainium)
+install and update it: add `https://github.com/Sined1010/kandleos` as a new app and set the APK filter to
+`KandleOS-.*[.]apk`. Android asks once to allow installing apps from Obtainium (or your browser). Every APK is
+signed with the same KandleOS key, so updates install over the previous version and keep your data.
 
 ## Data sources
 
@@ -93,8 +110,8 @@ otherwise in a file readable only by you).
 
 ## Privacy
 
-KandleOS collects no usage data and sends nothing to its author (no telemetry). Watchlist, drawings and settings stay
-on your computer (`%APPDATA%\kandleos` on Windows, `~/.config/kandleos` on Linux). To load prices the app connects
+KandleOS collects no usage data and sends nothing to its author (no telemetry). Watchlist, drawings, settings and the
+forecast archive stay on your computer (`%APPDATA%\kandleos` on Windows, `~/.config/kandleos` on Linux). To load prices the app connects
 directly to the providers above, which see your IP address. The update check is off by default: if you turn it on,
 KandleOS asks GitHub once a day for the latest version number (or when you click **Check for updates** in About);
 nothing is downloaded or installed automatically. Details are in the app under **About KandleOS**.

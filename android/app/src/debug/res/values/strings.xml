@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test builds (app id ….debug) show their own name next to the released app. -->
+<resources>
+    <string name="app_name">KandleOS Debug</string>
+    <string name="title_activity_main">KandleOS Debug</string>
+</resources>

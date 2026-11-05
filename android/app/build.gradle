@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Version from package.json: "0.5.0" → versionName 0.5.0, versionCode 500 (major·10000 + minor·100 + patch).
+def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def (vMajor, vMinor, vPatch) = appVersion.tokenize('.').collect { it as int }
+
+// Release signing: KANDLEOS_SIGNING names a .properties file outside the repo with storeFile, storePassword,
+// keyAlias and keyPassword (see android/build-apk.cmd). Without it the release APK stays unsigned.
+def signingPath = System.getenv('KANDLEOS_SIGNING')
+def signing = new Properties()
+if (signingPath) file(signingPath).withInputStream { signing.load(it) }
+
 android {
     namespace = "io.github.sined1010.kandleos"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +17,8 @@ android {
         applicationId "io.github.sined1010.kandleos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +26,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
+    signingConfigs {
         release {
+            if (signingPath) {
+                storeFile file(signing.storeFile)
+                storePassword signing.storePassword
+                keyAlias signing.keyAlias
+                keyPassword signing.keyPassword
+            }
+        }
+    }
+    buildTypes {
+        // Own app id, so test builds install next to the released app instead of replacing it (and its data).
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            signingConfig signingPath ? signingConfigs.release : null
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

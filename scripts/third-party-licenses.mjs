@@ -9,7 +9,9 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
 // Runtime dependencies are shipped as node_modules; these devDependencies are bundled into the app's JavaScript.
 const BUNDLED = ['react', 'react-dom', 'zustand', 'lucide-react', 'lightweight-charts', 'markdown-it']
-const roots = [...Object.keys(pkg.dependencies ?? {}), ...BUNDLED]
+// The Android app (src/mobile) also ships Capacitor: its JavaScript and its native Android part.
+const CAPACITOR = Object.keys(pkg.devDependencies ?? {}).filter((n) => n.startsWith('@capacitor/') && n !== '@capacitor/cli')
+const roots = [...Object.keys(pkg.dependencies ?? {}), ...BUNDLED, ...CAPACITOR]
 
 /** Directory of package `name` as Node would resolve it from `from` (nearest node_modules upwards). */
 function findPackage(name, from) {
@@ -56,6 +58,9 @@ const out = [
   '  Nichts davon ist im Installer enthalten; alles wird erst beim Einrichten der Analyse heruntergeladen.',
   '- Ladeanimation der Prognose nach „Candle Loader“ von Bilal Bostan (MIT,',
   '  https://uiverse.io/bilal_9731/new-moose-50); Lizenztext ganz unten.',
+  '- Nur in der Android-App: Capacitor (@capacitor/*, MIT, Liste unten) und AndroidX von Google (AppCompat,',
+  '  CoordinatorLayout, Core-SplashScreen, WorkManager; Apache-2.0, https://www.apache.org/licenses/LICENSE-2.0,',
+  '  Lizenztext wie bei lightweight-charts unten).',
   '',
   'Übersicht:',
   ...entries.map((e) => `- ${e.key} (${e.license})`),
