@@ -699,6 +699,13 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         onPointerMove={onAim}
         onPointerUp={endFinger}
         onPointerCancel={endFinger}
+        // The chart is a sibling, not a parent: hand the wheel over to whatever lies under the svg, so zooming works over drawings.
+        onWheel={(e) =>
+          document
+            .elementsFromPoint(e.clientX, e.clientY)
+            .find((el) => !svgRef.current?.contains(el))
+            ?.dispatchEvent(new WheelEvent('wheel', e.nativeEvent))
+        }
       >
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
         {preview && render(preview, true)}
