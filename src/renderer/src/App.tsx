@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AboutModal from './components/AboutModal'
 import ChartArea from './components/ChartArea'
+import ChartBoundary from './components/ChartBoundary'
 import ChartTabs from './components/ChartTabs'
 import DrawingToolbar from './components/DrawingToolbar'
 import { FULLSCREEN_ID } from './components/FullscreenButton'
@@ -53,7 +54,9 @@ export default function App() {
             <main className="relative min-h-0 flex-1">
               {/* Keyed by tab: switching tabs starts the chart afresh, so no forecast or panel of one tab
                   carries over to another. */}
-              <ChartArea key={activeTab} />
+              <ChartBoundary key={activeTab}>
+                <ChartArea />
+              </ChartBoundary>
             </main>
           </div>
         </div>

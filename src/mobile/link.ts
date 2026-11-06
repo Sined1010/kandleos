@@ -1,7 +1,7 @@
 // Phone ↔ PC link on the phone: pairing in the Keystore-backed storage, a hello every few minutes while the app is in
 // front, and the stock keys the PC hands over (the PC is their source while paired). Protocol in linkClient.ts.
 import { App as CapApp } from '@capacitor/app'
-import { create } from 'zustand'
+import { usePcStatus } from '../renderer/src/lib/pcStatus'
 import { saveAlpacaKeys } from '../data/alpaca'
 import { decodePairing, type PairingCode, type SourceKeys } from '../shared/link'
 import { t } from '../shared/i18n'
@@ -25,13 +25,7 @@ async function load(): Promise<Stored | null> {
 }
 const save = (p: Stored) => KandleNative.secureSet({ name: SECURE, value: JSON.stringify(p) })
 
-/** syncFailed: the PC answered, but the last sync did not go through (it is not off). */
-export const usePcStatus = create<{ state: 'none' | 'online' | 'offline'; pcName: string; lastSeen: number | null; syncFailed: boolean }>(() => ({
-  state: 'none',
-  pcName: '',
-  lastSeen: null,
-  syncFailed: false
-}))
+export { usePcStatus }
 
 const client = createLinkClient({ http: capHttp, load, save, onRemoved: () => unpair() })
 export const call = client.call

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
+import type { AgentsEnd, AgentsEvent, AgentsJob, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
 import type { BackupSummary } from '../main/backup'
 import type { LinkStatus } from '../main/link'
 import type { ArchiveEntry, Settlement, SummaryRow } from '../shared/archive'
@@ -89,6 +89,8 @@ const api = {
     run: (req: AgentsRequest): Promise<SavedAnalysis> => ipcRenderer.invoke('agents:run', req),
     onEvent: (cb: (e: AgentsEvent) => void): (() => void) => listen('agents:event', cb),
     cancel: (): Promise<void> => ipcRenderer.invoke('agents:cancel'),
+    /** The run going on now (also one a phone started) and how the last one ended. */
+    job: (): Promise<{ running: AgentsJob | null; last: AgentsEnd | null; now: number }> => ipcRenderer.invoke('agents:job'),
     results: (symbol: string): Promise<SavedAnalysis[]> => ipcRenderer.invoke('agents:results', symbol),
     ollamaModels: (url: string): Promise<string[] | null> => ipcRenderer.invoke('agents:ollama-models', url)
   },

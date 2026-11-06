@@ -180,6 +180,8 @@ export function createArchive(dir: string, rawLimit = ARCHIVE_RAW_LIMIT) {
       serial(async () => {
         const e = parseEntry(v)
         if (!e || entries.has(e.id)) return false
+        // Open forecasts are never thinned; past twice the limit no new one is taken, so the file cannot grow without end.
+        if (size > rawLimit * 2) return false
         const key = summaryKey(e)
         if (!shouldArchive(e, [...entries.values()].filter((p) => summaryKey(p) === key))) return false
         await append({ entry: e })

@@ -83,6 +83,13 @@ test('past the raw limit the oldest settled forecasts go and the summary keeps t
   assert.equal(Object.values(await createArchive(d, 5000).summary())[0].settled, 5)
 })
 
+test('open forecasts cannot grow the file past twice the raw limit', async () => {
+  const a = createArchive(await dir(), 2000)
+  const added = []
+  for (let k = 0; k < 5; k++) added.push(await a.add(entry(k)))
+  assert.deepEqual(added, [true, true, true, false, false])
+})
+
 test('a summary that cannot be read (not just missing) is never overwritten with recomputed totals', async () => {
   const d = await dir()
   const a = createArchive(d)

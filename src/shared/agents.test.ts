@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { agentsTicker, decisionOf, doneFromBridge, keyEnvFor, parseDecision, parseStructured, stageOf, structuredFromBridge } from './agents.ts'
+import { agentsTicker, checkAgentsConfig, decisionOf, doneFromBridge, keyEnvFor, parseDecision, parseStructured, stageOf, structuredFromBridge } from './agents.ts'
 
 // Shapes as TradingAgents 0.7.1 renders them (agents/schemas.py), German body text, English labels.
 const DECISION = `**Rating**: Overweight
@@ -121,4 +121,12 @@ test('doneFromBridge keeps only string reports with short keys and finite counts
     { rating: 'Buy', reports: { decision: 'ok' }, stats: { calls: 3, tokensIn: 0, tokensOut: 0 }, structured: { decision: { rating: 'Buy' } } }
   )
   assert.deepEqual(doneFromBridge('nope'), { rating: '', reports: {}, stats: { calls: 0, tokensIn: 0, tokensOut: 0 }, structured: undefined })
+})
+
+test('checkAgentsConfig takes over only known settings of the right kind', () => {
+  const good = { provider: 'ollama', models: { ollama: { deep: 'a', quick: 'b' } }, analysts: ['market'], debateRounds: 2, ollamaUrl: 'http://pc:11434' }
+  assert.deepEqual(checkAgentsConfig(good), good)
+  assert.deepEqual(checkAgentsConfig({ provider: 'evil', models: { ollama: { deep: 1 }, evil: { deep: 'a', quick: 'b' } }, analysts: 'market', debateRounds: 9, ollamaUrl: 5 }), { models: {} })
+  assert.deepEqual(checkAgentsConfig(null), {})
+  assert.deepEqual(checkAgentsConfig([]), {})
 })

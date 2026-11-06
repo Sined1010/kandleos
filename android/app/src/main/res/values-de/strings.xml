@@ -8,4 +8,13 @@
         <item quantity="other">KandleOS beobachtet %1$d Kurse</item>
     </plurals>
     <string name="alarm_body">Kurs-Alarm von KandleOS</string>
+    <string name="channel_analyses">Analysen</string>
+    <string name="analysis_done">Analyse %1$s fertig: %2$s</string>
+    <string name="analysis_failed">Analyse %1$s abgebrochen</string>
+    <string name="analysis_body">Umfassende Analyse auf deinem PC – zum Lesen tippen</string>
+    <string name="rating_buy">Kaufen</string>
+    <string name="rating_overweight">Übergewichten</string>
+    <string name="rating_hold">Halten</string>
+    <string name="rating_underweight">Untergewichten</string>
+    <string name="rating_sell">Verkaufen</string>
 </resources>

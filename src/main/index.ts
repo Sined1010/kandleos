@@ -4,6 +4,7 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  agentsJob,
   agentsStatus,
   cancelAgents,
   installAgents,
@@ -20,7 +21,8 @@ import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
 import { applyBackup, exportBackup, pickBackup } from './backup'
-import { forecast, modelReady } from './forecast'
+import { forecast, loadModel, modelReady } from './forecast'
+import { createRemoteOps } from './remoteOps'
 import { alpacaHasKeys, setAlpacaKeys, useAlpacaKeyStore } from '../data/alpaca'
 import { alpacaKeysFromDisk, finnhubKey, saveAlpacaKeysToDisk, saveFinnhubKey } from './keys'
 import { addFirewallRule, hasFirewallRule, otherFirewalls } from './firewall'
@@ -60,12 +62,45 @@ ipcMain.on('link:reply', (_e, id, r) => {
   pendingLink.get(id)?.(r)
   pendingLink.delete(id)
 })
+// The phone's forecasts and analyses (Abschnitt 3) are answered here in main, where model and TradingAgents run.
+const remote = createRemoteOps({
+  forecast: (series, groups) => forecast(series, groups, () => {}),
+  modelReady,
+  loadModel,
+  archive: { add: (entry) => archive().add(entry), summary: (key) => archive().summary(key) },
+  agents: {
+    status: agentsStatus,
+    keys: keyStatus,
+    // The window keeps the settings in its store file; the phone analyses with the PC's choice.
+    config: () => {
+      try {
+        return JSON.parse(readStore() ?? 'null')?.state?.agentsConfig ?? null
+      } catch {
+        return null
+      }
+    },
+    start: async (req, device) => {
+      const run = runAgents(req, () => {}, device)
+      // Set right away when the checks passed; the run then goes on on its own, whatever the connection does.
+      const started = agentsJob().running?.started
+      // A refusal (no key, already running) comes within a moment and is the answer instead.
+      const early = await Promise.race([run.then(() => null, (e: Error) => e), new Promise<null>((ok) => setTimeout(() => ok(null), 100))])
+      if (early) throw early
+      if (started === undefined) throw new Error('failed')
+      return { started }
+    },
+    job: agentsJob,
+    cancel: cancelAgents,
+    results: listAnalyses
+  }
+})
 configureLink({
   keys: () => ({ finnhub: finnhubKey(), alpaca: alpacaKeysFromDisk(), ...source }),
   forward: (op, args, device) =>
     new Promise((resolve, reject) => {
+      if (op !== 'sync') return remote(op, args, device).then(resolve, reject)
       const win = BrowserWindow.getAllWindows()[0]
-      if (op !== 'sync' || !win) return reject(new Error('unknown-op'))
+      if (!win) return reject(new Error('unknown-op'))
       const id = ++linkReq
       const timer = setTimeout(() => {
         pendingLink.delete(id)
@@ -185,6 +220,7 @@ ipcMain.handle('agents:keys', () => keyStatus())
 ipcMain.handle('agents:key-set', (_e, name, value) => setKey(name, value))
 ipcMain.handle('agents:run', (e, req) => runAgents(req, (ev) => !e.sender.isDestroyed() && e.sender.send('agents:event', ev)))
 ipcMain.handle('agents:cancel', () => cancelAgents())
+ipcMain.handle('agents:job', () => agentsJob())
 ipcMain.handle('agents:results', (_e, symbol) => listAnalyses(symbol))
 ipcMain.handle('agents:ollama-models', (_e, url) => ollamaModels(url))
 

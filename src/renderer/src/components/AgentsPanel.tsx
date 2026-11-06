@@ -1,14 +1,15 @@
 import { BrainCircuit, Check, Circle, Loader2, Settings2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { decisionOf, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
+import { decisionOf, modelsFor, providerById, RATINGS, STAGES, stageOf, type Decision, type Rating } from '../../../shared/agents'
 import { compareWithChronos, readWeighting, type ChronosSkip, type ChronosSnapshot } from '../../../shared/chronosLink'
 import { dailyForecast } from '../services/dailyForecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice, ipcError } from '../lib/format'
+import { usePcStatus } from '../lib/pcStatus'
+import { IS_MOBILE, PANEL_CLOSE, SIDE_PANEL } from '../lib/platform'
 import { renderMarkdown } from '../lib/markdown'
 import { useStore } from '../store/useStore'
-import { modelsFor } from './AgentsSetup'
 
 type Saved = Awaited<ReturnType<typeof window.api.agents.run>>
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
@@ -47,6 +48,12 @@ const errorText = (e: unknown) => {
   return hint ? `${t(hint)}
 
 ${message}` : message
+}
+const PC_SETUP = msg('Einrichten geht nur am PC: Prognose-Menü → Umfassende Analyse → Einrichten.')
+const RUN_TITLE = {
+  own: msg('Analyse von {symbol} läuft · {time}'),
+  pc: msg('Am PC gestartet: Analyse von {symbol} läuft · {time}'),
+  phone: msg('Vom Handy gestartet: Analyse von {symbol} läuft · {time}')
 }
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 const thousands = (n: number) => n.toLocaleString(locale())
@@ -134,6 +141,8 @@ interface Running {
   calls: number
   tokensIn: number
   tokensOut: number
+  /** A run this window did not start: 'pc' or the id of the phone that did (main/agents.ts AgentsJob). */
+  by?: string
 }
 
 // A run outlives the panel: a tab or language switch rebuilds the chart and this panel while the paid run goes on.
@@ -162,8 +171,13 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
   const [keys, setKeys] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState<Saved[]>([])
   const [shownId, setShownId] = useState<string | null>(null)
-  const running = useRun((s) => s.running)
+  const own = useRun((s) => s.running)
+  // A run this window did not start: from the phone (on the PC), or on the PC after the phone app was reopened.
+  const [foreign, setForeign] = useState<Running | null>(null)
+  const running = own ?? foreign
   const error = useRun((s) => s.error)
+  const pcState = usePcStatus((s) => s.state)
+  const pcOff = IS_MOBILE && pcState !== 'online'
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('decision')
   const [showLevels, setShowLevels] = useState(true)
   const [, tick] = useState(0)
@@ -182,7 +196,28 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
     if (!open || setupOpen) return
     window.api.agents.status().then(setStatus)
     window.api.agents.keys().then(setKeys)
-  }, [config, open, setupOpen])
+    // On the phone `config` itself comes from the PC with the status; asking again for it would loop.
+  }, [IS_MOBILE ? null : config, open, setupOpen, pcState])
+  useEffect(() => {
+    if (!open || own || pcOff) return void setForeign(null)
+    let live = true
+    let timer = 0
+    // The next question only after the answer: with the PC slow, questions must not pile up in the link.
+    const ask = () =>
+      window.api.agents
+        .job()
+        // The PC's clock may differ from this one: the start moves into this clock by the PC's own elapsed time.
+        .then((j) => live && setForeign(j.running && { ...j.running, started: Date.now() - (j.now - j.running.started) }))
+        .catch(() => {})
+        .finally(() => {
+          if (live) timer = window.setTimeout(ask, 3000)
+        })
+    void ask()
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [open, own, pcOff])
   // Read again when a run ends, so its result shows up even if this panel was rebuilt meanwhile.
   const idle = !running
   useEffect(() => setShownId(null), [symbol])
@@ -192,7 +227,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
     return () => {
       live = false
     }
-  }, [symbol, idle])
+  }, [symbol, idle, pcState])
   useEffect(() => {
     if (!running) return
     const id = setInterval(() => tick((n) => n + 1), 1000)
@@ -272,21 +307,22 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
   const target = decision?.priceTarget
   return (
     <aside
-      className={`absolute inset-y-0 right-0 z-20 w-[400px] flex-col border-l border-line bg-panel/95 text-xs shadow-2xl shadow-black/50 backdrop-blur ${
-        open ? 'flex' : 'hidden'
-      }`}
+      className={`${SIDE_PANEL} flex-col text-xs ${open ? 'flex' : 'hidden'}`}
       onPointerDown={(e) => e.stopPropagation()}
       aria-label={t('Umfassende Analyse')}
     >
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
         <BrainCircuit size={16} className="text-accent" />
         <span className="font-semibold text-white">{t('Umfassende Analyse')}</span>
-        <span className="text-muted">{t('mit TradingAgents · {symbol}', { symbol })}</span>
-        <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title={t('Einrichten')} aria-label={t('Umfassende Analyse einrichten')}>
-          <Settings2 size={15} />
-        </button>
-        <button onClick={onClose} className="rounded p-1 text-muted hover:bg-line hover:text-white" aria-label={t('Schließen')}>
-          <X size={15} />
+        <span className="truncate text-muted">{t('mit TradingAgents · {symbol}', { symbol })}</span>
+        {/* Setting up and keys stay on the PC; the phone only starts runs. */}
+        {!IS_MOBILE && (
+          <button onClick={onSetup} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" title={t('Einrichten')} aria-label={t('Umfassende Analyse einrichten')}>
+            <Settings2 size={15} />
+          </button>
+        )}
+        <button onClick={onClose} className={IS_MOBILE ? PANEL_CLOSE : 'rounded p-1 text-muted hover:bg-line hover:text-white'} aria-label={t('Schließen')}>
+          <X size={IS_MOBILE ? 22 : 15} />
         </button>
       </div>
 
@@ -294,9 +330,9 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
         {running ? (
           <div className="p-3">
             <p className="mb-2 text-slate-200">
-              {t('Analyse von {symbol} läuft · {time}', {
+              {t(own ? RUN_TITLE.own : running.by === 'pc' ? RUN_TITLE.pc : RUN_TITLE.phone, {
                 symbol: running.symbol,
-                time: clock(Math.round((Date.now() - running.started) / 1000))
+                time: clock(Math.max(0, Math.round((Date.now() - running.started) / 1000)))
               })}
             </p>
             {running.prep && (
@@ -346,16 +382,26 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
           </div>
         ) : (
           <div className="p-3">
-            {!status ? (
+            {pcOff ? (
+              <p className="rounded-lg bg-bg p-3 text-slate-200 ring-1 ring-line">
+                {pcState === 'none'
+                  ? t('Die Analyse läuft auf deinem PC. Koppeln: am PC Einstellungen → Handy koppeln.')
+                  : t('PC nicht erreichbar – die Analyse läuft auf dem PC. Gespeicherte Analysen siehst du trotzdem.')}
+              </p>
+            ) : !status ? (
               <p className="text-muted">{t('Prüfe …')}</p>
             ) : !status.installed ? (
               <Intro symbol={symbol} supported={status.supported} onSetup={onSetup} />
             ) : !ready ? (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
                 <p className="text-slate-200">{t('Für {provider} ist noch kein API-Key hinterlegt.', { provider: t(provider.label) })}</p>
-                <button onClick={onSetup} className="mt-2 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110">
-                  {t('Einrichten')}
-                </button>
+                {IS_MOBILE ? (
+                  <p className="mt-2 text-muted">{t(PC_SETUP)}</p>
+                ) : (
+                  <button onClick={onSetup} className="mt-2 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110">
+                    {t('Einrichten')}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="rounded-lg bg-bg p-3 ring-1 ring-line">
@@ -411,7 +457,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
                 {saved.map((a) => (
                   <option key={a.id} value={a.id}>
                     {new Date(a.createdAt).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })} ·{' '}
-                    {t(providerById(a.provider).label)} · {RATING[a.rating as Rating] ? t(RATING[a.rating as Rating][0]) : a.rating}
+                    {t(providerById(a.provider).label)} · {Object.hasOwn(RATING, a.rating) ? t(RATING[a.rating as Rating][0]) : a.rating}
                   </option>
                 ))}
               </select>
@@ -596,7 +642,9 @@ function Intro({ symbol, supported, onSetup }: { symbol: string; supported: bool
         {t('Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.')}
       </p>
 
-      {supported ? (
+      {IS_MOBILE ? (
+        <p className="mt-3 text-slate-200">{t(PC_SETUP)}</p>
+      ) : supported ? (
         <button
           onClick={onSetup}
           className="mt-3 rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-glow hover:brightness-110"

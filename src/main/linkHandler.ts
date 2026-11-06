@@ -29,6 +29,8 @@ export interface LinkContext {
   keys: () => SourceKeys
   /** Ops the window answers (sync); throws Error('unknown-op') for anything it does not know. */
   forward: (op: string, args: unknown, device: string) => Promise<unknown>
+  /** Called with the new counter in place before the op runs; link.ts saves it and lets the next request in. */
+  accepted?: (state: LinkState) => Promise<void>
 }
 
 type Reply = Envelope | null
@@ -95,6 +97,8 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
   if (!opened.ok) return { state, reply: null }
   const { ctr, op, args } = opened.body
   const next = { ...state, devices: state.devices.map((d) => (d === device ? { ...d, lastCtr: ctr, lastSeen: ctx.now } : d)) }
+  // From here a replay of this message is refused, so a long op (a forecast) need not hold up other requests.
+  await ctx.accepted?.(next)
 
   let body: Record<string, unknown>
   try {
@@ -106,7 +110,9 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
           : await ctx.forward(String(op), args, device.id)
     body = { res }
   } catch (err) {
-    body = { error: (err as Error).message === 'unknown-op' ? 'unknown-op' : 'failed' }
+    // In words ("an analysis is already running"), but never 'removed': that one would unpair the phone.
+    const message = (err as Error).message
+    body = { error: message && message !== 'removed' ? message : 'failed' }
   }
   return { state: next, reply: await sealEnvelope(key, device.id, { ctr, ...body }, 'res') }
 }

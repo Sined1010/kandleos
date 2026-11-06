@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { checkAnalysis, checkKeys, openKeys, parseBackup, sealKeys } from './backupFormat.ts'
+import { checkKeys, openKeys, parseBackup, sealKeys } from './backupFormat.ts'
+import { checkAnalyses, checkAnalysis } from '../shared/savedAnalysis.ts'
 
 const keys = { finnhub: 'abc123', alpaca: { id: 'AKID1234567890', secret: 'SECRET1234567890' }, agents: { anthropic: 'sk-ant-x', fred: 'f1' } }
 const analysis = {
@@ -44,6 +45,11 @@ test('a backup is parsed only when it looks like one', () => {
     assert.throws(() => parseBackup(bad), bad.slice(0, 60))
 })
 
+test('a backup store cannot bring a Finnhub key past the password', () => {
+  const parsed = parseBackup(backup({ store: { state: { folders: [], finnhubKey: 'evil123' }, version: 2 } }))
+  assert.deepEqual(parsed.store, { state: { folders: [] }, version: 2 })
+})
+
 test('analyses keep checked Chronos and structured results; old ones stay as they are', () => {
   assert.deepEqual(checkAnalysis(analysis), analysis)
   const chronos = { skipped: 'declined' }
@@ -66,6 +72,12 @@ test('imported key blobs cannot choose expensive key-derivation settings', () =>
   const sealed = sealKeys(keys, 'richtig-langes-passwort')
   assert.equal(parseBackup(backup({ keys: sealed })).keys?.data, sealed.data)
   assert.throws(() => parseBackup(backup({ keys: { ...sealed, n: 2 ** 30 } })))
+})
+
+test('checkAnalyses keeps only valid analyses of a list, up to the limit', () => {
+  assert.deepEqual(checkAnalyses({ evil: 1 }), [])
+  assert.deepEqual(checkAnalyses([analysis, { ...analysis, reports: null }, 5, null]), [analysis])
+  assert.equal(checkAnalyses([analysis, analysis, analysis], 2).length, 2)
 })
 
 test('analyses that would write outside their folder are dropped, extra fields are not copied', () => {

@@ -2,10 +2,10 @@
 // A backup may come from someone else, so everything read from it is checked here before backup.ts writes it.
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import type { SavedAnalysis } from './agents'
-import { keyEnvFor, parseStructured, PROVIDERS, type ProviderId } from '../shared/agents.ts'
-import { parseChronos } from '../shared/chronosLink.ts'
+import { keyEnvFor } from '../shared/agents.ts'
 import { t } from '../shared/i18n.ts'
-import { ALPACA_KEY_RE, FINNHUB_KEY_RE, SYMBOL_RE } from '../shared/types.ts'
+import { checkAnalyses } from '../shared/savedAnalysis.ts'
+import { ALPACA_KEY_RE, FINNHUB_KEY_RE } from '../shared/types.ts'
 
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 
@@ -78,7 +78,6 @@ export function openKeys(sealed: SealedKeys, password: string): BackupKeys {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max
-const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const fail = (): never => {
   throw new Error(t('Keine gültige KandleOS-Sicherung'))
 }
@@ -110,55 +109,6 @@ export function checkKeys(v: unknown): BackupKeys {
 
 const SEALED_FIELDS = ['salt', 'iv', 'tag', 'data'] as const
 
-/** A saved analysis rebuilt from known fields only; null if it does not look like one. */
-export function checkAnalysis(v: unknown): SavedAnalysis | null {
-  if (!isObject(v)) return null
-  const { id, symbol, ticker, date, createdAt, durationSec, provider, deepModel, quickModel, analysts, rating, reports, stats } = v
-  const ok =
-    typeof id === 'string' &&
-    // Becomes the file name: only the format runAgents itself uses.
-    /^\d{4}-\d{2}-\d{2}_\d{1,16}$/.test(id) &&
-    typeof symbol === 'string' &&
-    SYMBOL_RE.test(symbol) &&
-    str(ticker, 40) &&
-    typeof date === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
-    num(createdAt) &&
-    num(durationSec) &&
-    PROVIDERS.some((p) => p.id === provider) &&
-    str(deepModel, 80) &&
-    str(quickModel, 80) &&
-    Array.isArray(analysts) &&
-    analysts.length <= 20 &&
-    analysts.every((a) => str(a, 40)) &&
-    str(rating, 40) &&
-    isObject(reports) &&
-    Object.entries(reports).every(([k, r]) => k.length <= 40 && str(r, 500_000)) &&
-    isObject(stats) &&
-    num(stats.calls) &&
-    num(stats.tokensIn) &&
-    num(stats.tokensOut)
-  if (!ok) return null
-  return {
-    id,
-    symbol,
-    ticker,
-    date,
-    createdAt,
-    durationSec,
-    provider: provider as ProviderId,
-    deepModel,
-    quickModel,
-    analysts: analysts as string[],
-    rating,
-    reports: { ...(reports as Record<string, string>) },
-    stats: { calls: stats.calls as number, tokensIn: stats.tokensIn as number, tokensOut: stats.tokensOut as number },
-    // Since the Chronos link: optional, checked one by one; a broken one drops only that field.
-    ...(parseChronos(v.chronos) && { chronos: parseChronos(v.chronos) }),
-    ...(parseStructured(v.structured) && { structured: parseStructured(v.structured) })
-  }
-}
-
 /** Parses and checks a backup file. Invalid analyses are dropped; anything else invalid rejects the file. */
 export function parseBackup(text: string): Backup {
   let v: unknown
@@ -176,13 +126,20 @@ export function parseBackup(text: string): Backup {
     if (!isObject(keys) || keys.kdf !== 'scrypt' || keys.n !== N || keys.r !== R || keys.p !== P) return fail()
     if (!SEALED_FIELDS.every((f) => typeof keys[f] === 'string' && /^[A-Za-z0-9+/=]{1,200000}$/.test(keys[f] as string))) return fail()
   }
+  // An old store (version < 3) still carried the Finnhub key; its migration would write it into the key file
+  // without the password. Keys come only from the sealed part.
+  let cleanStore = store as Backup['store']
+  if (cleanStore) {
+    const { finnhubKey: _, ...state } = cleanStore.state
+    cleanStore = { state, version: cleanStore.version }
+  }
   return {
     app: 'KandleOS',
     format: 1,
     appVersion: str(v.appVersion, 40) ? v.appVersion : '',
     exportedAt: str(v.exportedAt, 40) ? v.exportedAt : '',
-    store: store as Backup['store'],
-    analyses: v.analyses.map(checkAnalysis).filter((a): a is SavedAnalysis => a !== null),
+    store: cleanStore,
+    analyses: checkAnalyses(v.analyses),
     keys: keys as SealedKeys | null,
     ...(isObject(v.archive) && typeof v.archive.archive === 'string' && { archive: { archive: v.archive.archive, summary: v.archive.summary } })
   }

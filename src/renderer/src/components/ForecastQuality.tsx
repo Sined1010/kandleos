@@ -4,6 +4,7 @@ import { summaryKey, type SummaryRow } from '../../../shared/archive'
 import type { BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { tfLabel, type Timeframe } from '../../../shared/types'
+import { IS_MOBILE, PANEL_CLOSE, SIDE_PANEL } from '../lib/platform'
 import { useStore } from '../store/useStore'
 import type { ForecastResult } from './ForecastInfo'
 
@@ -183,7 +184,7 @@ export default function ForecastQuality({ open, symbol, timeframe, result, onClo
   const tabClass = (on: boolean) => `rounded-md px-2.5 py-1 ${on ? 'bg-brand text-white shadow-glow' : 'text-muted hover:text-white'}`
   return (
     <aside
-      className={`absolute inset-y-0 right-0 z-20 w-[400px] flex-col border-l border-line bg-panel/95 text-xs shadow-2xl shadow-black/50 backdrop-blur ${open ? 'flex' : 'hidden'}`}
+      className={`${SIDE_PANEL} flex-col text-xs ${open ? 'flex' : 'hidden'}`}
       onPointerDown={(e) => e.stopPropagation()}
       aria-label={t('Prognose-Qualität')}
     >
@@ -191,8 +192,8 @@ export default function ForecastQuality({ open, symbol, timeframe, result, onClo
         <Gauge size={16} className="text-accent" />
         <span className="font-semibold text-white">{t('Prognose-Qualität')}</span>
         <span className="text-muted">{label}</span>
-        <button onClick={onClose} className="ml-auto rounded p-1 text-muted hover:bg-line hover:text-white" aria-label={t('Schließen')}>
-          <X size={15} />
+        <button onClick={onClose} className={PANEL_CLOSE} aria-label={t('Schließen')}>
+          <X size={IS_MOBILE ? 22 : 15} />
         </button>
       </div>
       <div className="flex gap-1 px-3 pt-3" role="tablist">

@@ -28,7 +28,7 @@ const url = (addr: string, port: number) => `http://${addr.includes(':') ? `[${a
 
 export function createLinkClient(deps: LinkDeps) {
   /** Sends one sealed message to the first address that answers with a reply to exactly this message. */
-  async function send(addrs: string[], port: number, key: Uint8Array<ArrayBuffer>, device: string, ctr: number, body: Record<string, unknown>) {
+  async function send(addrs: string[], port: number, key: Uint8Array<ArrayBuffer>, device: string, ctr: number, body: Record<string, unknown>, timeoutMs = TIMEOUT_MS) {
     const env = await sealEnvelope(key, device, { ctr, ...body }, 'req')
     for (const addr of addrs) {
       let reply: unknown
@@ -37,7 +37,7 @@ export function createLinkClient(deps: LinkDeps) {
           method: 'POST',
           body: JSON.stringify(env),
           headers: { 'Content-Type': 'application/json' },
-          timeoutMs: TIMEOUT_MS
+          timeoutMs
         })
         if (!res.ok) continue
         reply = await res.json()
@@ -52,13 +52,13 @@ export function createLinkClient(deps: LinkDeps) {
     return null
   }
 
-  async function callNow(op: string, args?: unknown): Promise<unknown> {
+  async function callNow(op: string, args?: unknown, timeoutMs?: number): Promise<unknown> {
     const p = await deps.load()
     if (!p) throw new Error('not-paired')
     const ctr = nextCtr(p.lastCtr)
     // Saved before sending: a counter is never used twice, even if the app dies mid-request.
     await deps.save({ ...p, lastCtr: ctr })
-    const got = await send(p.addrs, p.port, fromB64url(p.key)!, p.deviceId, ctr, { op, args })
+    const got = await send(p.addrs, p.port, fromB64url(p.key)!, p.deviceId, ctr, { op, args }, timeoutMs)
     if (!got) throw new Error('offline')
     // Sealed with our own key, so it really is our PC saying it removed this phone.
     if (got.body.error === 'removed') {
@@ -92,8 +92,9 @@ export function createLinkClient(deps: LinkDeps) {
       return { pairing, keys: b.keys as SourceKeys }
     },
 
-    call(op: string, args?: unknown): Promise<unknown> {
-      const run = queue.then(() => callNow(op, args))
+    /** `timeoutMs` per address: a forecast takes the PC far longer than a hello. */
+    call(op: string, args?: unknown, timeoutMs?: number): Promise<unknown> {
+      const run = queue.then(() => callNow(op, args, timeoutMs))
       queue = run.catch(() => {})
       return run
     }

@@ -3,6 +3,8 @@
 // last changed each unit (stamps). Comparing base, mine and theirs per unit shows who changed what; nothing in the
 // store's actions has to know about sync.
 import type { Alarm } from './alarms.ts'
+import { checkDrawing } from './drawings.ts'
+import { TIMEFRAMES, type Timeframe } from './types.ts'
 import type { ChartTab, Drawing, Folder, Indicators } from '../renderer/src/store/useStore.ts'
 import type { SavedChart } from '../renderer/src/lib/charts.ts'
 
@@ -236,20 +238,22 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
     .filter(str)
     .flatMap((id) => {
       const t = parse<unknown>(u[`tab:${id}`], null)
-      return isObj(t) && str(t.symbol) && str(t.timeframe) ? [{ ...(t as unknown as Omit<ChartTab, 'id'>), id }] : []
+      return isObj(t) && str(t.symbol) && TIMEFRAMES.includes(t.timeframe as Timeframe) ? [{ ...(t as unknown as Omit<ChartTab, 'id'>), id }] : []
     })
   const drawings: Record<string, Drawing[]> = {}
   for (const k of keys) if (k.startsWith('drawing:')) {
-    const d = parse<unknown>(u[k], null)
-    if (!isObj(d) || !str(d.id) || !str(d.type) || !k.endsWith(':' + d.id)) continue
+    const d = checkDrawing(parse<unknown>(u[k], null))
+    if (!d || !k.endsWith(':' + d.id)) continue
     const key = k.slice(8, k.length - d.id.length - 1)
-    ;(drawings[key] ??= []).push(d as unknown as Drawing)
+    ;(drawings[key] ??= []).push(d)
   }
   for (const key of Object.keys(drawings)) drawings[key] = inOrder(drawings[key], keep.drawings[key] ?? [])
   const charts = inOrder(
     keys.filter((k) => k.startsWith('chart:')).flatMap((k) => {
       const c = parse<unknown>(u[k], null)
-      return isObj(c) && str(c.id) && str(c.name) && str(c.symbol) && Array.isArray(c.drawings) ? [c as unknown as SavedChart] : []
+      return isObj(c) && str(c.id) && str(c.name) && str(c.symbol) && TIMEFRAMES.includes(c.timeframe as Timeframe) && Array.isArray(c.drawings) && c.drawings.every(checkDrawing)
+        ? [c as unknown as SavedChart]
+        : []
     }),
     keep.charts
   )

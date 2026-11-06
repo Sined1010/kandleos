@@ -6,7 +6,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { agentsTicker, ANALYSTS, doneFromBridge, keyEnvFor, PROVIDERS, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
+import { agentsTicker, ANALYSTS, doneFromBridge, keyEnvFor, PROVIDERS, stageOf, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
 import { chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
@@ -270,11 +270,73 @@ function checkRequest(req: unknown): AgentsRequest {
 const resultsDir = (symbol: string): string => join(base(), 'results', symbol.replace(/[^A-Z0-9.=^-]/gi, '_'))
 let current: ChildProcess | null = null
 
+/** The run going on now, for a phone that started it or a window that did not (link ops agents.job). */
+export interface AgentsJob {
+  symbol: string
+  started: number
+  stage: number
+  node: string
+  tool: string
+  calls: number
+  tokensIn: number
+  tokensOut: number
+  /** 'pc' or the id of the phone that started it. */
+  by: string
+}
+/** How the last run ended: the saved analysis, or the error. */
+export interface AgentsEnd {
+  started: number
+  symbol: string
+  by: string
+  id?: string
+  rating?: string
+  error?: string
+}
+let job: AgentsJob | null = null
+// The last few ends, not only the latest: a phone asking late must still find its own run after another one ran.
+let ends: AgentsEnd[] = []
+const ended = (e: AgentsEnd) => (ends = [e, ...ends].slice(0, 10))
+/** `now`: this clock, so a phone can show how long the run has been going whatever its own clock says. */
+export const agentsJob = (started?: number): { running: AgentsJob | null; last: AgentsEnd | null; now: number } => ({
+  running: job,
+  // With `started` the end of that very run, else the latest.
+  last: (started === undefined ? ends[0] : ends.find((e) => e.started === started)) ?? null,
+  now: Date.now()
+})
+
 /** Runs TradingAgents for a symbol as of today; progress goes to `onEvent`, the saved result is returned. */
-export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => void): Promise<SavedAnalysis> {
+export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => void, by = 'pc'): Promise<SavedAnalysis> {
   const req = checkRequest(reqArg)
   if (!agentsStatus().installed) throw new Error(t('Die umfassende Analyse ist noch nicht eingerichtet'))
-  if (current) throw new Error(t('Es läuft bereits eine Analyse'))
+  if (current || job) throw new Error(t('Es läuft bereits eine Analyse'))
+  const started = Date.now()
+  job = { symbol: req.symbol, started, stage: 0, node: '', tool: '', calls: 0, tokensIn: 0, tokensOut: 0, by }
+  const track = (e: AgentsEvent) => {
+    if (job?.started === started)
+      job = {
+        ...job,
+        stage: Math.max(job.stage, stageOf(e.node)),
+        node: e.node || job.node,
+        tool: e.event === 'tool' ? e.name ?? '' : job.tool,
+        calls: e.calls ?? job.calls,
+        tokensIn: e.tokensIn ?? job.tokensIn,
+        tokensOut: e.tokensOut ?? job.tokensOut
+      }
+    onEvent(e)
+  }
+  try {
+    const saved = await runChecked(req, track, started)
+    ended({ started, symbol: req.symbol, by, id: saved.id, rating: saved.rating })
+    return saved
+  } catch (e) {
+    ended({ started, symbol: req.symbol, by, error: (e as Error).message })
+    throw e
+  } finally {
+    job = null
+  }
+}
+
+async function runChecked(req: AgentsRequest, onEvent: (e: AgentsEvent) => void, started: number): Promise<SavedAnalysis> {
   const keys = readKeys()
   const keyEnv = keyEnvFor(req.provider)
   if (keyEnv && !keys[req.provider]) {
@@ -290,7 +352,6 @@ export async function runAgents(reqArg: unknown, onEvent: (e: AgentsEvent) => vo
   if (keyEnv) env[keyEnv] = keys[req.provider]
   if (keys.fred) env.FRED_API_KEY = keys.fred
   if (req.provider === 'ollama' && req.ollamaUrl) env.OLLAMA_BASE_URL = req.ollamaUrl.replace(/\/?$/, '').replace(/(\/v1)?$/, '/v1')
-  const started = Date.now()
 
   const result = await new Promise<{ rating: string; reports: Record<string, string>; stats: SavedAnalysis['stats']; structured?: unknown }>(
     (resolve, reject) => {

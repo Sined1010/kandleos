@@ -42,6 +42,8 @@ import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { sessionLine } from '../lib/sessionLine'
 import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
 import { IS_MOBILE } from '../lib/platform'
+import { usePcStatus } from '../lib/pcStatus'
+import { useBack } from '../../../mobile/useBack'
 import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
 import ForecastQuality from './ForecastQuality'
@@ -67,6 +69,8 @@ const OLDER_HINT = {
 }
 // Width of the analysis panel (w-[400px] in AgentsPanel).
 const AGENTS_WIDTH = 400
+const PC_NONE = msg('Die KI-Prognose rechnet dein PC. Koppeln: am PC Einstellungen → Handy koppeln.')
+const PC_OFF = msg('PC nicht erreichbar. Die KI-Prognose rechnet dein PC – ist er an und im selben WLAN oder VPN?')
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 export const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
 
@@ -138,7 +142,12 @@ export default function ChartArea() {
   const [agentsOpen, setAgentsOpen] = useState(false)
   // "Prognose-Qualität" panel (from the forecast card); it takes the same right edge as the analysis panel.
   const [qualityOpen, setQualityOpen] = useState(false)
-  const sideOpen = agentsOpen || qualityOpen
+  // On the phone the panels cover the screen; nothing beside them moves aside.
+  const sideOpen = !IS_MOBILE && (agentsOpen || qualityOpen)
+  useBack('forecast-menu', fcMenu, () => setFcMenu(false))
+  useBack('agents', agentsOpen, () => setAgentsOpen(false))
+  useBack('quality', qualityOpen, () => setQualityOpen(false))
+  const pcOff = usePcStatus((s) => IS_MOBILE && s.state !== 'online')
   const [agentsSetup, setAgentsSetup] = useState(false)
   const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
@@ -472,8 +481,16 @@ export default function ChartArea() {
     }
   }, [api, symbol, timeframe])
 
-  const toggleForecast = () => {
-    if (fc.state !== 'shown') return void runForecast()
+  const toggleForecast = async () => {
+    if (fc.state !== 'shown') {
+      // On the phone the PC computes; the model (480 MB) only loads there after a yes.
+      if (IS_MOBILE) {
+        const pc = usePcStatus.getState().state
+        if (pc !== 'online') return alert(t(pc === 'none' ? PC_NONE : PC_OFF))
+        if (!(await window.api.modelReady()) && !confirm(t('Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?'))) return
+      }
+      return void runForecast()
+    }
     // Also stops the check still running for it.
     fcRun.current++
     setFc({ state: 'idle' })
@@ -802,6 +819,30 @@ export default function ChartArea() {
     return () => chart.remove()
   }, [])
 
+  // Buttons, card and currency sign sit beside the price axis, whose width is only known after the chart's first
+  // layout and changes with the prices; the time scale's width changes with it, so that redraws them.
+  const [, setAxisWidth] = useState(0)
+  useEffect(() => {
+    if (!api) return
+    const ts = api.chart.timeScale()
+    const sync = () => setAxisWidth(api.chart.priceScale('right').width())
+    ts.subscribeSizeChange(sync)
+    return () => ts.unsubscribeSizeChange(sync)
+  }, [api])
+
+  const summary = fc.result && (
+    <ForecastSummary
+      result={fc.result}
+      intraday={TF_SECONDS[timeframe] < 86400}
+      showCheck={forecastRun.backtestRuns > 0}
+      symbol={symbol}
+      timeframe={timeframe}
+      onDetails={() => {
+        setAgentsOpen(false)
+        setQualityOpen(true)
+      }}
+    />
+  )
   return (
     <div className="absolute inset-0 flex flex-col">
       <div className="relative min-h-0 flex-1" onPointerDown={() => select(null)}>
@@ -837,7 +878,7 @@ export default function ChartArea() {
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
-          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 0 : fc.result ? 547 : 215) }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 150 : fc.result ? 547 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -852,25 +893,23 @@ export default function ChartArea() {
         </div>
         {/* The forecast is the app's headline feature: a large button at the top right, beside the price axis,
             with its display settings right next to it and the summary card to its left. */}
+        {/* On the phone the card sits at the bottom of the chart and opens upwards: beside or under the button it
+            would cover the symbol, price and market lines. */}
+        {IS_MOBILE && summary && (
+          <div
+            className="absolute left-2 z-30 flex justify-end"
+            style={{ bottom: (api?.chart.timeScale().height() ?? 28) + 8, right: (api?.chart.priceScale('right').width() ?? 60) + 8 }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {summary}
+          </div>
+        )}
         <div
-          // The forecast needs the PC; on the phone it comes with Abschnitt 3.
-          className={`absolute top-2 z-30 flex items-start gap-2 ${IS_MOBILE ? 'hidden' : ''}`}
+          className="absolute top-2 z-30 flex items-start gap-2"
           style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {fc.result && (
-            <ForecastSummary
-              result={fc.result}
-              intraday={TF_SECONDS[timeframe] < 86400}
-              showCheck={forecastRun.backtestRuns > 0}
-              symbol={symbol}
-              timeframe={timeframe}
-              onDetails={() => {
-                setAgentsOpen(false)
-                setQualityOpen(true)
-              }}
-            />
-          )}
+          {!IS_MOBILE && summary}
           <div className="relative flex">
             <button
               onClick={toggleForecast}
@@ -890,7 +929,7 @@ export default function ChartArea() {
                 fc.state === 'shown'
                   ? 'bg-panel/90 text-slate-200 ring-1 ring-accent/60 backdrop-blur hover:bg-line'
                   : 'bg-brand text-white shadow-glow enabled:hover:brightness-110'
-              } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'}`}
+              } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'} ${pcOff && fc.state !== 'shown' ? 'opacity-40 grayscale' : ''}`}
             >
               {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
               {fc.state === 'shown'

@@ -2,6 +2,7 @@ import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { futureTimes } from '../../../shared/calendar'
+import { CLICKS } from '../../../shared/drawings'
 import { locale, t } from '../../../shared/i18n'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
@@ -55,27 +56,6 @@ const NO_DRAWINGS: Drawing[] = []
 // How far right of the last candle drawings follow the trading calendar; beyond that, even steps.
 const FUTURE_BARS = 500
 
-/** Clicks each tool needs; the drawing is created on the last one. */
-const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
-  trend: 2,
-  ray: 2,
-  hline: 1,
-  vline: 1,
-  fib: 2,
-  rect: 2,
-  channel: 3,
-  elliott: 6,
-  abc: 4,
-  measure: 2,
-  fibext: 3,
-  fibfan: 2,
-  fibtime: 2,
-  triangle: 6,
-  wxy: 4,
-  wxyxz: 6,
-  sine: 2,
-  text: 1
-}
 
 /** 'move' drags the whole drawing, a number drags that point. */
 type Handle = 'move' | number

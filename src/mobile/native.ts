@@ -16,6 +16,9 @@ export interface KandleNativePlugin {
   setAlarms(o: { alarms: NativeAlarm[]; instant: boolean }): Promise<void>
   /** Triggers the background check found since the last call. */
   takeTriggered(): Promise<{ list: NativeTrigger[] }>
+  /** Background check "analysis done?" for a run this phone started on the PC (AnalysisWorker.java). */
+  watchAnalysis(o: { symbol: string; started: number }): Promise<void>
+  unwatchAnalysis(): Promise<void>
 }
 export type NativeAlarm = { id: string; symbol: string; title: string; op: 'above' | 'below'; price: number; checkedUntil: number } & AlarmSource
 
@@ -42,6 +45,8 @@ class KandleNativeWeb extends WebPlugin implements KandleNativePlugin {
   async takeTriggered() {
     return { list: [] }
   }
+  async watchAnalysis() {}
+  async unwatchAnalysis() {}
 }
 
 export const KandleNative = registerPlugin<KandleNativePlugin>('KandleNative', { web: () => new KandleNativeWeb() })

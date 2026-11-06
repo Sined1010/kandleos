@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { forecastCandles, probabilityAbove, Q, trend, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
 import { formatPrice } from '../lib/format'
+import { IS_MOBILE } from '../lib/platform'
 import { useStore, type ForecastView } from '../store/useStore'
 import type { Timeframe } from '../../../shared/types'
 import { useSummary } from './ForecastQuality'
@@ -130,7 +131,7 @@ export function ForecastSummary({ result, intraday, showCheck, symbol, timeframe
     ...(intraday && { timeStyle: 'short' })
   })
   return (
-    <div className="w-80 rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
+    <div className="w-80 max-w-[calc(100vw-5.5rem)] rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
       {help && <ForecastHelp onClose={() => setHelp(false)} />}
       <button
         onClick={() => setOpen(!open)}
@@ -365,7 +366,7 @@ function ForecastHelp({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="forecast-help-title"
-        className="max-h-[85vh] w-[520px] overflow-y-auto rounded-xl border border-line bg-panel/95 p-5 text-xs leading-relaxed text-slate-300 shadow-2xl backdrop-blur"
+        className="max-h-[85vh] w-[520px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-panel/95 p-5 text-xs leading-relaxed text-slate-300 shadow-2xl backdrop-blur"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id="forecast-help-title" className="text-base font-semibold text-white">
@@ -538,14 +539,15 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
             </span>
           </span>
         </label>
-        <button
+        {/* The archive lives on the PC; clearing it stays there. */}
+        {!IS_MOBILE && <button
           onClick={() => {
             if (confirm(t('Alle archivierten Prognosen und die Bilanz löschen?'))) void window.api.archive.clear()
           }}
           className="ml-6 rounded px-1 py-0.5 text-[11px] text-muted underline-offset-2 hover:text-white hover:underline"
         >
           {t('Archiv löschen')}
-        </button>
+        </button>}
         {/* Separates the Chronos-2 settings above from the TradingAgents analysis below. */}
         <div className="mx-1 mt-2 h-px bg-line" />
         <p className={heading}>{t('Erweitert · optional')}</p>

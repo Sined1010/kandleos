@@ -993,4 +993,17 @@ export const EN: Record<string, string> = {
   'Beim Schließen des Fensters läuft KandleOS im Infobereich weiter, damit das Handy den PC erreicht.': 'When you close the window, KandleOS keeps running in the notification area so the phone can reach the PC.',
   'Erweitert': 'Advanced',
   'Handy-Kopplung eingeschaltet (verschlüsselt, nur gekoppelte Geräte, Port {port})': 'Phone pairing turned on (encrypted, paired devices only, port {port})',
+  'Die Analyse ist fertig, ließ sich aber nicht laden': 'The analysis is done but could not be loaded',
+  'Die Analyse am PC wurde unterbrochen': 'The analysis on the PC was interrupted',
+  'Einrichten geht nur am PC: Prognose-Menü → Umfassende Analyse → Einrichten.': 'Setup is only possible on the PC: forecast menu → Comprehensive analysis → Set up.',
+  'Am PC gestartet: Analyse von {symbol} läuft · {time}': 'Started on the PC: analysis of {symbol} running · {time}',
+  'Vom Handy gestartet: Analyse von {symbol} läuft · {time}': 'Started from the phone: analysis of {symbol} running · {time}',
+  'Die Analyse läuft auf deinem PC. Koppeln: am PC Einstellungen → Handy koppeln.': 'The analysis runs on your PC. To pair: on the PC, Settings → Pair a phone.',
+  'PC nicht erreichbar – die Analyse läuft auf dem PC. Gespeicherte Analysen siehst du trotzdem.': 'PC not reachable – the analysis runs on the PC. Saved analyses are still shown.',
+  'Die KI-Prognose rechnet dein PC. Koppeln: am PC Einstellungen → Handy koppeln.': 'Your PC computes the AI forecast. To pair: on the PC, Settings → Pair a phone.',
+  'PC nicht erreichbar. Die KI-Prognose rechnet dein PC – ist er an und im selben WLAN oder VPN?': 'PC not reachable. Your PC computes the AI forecast – is it on and in the same Wi-Fi or VPN?',
+  'Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?': 'The forecast model is missing on the PC. Download it on the PC now (about 480 MB)?',
+  // Chart error boundary
+  'Der Chart konnte nicht angezeigt werden.': 'The chart could not be shown.',
+  'Erneut versuchen': 'Try again'
 }

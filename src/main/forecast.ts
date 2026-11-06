@@ -54,11 +54,14 @@ async function download(onProgress: (share: number) => void): Promise<void> {
 export const modelReady = (): Promise<boolean> => stat(modelFile()).then((s) => s.size === MODEL.bytes, () => false)
 
 let session: Promise<InferenceSession> | null = null
+// Everyone waiting for the model hears the download, not only whoever started it (the window or a phone).
+const listeners = new Set<(share: number) => void>()
 
 function getSession(onProgress: (share: number) => void): Promise<InferenceSession> {
+  listeners.add(onProgress)
   session ??= (async () => {
     const complete = await stat(modelFile()).then((s) => s.size === MODEL.bytes, () => false)
-    if (!complete) await download(onProgress)
+    if (!complete) await download((share) => listeners.forEach((l) => l(share)))
     // Loaded lazily: the native runtime is only needed once someone asks for a forecast.
     const ort = await import('onnxruntime-node')
     return ort.InferenceSession.create(modelFile())
@@ -66,8 +69,11 @@ function getSession(onProgress: (share: number) => void): Promise<InferenceSessi
     session = null
     throw e
   })
-  return session
+  return session.finally(() => listeners.delete(onProgress))
 }
+
+/** Downloads (if needed) and loads the model; a paired phone starts this and then asks for the progress. */
+export const loadModel = (onProgress: (share: number) => void): Promise<unknown> => getSession(onProgress)
 
 /**
  * Forecasts the next 64 bars of each price series (up to the last 2048 values each) in one model run.

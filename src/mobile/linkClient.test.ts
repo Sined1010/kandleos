@@ -120,3 +120,16 @@ test('pair stores the device key from the PC and returns the stock keys', async 
   assert.equal(stored()!.deviceId, 'dev-9')
   assert.deepEqual(fromB64url(stored()!.key), devKey)
 })
+
+test('call hands its time limit to http; without one it is 4 s', async () => {
+  const pc = fakePc(['10.0.0.1'])
+  const limits: (number | undefined)[] = []
+  const http: Http = (url, init) => {
+    limits.push(init.timeoutMs)
+    return pc.http(url, init)
+  }
+  const { c } = client(http)
+  await c.call('forecast', 1, 120_000)
+  await c.call('hello')
+  assert.deepEqual(limits, [120_000, 4000])
+})

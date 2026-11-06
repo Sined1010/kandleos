@@ -205,6 +205,28 @@ test('broken units from the other side are skipped, not crashing', () => {
   assert.equal(out.drawings['t1:BTCUSDT'].length, 2)
 })
 
+test('drawings, tabs and charts missing what they are drawn with are skipped', () => {
+  const s = slice()
+  const d = (key: string, v: unknown) => ({ [`drawing:t1:BTCUSDT:${key}`]: JSON.stringify(v) })
+  const bad = {
+    ...unitsOf(s),
+    ...d('a', { id: 'a', type: 'trend', p1: { time: 1, price: 2 } }),
+    ...d('b', { id: 'b', type: 'elliott', points: [{ time: 1, price: 2 }] }),
+    ...d('c', { id: 'c', type: 'hline', price: 'x' }),
+    ...d('e', { id: 'e', type: 'evil', price: 1 }),
+    ...d('f', { id: 'f', type: 'text', points: [{ time: 1, price: 2 }] }),
+    ...d('g', { id: 'g', type: 'rect', points: [{ time: 1, price: 2 }, { time: 3, price: 4 }], color: 7 }),
+    ...d('ok', { id: 'ok', type: 'text', points: [{ time: 1, price: 2 }], text: 'hi' }),
+    'tab:t9': JSON.stringify({ symbol: 'ETHUSDT', timeframe: '7x', range: null }),
+    'order:tabs': '["t1","t9"]',
+    'chart:c1': JSON.stringify({ id: 'c1', name: 'n', symbol: 'BTCUSDT', timeframe: '1h', drawings: [{ id: 'x', type: 'vline' }] })
+  }
+  const out = sliceOf(bad, s)
+  assert.deepEqual(out.drawings['t1:BTCUSDT'].map((x) => x.id).sort(), ['d1', 'd2', 'ok'])
+  assert.deepEqual(out.tabs.map((t) => t.id), ['t1'])
+  assert.equal(out.charts.length, 0)
+})
+
 // ── one full round: phone sends, PC answers, phone receives ──
 import { answerSync, checkSyncRequest, emptySync, receiveSync } from './sync.ts'
 

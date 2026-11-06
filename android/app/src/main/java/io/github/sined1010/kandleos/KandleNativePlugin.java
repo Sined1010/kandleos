@@ -115,6 +115,23 @@ public class KandleNativePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** Background check "analysis done?" for a run this phone started on the PC (AnalysisWorker). */
+    @PluginMethod
+    public void watchAnalysis(PluginCall call) {
+        String symbol = call.getString("symbol");
+        Long started = call.getLong("started");
+        if (symbol == null || started == null) { call.reject("symbol or started missing"); return; }
+        AnalysisWorker.watch(getContext(), symbol, started);
+        call.resolve();
+    }
+
+    /** The app saw the run end itself: no check, no notification. */
+    @PluginMethod
+    public void unwatchAnalysis(PluginCall call) {
+        AnalysisWorker.cancel(getContext());
+        call.resolve();
+    }
+
     @PermissionCallback
     private void notifyAnswered(PluginCall call) {
         JSObject ret = new JSObject();

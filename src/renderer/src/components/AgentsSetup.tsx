@@ -1,18 +1,12 @@
 import { Check, Download, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { ANALYSTS, PROVIDERS, providerById, type ProviderId } from '../../../shared/agents'
+import { ANALYSTS, modelsFor, PROVIDERS, providerById } from '../../../shared/agents'
 import { t } from '../../../shared/i18n'
 import { ipcError } from '../lib/format'
 import { useStore } from '../store/useStore'
 
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
 type Setup = Parameters<Parameters<typeof window.api.agents.onSetup>[0]>[0]
-
-/** Models in use for a provider: the user's choice, else the catalog's first suggestion. */
-export function modelsFor(provider: ProviderId, chosen?: { deep: string; quick: string }) {
-  const p = providerById(provider)
-  return { deep: chosen?.deep || p.deep[0], quick: chosen?.quick || p.quick[0] }
-}
 
 const field = 'w-full rounded-lg bg-bg px-2 py-1.5 text-sm outline-none ring-1 ring-line focus:ring-accent'
 const heading = 'mb-1.5 mt-5 text-[10px] font-semibold uppercase tracking-wider text-muted'

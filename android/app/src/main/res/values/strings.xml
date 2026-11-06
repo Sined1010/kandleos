@@ -11,4 +11,13 @@
         <item quantity="other">KandleOS is watching %1$d prices</item>
     </plurals>
     <string name="alarm_body">Price alarm from KandleOS</string>
+    <string name="channel_analyses">Analyses</string>
+    <string name="analysis_done">Analysis %1$s done: %2$s</string>
+    <string name="analysis_failed">Analysis %1$s stopped</string>
+    <string name="analysis_body">Comprehensive analysis on your PC – tap to read it</string>
+    <string name="rating_buy">Buy</string>
+    <string name="rating_overweight">Overweight</string>
+    <string name="rating_hold">Hold</string>
+    <string name="rating_underweight">Underweight</string>
+    <string name="rating_sell">Sell</string>
 </resources>

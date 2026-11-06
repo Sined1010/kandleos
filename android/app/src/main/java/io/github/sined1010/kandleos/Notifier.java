@@ -13,11 +13,14 @@ import androidx.core.app.NotificationManagerCompat;
 /** Notifications for price alarms (and later finished analyses); a tap opens the app. */
 public final class Notifier {
     public static final String ALARMS = "alarms";
+    /** Finished analyses from the PC (AnalysisWorker); a channel of its own, so it can be muted apart from alarms. */
+    public static final String ANALYSES = "analyses";
 
     static void channels(Context c) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(ALARMS, c.getString(R.string.channel_alarms), NotificationManager.IMPORTANCE_HIGH));
+        nm.createNotificationChannel(new NotificationChannel(ANALYSES, c.getString(R.string.channel_analyses), NotificationManager.IMPORTANCE_DEFAULT));
     }
 
     static PendingIntent openApp(Context c) {
@@ -32,8 +35,12 @@ public final class Notifier {
 
     /** Shows one notification; `id` keeps the same alarm from stacking up. Silently skipped without permission. */
     public static void show(Context c, int id, String title, String body) {
+        show(c, id, title, body, ALARMS);
+    }
+
+    public static void show(Context c, int id, String title, String body, String channel) {
         channels(c);
-        NotificationCompat.Builder b = new NotificationCompat.Builder(c, ALARMS)
+        NotificationCompat.Builder b = new NotificationCompat.Builder(c, channel)
                 .setSmallIcon(R.drawable.ic_stat_alarm)
                 .setContentTitle(title)
                 .setContentText(body)

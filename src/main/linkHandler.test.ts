@@ -107,3 +107,38 @@ test('keys returns the stock keys, other ops go to forward, unknown ops get an e
   assert.deepEqual((await body(s))?.res, { echo: 1 })
   assert.equal((await body(u))?.error, 'unknown-op')
 })
+
+test('an error from forward reaches the phone in words, but never as "removed"', async () => {
+  const { state } = await pairPhone()
+  const dev = state.devices[0]
+  const key = fromB64url(dev.key)!
+  const fail = (msg: string) => async () => {
+    throw new Error(msg)
+  }
+  const busy = await handleRequest(await sealEnvelope(key, dev.id, { ctr: 1, op: 'agents.start' }, 'req'), state, ctx(500, fail('Es läuft bereits eine Analyse')))
+  const gone = await handleRequest(await sealEnvelope(key, dev.id, { ctr: 2, op: 'x' }, 'req'), busy.state, ctx(500, fail('removed')))
+  const empty = await handleRequest(await sealEnvelope(key, dev.id, { ctr: 3, op: 'x' }, 'req'), gone.state, ctx(500, fail('')))
+  const error = async (r: { reply: unknown }) => {
+    const o = await openEnvelope(key, r.reply as Envelope, 0, 'res')
+    return o.ok ? o.body.error : null
+  }
+  assert.equal(await error(busy), 'Es läuft bereits eine Analyse')
+  assert.equal(await error(gone), 'failed')
+  assert.equal(await error(empty), 'failed')
+})
+
+test('accepted is told the new counter before forward runs, so the next request need not wait for a long op', async () => {
+  const { state } = await pairPhone()
+  const dev = state.devices[0]
+  const key = fromB64url(dev.key)!
+  const order: string[] = []
+  const r = await handleRequest(await sealEnvelope(key, dev.id, { ctr: 9, op: 'forecast' }, 'req'), state, {
+    ...ctx(700, async () => {
+      order.push('forward')
+      return 1
+    }),
+    accepted: async (s: LinkState) => void order.push(`accepted ${s.devices[0].lastCtr}`)
+  })
+  assert.deepEqual(order, ['accepted 9', 'forward'])
+  assert.equal(r.state.devices[0].lastCtr, 9)
+})

@@ -88,8 +88,11 @@ export function resetSync(): void {
 let running: Promise<void> | null = null
 let firstNotice = false
 
+// The PC's window gets 10 s to answer (main/index.ts); waiting less showed a slow sync as "PC off".
+const SYNC_TIMEOUT_MS = 12_000
+
 /** Phone: one sync with the PC; a second call while one runs waits for it. */
-export function syncWithPc(pcId: string, call: (op: string, args: unknown) => Promise<unknown>): Promise<void> {
+export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeoutMs?: number) => Promise<unknown>): Promise<void> {
   running ??= (async () => {
     try {
       stampNow()
@@ -102,7 +105,7 @@ export function syncWithPc(pcId: string, call: (op: string, args: unknown) => Pr
         firstNotice = true
         alert(t('Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.'))
       }
-      const reply = checkSyncReply(await call('sync', { units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }))
+      const reply = checkSyncReply(await call('sync', { units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }, SYNC_TIMEOUT_MS))
       if (!reply) throw new Error('bad-reply')
       const out = receiveSync(sliceOfStore(), useStore.getState().sync, pcId, sent, reply, Date.now())
       apply(out.slice, out.sync)

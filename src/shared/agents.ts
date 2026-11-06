@@ -1,5 +1,6 @@
 // TradingAgents (multi-agent LLM analysis) as seen from KandleOS: the providers a user can choose, how a run's
 // progress maps to stages, and how its final texts are read. The Python side is resources/agents/kandleos_agents.py.
+import type { AgentsConfig } from '../renderer/src/store/useStore.ts'
 import { msg } from './i18n.ts'
 import { cryptoQuoteAsset, isCrypto } from './types.ts'
 
@@ -68,6 +69,35 @@ export const PROVIDERS: Provider[] = [
 ]
 
 export const providerById = (id: ProviderId): Provider => PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0]
+
+/**
+ * The PC's analysis settings as a phone takes them over (mobile/api.ts): only known fields of the right kind, so a
+ * broken answer cannot break the phone's analysis panel. Missing fields keep the phone's own.
+ */
+export function checkAgentsConfig(v: unknown): Partial<AgentsConfig> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const c = v as Record<string, unknown>
+  const out: Partial<AgentsConfig> = {}
+  if (PROVIDERS.some((p) => p.id === c.provider)) out.provider = c.provider as ProviderId
+  if (c.models && typeof c.models === 'object' && !Array.isArray(c.models)) {
+    const models: AgentsConfig['models'] = {}
+    for (const p of PROVIDERS) {
+      const m = (c.models as Record<string, { deep?: unknown; quick?: unknown } | null>)[p.id]
+      if (m && typeof m.deep === 'string' && typeof m.quick === 'string' && m.deep.length <= 80 && m.quick.length <= 80) models[p.id] = { deep: m.deep, quick: m.quick }
+    }
+    out.models = models
+  }
+  if (Array.isArray(c.analysts) && c.analysts.length && c.analysts.every((a) => ANALYSTS.some(([id]) => id === a))) out.analysts = c.analysts as AnalystId[]
+  if (Number.isInteger(c.debateRounds) && (c.debateRounds as number) >= 1 && (c.debateRounds as number) <= 3) out.debateRounds = c.debateRounds as number
+  if (typeof c.ollamaUrl === 'string' && c.ollamaUrl.length <= 200) out.ollamaUrl = c.ollamaUrl
+  return out
+}
+
+/** Models in use for a provider: the user's choice, else the catalog's first suggestion. */
+export function modelsFor(provider: ProviderId, chosen?: { deep: string; quick: string }) {
+  const p = providerById(provider)
+  return { deep: chosen?.deep || p.deep[0], quick: chosen?.quick || p.quick[0] }
+}
 
 /** Keys KandleOS can store besides the providers' own: FRED (free macro data). */
 export const EXTRA_KEYS = { fred: 'FRED_API_KEY' } as const

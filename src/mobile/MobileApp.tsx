@@ -6,6 +6,7 @@ import { InfoPanel } from '../renderer/src/components/CompanyInfo'
 import { SaveDialog, SavedChartsPanel } from '../renderer/src/components/SavedCharts'
 import { isCrypto } from '../shared/types'
 import ChartArea from '../renderer/src/components/ChartArea'
+import ChartBoundary from '../renderer/src/components/ChartBoundary'
 import ChartTabs from '../renderer/src/components/ChartTabs'
 import SettingsModal from '../renderer/src/components/SettingsModal'
 import { IndicatorMenu, TimeframePicker } from '../renderer/src/components/TopBar'
@@ -110,7 +111,9 @@ export default function MobileApp() {
       {/* The low sheet (grip + search) and the drawing tools both cover the bottom 96 px; the chart ends above
           them and keeps its size when drawing starts. */}
       <main className="relative mb-24 min-h-0 flex-1">
-        <ChartArea key={activeTab} />
+        <ChartBoundary key={activeTab}>
+          <ChartArea />
+        </ChartBoundary>
       </main>
       {/* While drawing, the tools take the sheet's place; the sheet stays mounted (hidden), so leaving drawing
           does not rebuild the whole watchlist. */}
