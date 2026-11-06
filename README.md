@@ -10,7 +10,7 @@
 
 A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
 AI price forecast (Chronos-2) that runs entirely on your computer. An Android app brings charts, watchlist,
-drawings and price alarms to your phone.
+drawings and price alarms to your phone, and paired with your PC also the AI forecast and analysis.
 
 <p align="center">
   <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="docs/badges/windows.svg" height="48" alt="Download for Windows"></a>
@@ -46,6 +46,9 @@ drawings and price alarms to your phone.
   The market analyst gets the daily Chronos-2 forecast with its track record, and the report compares the agents' decision with it
 - **Back up your data:** export watchlist, drawings, saved charts and settings to one file, API keys only password-encrypted
 - **Android app** with price alarms (in the app, in the background every 15 minutes, or as instant alarms every 15 seconds)
+- **Pair your phone with your PC:** watchlist, drawings, saved charts and alarms stay in sync, alarms also show up on the PC,
+  and the phone gets the AI forecast, its quality check and the TradingAgents analysis computed by your PC. Directly over
+  your home network or VPN, end-to-end encrypted, no cloud
 - English and German interface
 
 ## Download and installation
@@ -78,12 +81,22 @@ To uninstall: `bash ~/.local/share/kandleos-app/install.sh --uninstall` (your da
 ### Android (8.0 or newer)
 
 The Android app has charts, indicators, the watchlist with folders, drawings and saved charts, plus price alarms
-that also fire in the background. The AI forecast and the TradingAgents analysis are desktop-only for now.
+that also fire in the background.
 
 Install `KandleOS-<version>.apk` from the Releases page, or let [Obtainium](https://github.com/ImranR98/Obtainium)
 install and update it: add `https://github.com/Sined1010/kandleos` as a new app and set the APK filter to
 `KandleOS-.*[.]apk`. Android asks once to allow installing apps from Obtainium (or your browser). Every APK is
 signed with the same KandleOS key, so updates install over the previous version and keep your data.
+
+**Pair it with your PC** to sync watchlist, drawings, saved charts and alarms, and to use the AI forecast and the
+TradingAgents analysis on the phone (your PC computes them, so it needs to be on):
+
+1. On the PC: **Settings → Pair a phone → Pair now**. On Windows, KandleOS asks once for admin rights to add its own
+   firewall rule (`KandleOS-Handy-Kopplung`: only KandleOS, only TCP port 47321, only from your local network).
+2. On the phone: scan the QR code in the KandleOS app (**⋯ → Settings → Pair with PC**) or with your camera app.
+
+Phone and PC must be in the same Wi-Fi, or connected through a VPN (set the PC's VPN address under **Advanced**).
+While pairing is on, closing the PC window keeps KandleOS running in the system tray, so sync and alarms go on.
 
 ## Data sources
 
@@ -120,7 +133,9 @@ KandleOS collects no usage data and sends nothing to its author (no telemetry). 
 forecast archive stay on your computer (`%APPDATA%\kandleos` on Windows, `~/.config/kandleos` on Linux). To load prices the app connects
 directly to the providers above, which see your IP address. The update check is off by default: if you turn it on,
 KandleOS asks GitHub once a day for the latest version number (or when you click **Check for updates** in About);
-nothing is downloaded or installed automatically. Details are in the app under **About KandleOS**.
+nothing is downloaded or installed automatically. A paired phone talks to your PC directly over your local network or
+VPN; every message is encrypted with a key that only the two devices know, and nothing goes through a server.
+Details are in the app under **About KandleOS**.
 
 ## Not investment advice
 
