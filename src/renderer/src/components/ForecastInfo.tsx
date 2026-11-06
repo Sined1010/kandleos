@@ -434,7 +434,8 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         role="dialog"
         aria-label={t('Prognose-Anzeige')}
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute right-0 top-full z-30 mt-2 max-h-[calc(100vh-9rem)] w-64 overflow-y-auto rounded-xl border border-line bg-panel/95 p-2 text-xs shadow-2xl shadow-black/50 backdrop-blur"
+        // On the phone the watchlist sheet covers the bottom of the screen; the menu must end above it.
+        className={`absolute right-0 top-full z-30 mt-2 ${IS_MOBILE ? 'max-h-[calc(100dvh-20rem)]' : 'max-h-[calc(100vh-9rem)]'} w-64 overflow-y-auto rounded-xl border border-line bg-panel/95 p-2 text-xs shadow-2xl shadow-black/50 backdrop-blur`}
       >
         {/* What the forecast is, before its display options. */}
         <div className="flex items-start gap-2 px-1 pb-1 pt-1">
