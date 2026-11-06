@@ -1,6 +1,7 @@
 import qrcode from 'qrcode-generator'
 import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { LinkStatus } from '../../../main/link'
 import { t } from '../../../shared/i18n'
 import { ipcError } from '../lib/format'
@@ -93,7 +94,8 @@ export default function PairWizard({ onClose, onStatus }: { onClose: () => void;
 
   const left = until ? Math.max(0, Math.round((until - now) / 1000)) : 0
 
-  return (
+  // Into <body>: the settings dialog has backdrop-blur, which would pin "fixed" to its scrolled content, out of view.
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60" onClick={(e) => e.stopPropagation()}>
       <div role="dialog" aria-modal="true" aria-labelledby="pair-title" className="w-[420px] rounded-xl border border-line bg-panel p-5 text-sm shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
@@ -192,6 +194,7 @@ export default function PairWizard({ onClose, onStatus }: { onClose: () => void;
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
