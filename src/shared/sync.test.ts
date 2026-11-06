@@ -139,6 +139,32 @@ test('first merge: folders meet by name, phone tabs with drawings become saved c
   assert.ok(out.charts.some((c) => c.id === 'c2' && c.name === 'idee (Handy)'))
 })
 
+test('first merge: start folders in the other language are one folder, a folder with the same id keeps the phone symbols', () => {
+  const pc = slice({
+    folders: [
+      { id: 'a', name: 'Krypto', symbols: ['BTCUSDT'], collapsed: false },
+      { id: 'b', name: 'Aktien', symbols: ['AAPL'], collapsed: false },
+      { id: 'c', name: 'Ideen', symbols: [], collapsed: false }
+    ]
+  })
+  const phone = slice({
+    folders: [
+      { id: 'x', name: 'Crypto', symbols: ['BTCUSDT', 'SOLUSDT'], collapsed: false },
+      { id: 'y', name: 'Stocks', symbols: ['NVDA'], collapsed: false },
+      { id: 'c', name: 'Ideas', symbols: ['TSLA'], collapsed: false }
+    ]
+  })
+  const out = firstMerge(pc, phone, 'Tab vom Handy', ' (Handy)').slice.folders
+  assert.deepEqual(out.map((f) => [f.name, f.symbols]), [['Krypto', ['BTCUSDT', 'SOLUSDT']], ['Aktien', ['AAPL', 'NVDA']], ['Ideen', ['TSLA']]])
+})
+
+test('first merge: an exact name wins over a translated one', () => {
+  const pc = slice({ folders: [{ id: 'a', name: 'Krypto', symbols: [], collapsed: false }, { id: 'b', name: 'Crypto', symbols: [], collapsed: false }] })
+  const phone = slice({ folders: [{ id: 'x', name: 'Crypto', symbols: ['SOLUSDT'], collapsed: false }] })
+  const out = firstMerge(pc, phone, 'Tab vom Handy', ' (Handy)').slice.folders
+  assert.deepEqual(out.map((f) => f.symbols), [[], ['SOLUSDT']])
+})
+
 test('capTabs keeps the first three tabs and saves a dropped tab with drawings as a chart', () => {
   const tabs = ['a', 'b', 'c', 'd'].map((id) => ({ id, symbol: 'BTCUSDT', timeframe: '1h' as const, range: null }))
   const out = capTabs(slice({ tabs, drawings: { 'd:BTCUSDT': [{ id: 'z', type: 'hline', price: 1 }] } }), 3, 'Tab vom PC')
@@ -212,6 +238,33 @@ test('a full round: both sides end with the same data, and the next round change
   }
   assert.deepEqual(pc.folders[0].symbols, ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
   assert.deepEqual(phone.tabs.map((t) => t.id), ['t1'])
+})
+
+test('stamps of deleted units are dropped after a sync on both sides', () => {
+  let pc = slice({ names: { BTCUSDT: 'Bitcoin', ETHUSDT: 'Ether' } })
+  let phone = slice()
+  let pcSync = emptySync(), phoneSync = emptySync()
+  const round = (now: number) => {
+    const sent = unitsOf(phone)
+    const a = answerSync(pc, pcSync, 'dev', { units: sent, stamps: phoneSync.stamps, phoneNow: now, baseId: phoneSync.bases.pc?.[0]?.id ?? null }, now, labels)
+    pc = a.slice
+    pcSync = a.sync
+    const r = receiveSync(phone, phoneSync, 'pc', sent, a.reply, now)
+    phone = r.slice
+    phoneSync = r.sync
+    return a.reply
+  }
+  round(10)
+  assert.ok('name:ETHUSDT' in phoneSync.stamps)
+  // The phone removes the name; the stamp of the deleted unit must not live on.
+  phone = { ...phone, names: { BTCUSDT: 'Bitcoin' } }
+  phoneSync = { ...phoneSync, stamps: stampChanges(phoneSync.seen, unitsOf(phone), phoneSync.stamps, 20), seen: unitsOf(phone) }
+  const reply = round(20)
+  assert.equal(pc.names.ETHUSDT, undefined)
+  for (const st of [pcSync.stamps, phoneSync.stamps, reply.stamps]) {
+    assert.equal('name:ETHUSDT' in st, false)
+    assert.ok('name:BTCUSDT' in st)
+  }
 })
 
 test('a change on the phone during the round stays and goes with the next round', () => {

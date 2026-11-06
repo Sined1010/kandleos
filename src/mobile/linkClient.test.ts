@@ -9,8 +9,8 @@ const paired: Pairing = { pcId: 'pc', pcName: 'Desktop', addrs: ['10.0.0.1', '10
 
 /** A fake PC: answers hello on the addresses in `up`, records every request. */
 function fakePc(up: string[], answer: (env: Envelope) => Promise<unknown> = async (env) => {
-  const o = await openEnvelope(devKey, env, 0)
-  return o.ok ? sealEnvelope(devKey, 'dev', { ctr: o.body.ctr, res: { pcNow: 1 } }) : null
+  const o = await openEnvelope(devKey, env, 0, 'req')
+  return o.ok ? sealEnvelope(devKey, 'dev', { ctr: o.body.ctr, res: { pcNow: 1 } }, 'res') : null
 }) {
   const calls: string[] = []
   const http: Http = async (url: string, init: HttpInit) => {
@@ -53,8 +53,8 @@ test('no address answers → offline', async () => {
 
 test('a sealed "removed" unpairs exactly once and stops all further requests', async () => {
   const pc = fakePc(['10.0.0.1'], async (env) => {
-    const o = await openEnvelope(devKey, env, 0)
-    return sealEnvelope(devKey, 'dev', { ctr: o.ok ? o.body.ctr : 0, error: 'removed' })
+    const o = await openEnvelope(devKey, env, 0, 'req')
+    return sealEnvelope(devKey, 'dev', { ctr: o.ok ? o.body.ctr : 0, error: 'removed' }, 'res')
   })
   const { c, removed } = client(pc.http)
   await assert.rejects(c.call('hello'), /removed/)
@@ -73,11 +73,36 @@ test('a plaintext "unknown-device" (another PC on the old address, or a forger) 
 
 test('a reply that does not belong to the request (wrong counter) is refused', async () => {
   const pc = fakePc(['10.0.0.1'], async (env) => {
-    const o = await openEnvelope(devKey, env, 0)
-    return sealEnvelope(devKey, 'dev', { ctr: o.ok ? o.body.ctr + 1 : 0, res: 'forged' })
+    const o = await openEnvelope(devKey, env, 0, 'req')
+    return sealEnvelope(devKey, 'dev', { ctr: o.ok ? o.body.ctr + 1 : 0, res: 'forged' }, 'res')
   })
   const { c } = client(pc.http)
   await assert.rejects(c.call('hello'), /offline/)
+})
+
+test('calls made at the same time go one after another, each with its own counter', async () => {
+  // Like the real PC: a counter not above the last one gets no answer.
+  let last = 0
+  const pc = fakePc(['10.0.0.1'], async (env) => {
+    const o = await openEnvelope(devKey, env, last, 'req')
+    if (!o.ok) return null
+    last = o.body.ctr
+    return sealEnvelope(devKey, 'dev', { ctr: o.body.ctr, res: o.body.op }, 'res')
+  })
+  const { c } = client(pc.http)
+  assert.deepEqual(await Promise.all([c.call('hello'), c.call('keys'), c.call('sync')]), ['hello', 'keys', 'sync'])
+})
+
+test('a failed call does not block the next one', async () => {
+  let up = false
+  const pc = fakePc(['10.0.0.1'], async (env) => {
+    const o = await openEnvelope(devKey, env, 0, 'req')
+    return up && o.ok ? sealEnvelope(devKey, 'dev', { ctr: o.body.ctr, res: 'ok' }, 'res') : null
+  })
+  const { c } = client(pc.http)
+  await assert.rejects(c.call('hello'), /offline/)
+  up = true
+  assert.equal(await c.call('hello'), 'ok')
 })
 
 test('pair stores the device key from the PC and returns the stock keys', async () => {
@@ -85,9 +110,9 @@ test('pair stores the device key from the PC and returns the stock keys', async 
   const code: PairingCode = { v: 1, pc: 'pc', name: 'Desktop', addrs: ['192.168.1.2'], port: 47321, key: toB64url(pairKey), exp: 0 }
   const keys = { finnhub: 'fh', alpaca: null, stockSource: 'yahoo', yahooExtra: false }
   const pc = fakePc(['192.168.1.2'], async (env) => {
-    const o = await openEnvelope(pairKey, env, 0)
+    const o = await openEnvelope(pairKey, env, 0, 'req')
     if (!o.ok || o.body.op !== 'pair' || o.body.name !== 'Pixel 8') return null
-    return sealEnvelope(pairKey, 'pair', { ctr: o.body.ctr, deviceId: 'dev-9', deviceKey: toB64url(devKey), pcId: 'pc', pcName: 'Desktop', keys })
+    return sealEnvelope(pairKey, 'pair', { ctr: o.body.ctr, deviceId: 'dev-9', deviceKey: toB64url(devKey), pcId: 'pc', pcName: 'Desktop', keys }, 'res')
   })
   const { c, stored } = client(pc.http, null)
   const out = await c.pair(code, 'Pixel 8')

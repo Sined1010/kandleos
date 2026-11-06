@@ -25,10 +25,12 @@ async function load(): Promise<Stored | null> {
 }
 const save = (p: Stored) => KandleNative.secureSet({ name: SECURE, value: JSON.stringify(p) })
 
-export const usePcStatus = create<{ state: 'none' | 'online' | 'offline'; pcName: string; lastSeen: number | null }>(() => ({
+/** syncFailed: the PC answered, but the last sync did not go through (it is not off). */
+export const usePcStatus = create<{ state: 'none' | 'online' | 'offline'; pcName: string; lastSeen: number | null; syncFailed: boolean }>(() => ({
   state: 'none',
   pcName: '',
-  lastSeen: null
+  lastSeen: null,
+  syncFailed: false
 }))
 
 const client = createLinkClient({ http: capHttp, load, save, onRemoved: () => unpair() })
@@ -51,6 +53,7 @@ const deviceName = () => /Android [\d.]+; ([^;)]+)/.exec(navigator.userAgent)?.[
 export async function hello(): Promise<void> {
   const p = await load()
   if (!p) return usePcStatus.setState({ state: 'none' })
+  let reached = false
   try {
     const res = (await call('hello')) as { keysVersion: string }
     if (res.keysVersion !== p.keysVersion) {
@@ -58,11 +61,16 @@ export async function hello(): Promise<void> {
       const now = await load()
       if (now) await save({ ...now, keysVersion: res.keysVersion })
     }
+    reached = true
     usePcStatus.setState({ state: 'online', pcName: p.pcName, lastSeen: Date.now() })
     await syncWithPc(p.pcId, call)
+    usePcStatus.setState({ syncFailed: false })
   } catch (e) {
-    const gone = /removed|not-paired/.test((e as Error).message)
-    usePcStatus.setState(gone ? { state: 'none' } : { state: 'offline', pcName: p.pcName })
+    const msg = (e as Error).message
+    if (/removed|not-paired/.test(msg)) usePcStatus.setState({ state: 'none' })
+    // Answered hello, then the sync failed (window busy, bad reply): the PC is there, the sync is what went wrong.
+    else if (reached && msg !== 'offline') usePcStatus.setState({ syncFailed: true })
+    else usePcStatus.setState({ state: 'offline', pcName: p.pcName })
   }
 }
 
@@ -82,7 +90,7 @@ export async function unpair(): Promise<void> {
   await KandleNative.secureRemove({ name: SECURE })
   await applyKeys({ finnhub: '', alpaca: null, stockSource: null, yahooExtra: false })
   resetSync()
-  usePcStatus.setState({ state: 'none', pcName: '', lastSeen: null })
+  usePcStatus.setState({ state: 'none', pcName: '', lastSeen: null, syncFailed: false })
 }
 
 /**
@@ -96,7 +104,7 @@ async function openLink(url: string): Promise<void> {
     await pairWith(code)
     alert(t('Mit „{name}“ gekoppelt.', { name: code.name }))
   } catch (e) {
-    alert((e as Error).message === 'offline' ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN?') : (e as Error).message)
+    alert((e as Error).message === 'offline' ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?') : (e as Error).message)
   }
 }
 

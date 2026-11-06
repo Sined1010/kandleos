@@ -1,6 +1,7 @@
 // PC <-> phone link (Android Abschnitt 2): the pairing QR code and the encrypted envelope every message travels in.
 // AES-256-GCM via WebCrypto, which Electron's main process and the Android WebView both have. The envelope's device
-// id is bound as additional data, the counter inside the ciphertext stops replays. No plaintext ever goes over the wire.
+// id and its direction are bound as additional data, the counter inside the ciphertext stops replays. No plaintext ever
+// goes over the wire.
 
 export const LINK_PORT = 47321
 const PREFIX = 'kandleos:'
@@ -27,6 +28,8 @@ export interface Envelope {
 }
 
 export type Body = { ctr: number } & Record<string, unknown>
+/** Phone → PC is a request, PC → phone a reply; bound into the seal, so a request sent back is no answer to itself. */
+export type Dir = 'req' | 'res'
 
 /** Stock data keys and source choice; the phone fetches prices with them itself. LLM keys never leave the PC. */
 export interface SourceKeys {
@@ -82,23 +85,26 @@ export function decodePairing(s: string): PairingCode | null {
 
 const aesKey = (raw: Uint8Array<ArrayBuffer>) => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
 
-export async function sealEnvelope(key: Uint8Array<ArrayBuffer>, device: string, body: Body): Promise<Envelope> {
+const aad = (dir: Dir, device: string) => utf8.encode(`${dir}:${device}`)
+
+export async function sealEnvelope(key: Uint8Array<ArrayBuffer>, device: string, body: Body, dir: Dir): Promise<Envelope> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: utf8.encode(device) }, await aesKey(key), utf8.encode(JSON.stringify(body)))
+  const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(dir, device) }, await aesKey(key), utf8.encode(JSON.stringify(body)))
   return { d: device, n: toB64url(iv), c: toB64url(new Uint8Array(c)) }
 }
 
 export async function openEnvelope(
   key: Uint8Array<ArrayBuffer>,
   env: Envelope,
-  lastCtr: number
+  lastCtr: number,
+  dir: Dir
 ): Promise<{ ok: true; body: Body } | { ok: false; reason: 'bad-key' | 'replay' | 'format' }> {
   const iv = typeof env?.d === 'string' ? fromB64url(env.n) : null
   const c = iv ? fromB64url(env.c) : null
   if (!iv || iv.length !== 12 || !c || c.length < 16) return { ok: false, reason: 'format' }
   let plain: ArrayBuffer
   try {
-    plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: utf8.encode(env.d) }, await aesKey(key), c)
+    plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad(dir, env.d) }, await aesKey(key), c)
   } catch {
     return { ok: false, reason: 'bad-key' }
   }

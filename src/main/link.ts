@@ -43,6 +43,7 @@ let keys: () => SourceKeys = () => ({ finnhub: '', alpaca: null, stockSource: nu
 let forward: (op: string, args: unknown, device: string) => Promise<unknown> = async () => {
   throw new Error('unknown-op')
 }
+let onError: (message: string) => void = () => {}
 
 function load(): LinkFile {
   if (file) return file
@@ -70,10 +71,11 @@ export function linkStatus(): LinkStatus {
   }
 }
 
-/** What the window and the tray hand in: where the stock keys come from and who answers sync. */
-export function configureLink(o: { keys: () => SourceKeys; forward: typeof forward }): void {
+/** What the window and the tray hand in: where the stock keys come from, who answers sync, who hears of a failed start. */
+export function configureLink(o: { keys: () => SourceKeys; forward: typeof forward; onError: typeof onError }): void {
   keys = o.keys
   forward = o.forward
+  onError = o.onError
 }
 
 async function answer(raw: string): Promise<string | null> {
@@ -96,8 +98,9 @@ async function answer(raw: string): Promise<string | null> {
   return reply ? JSON.stringify(reply) : null
 }
 
-function start(): void {
-  if (server) return
+/** Resolves once the port is open or failed, so the status returned afterwards shows the error. */
+function start(): Promise<void> {
+  if (server) return Promise.resolve()
   error = null
   const s = createServer((req, res) => {
     // Strangers from outside the home network or VPN get nothing, not even an error page.
@@ -127,14 +130,22 @@ function start(): void {
   s.on('error', (err: NodeJS.ErrnoException) => {
     error = err.code === 'EADDRINUSE' ? t('Port {port} ist belegt', { port: String(LINK_PORT) }) : err.message
     server = null
+    // Started hidden at login, nobody would see it in the settings.
+    onError(error)
   })
   // '::' takes IPv4 too (dual stack); the sender check above filters both.
   s.listen(LINK_PORT, '::')
   server = s
+  return new Promise((resolve) => {
+    s.once('listening', resolve)
+    s.once('error', () => resolve())
+  })
 }
 
 function stop(): void {
   server?.close()
+  // close() alone lets a phone's kept-alive connection go on for a few seconds.
+  server?.closeAllConnections()
   server = null
   pairing = null
 }
@@ -144,7 +155,7 @@ export async function setLinkEnabled(on: unknown): Promise<LinkStatus> {
   const f = load()
   f.enabled = on === true
   await persist()
-  if (f.enabled) start()
+  if (f.enabled) await start()
   else stop()
   return linkStatus()
 }

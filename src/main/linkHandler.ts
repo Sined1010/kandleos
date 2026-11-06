@@ -61,7 +61,7 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
     const p = state.pairing
     if (!p || ctx.now > p.exp) return { state, reply: null }
     const key = fromB64url(p.key)!
-    const opened = await openEnvelope(key, e, 0)
+    const opened = await openEnvelope(key, e, 0, 'req')
     if (!opened.ok || opened.body.op !== 'pair') return { state, reply: null }
     const device: LinkDevice = {
       id: crypto.randomUUID(),
@@ -77,7 +77,7 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
       pcId: state.pcId,
       pcName: state.pcName,
       keys: ctx.keys()
-    })
+    }, 'res')
     // A code pairs once: used up even before the phone has the answer.
     return { state: { ...state, devices: [...state.devices, device], pairing: null }, reply }
   }
@@ -87,11 +87,11 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
     // Only a removed phone that still holds its key gets an answer; anyone else gets none.
     const gone = state.removed.find((d) => d.id === e.d)
     const key = gone && fromB64url(gone.key)
-    const opened = key ? await openEnvelope(key, e, 0) : null
-    return { state, reply: key && opened?.ok ? await sealEnvelope(key, e.d, { ctr: opened.body.ctr, error: 'removed' }) : null }
+    const opened = key ? await openEnvelope(key, e, 0, 'req') : null
+    return { state, reply: key && opened?.ok ? await sealEnvelope(key, e.d, { ctr: opened.body.ctr, error: 'removed' }, 'res') : null }
   }
   const key = fromB64url(device.key)!
-  const opened = await openEnvelope(key, e, device.lastCtr)
+  const opened = await openEnvelope(key, e, device.lastCtr, 'req')
   if (!opened.ok) return { state, reply: null }
   const { ctr, op, args } = opened.body
   const next = { ...state, devices: state.devices.map((d) => (d === device ? { ...d, lastCtr: ctr, lastSeen: ctx.now } : d)) }
@@ -108,5 +108,5 @@ export async function handleRequest(env: unknown, state: LinkState, ctx: LinkCon
   } catch (err) {
     body = { error: (err as Error).message === 'unknown-op' ? 'unknown-op' : 'failed' }
   }
-  return { state: next, reply: await sealEnvelope(key, device.id, { ctr, ...body }) }
+  return { state: next, reply: await sealEnvelope(key, device.id, { ctr, ...body }, 'res') }
 }

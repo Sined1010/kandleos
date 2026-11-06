@@ -9,7 +9,7 @@ const button = 'rounded-lg px-4 py-3 text-sm text-white ring-1 ring-line active:
 
 const message = (e: unknown) =>
   (e as Error).message === 'offline'
-    ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN?')
+    ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?')
     : (e as Error).message
 
 // Android's WebView has a built-in barcode reader (from the phone's own system services, nothing we ship); it reads a
@@ -127,7 +127,7 @@ function PairPage({ onDone }: { onDone(): void }) {
 
 /** Settings → PC (phone): pair, see whether the PC is there, unpair. */
 export default function PcLink() {
-  const { state, pcName, lastSeen } = usePcStatus()
+  const { state, pcName, lastSeen, syncFailed } = usePcStatus()
   const [pairing, setPairing] = useState(false)
   return (
     <section className="mb-5">
@@ -146,7 +146,7 @@ export default function PcLink() {
           <span className={`h-2 w-2 rounded-full ${state === 'online' ? 'bg-up' : 'bg-muted'}`} />
           <span className="text-slate-200">{pcName}</span>
           <span className="text-muted">
-            {state === 'online' ? t('erreichbar') : lastSeen ? t('PC aus · zuletzt {when}', { when: new Date(lastSeen).toLocaleString() }) : t('PC aus')}
+            {state === 'online' ? (syncFailed ? t('erreichbar · Abgleich fehlgeschlagen') : t('erreichbar')) : lastSeen ? t('PC aus · zuletzt {when}', { when: new Date(lastSeen).toLocaleString() }) : t('PC aus')}
           </span>
           <button
             type="button"

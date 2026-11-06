@@ -15,7 +15,7 @@ import {
   setKey
 } from './agents'
 import icon from '../../resources/icon.png?asset'
-import { setLang } from '../shared/i18n'
+import { setLang, t } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
@@ -76,7 +76,12 @@ configureLink({
         else reject(new Error(r?.error ?? 'failed'))
       })
       win.webContents.send('link:request', { id, op, args, device })
-    })
+    }),
+  onError: (message) => {
+    // With the window in view, the settings show the error; hidden (in the tray, started at login) only this does.
+    if (!BrowserWindow.getAllWindows()[0]?.isVisible()) notify(t('Handy-Zugang funktioniert nicht'), message)
+    syncTray()
+  }
 })
 ipcMain.handle('link:status', () => linkStatus())
 ipcMain.handle('link:set-enabled', async (_e, on) => {

@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { t } from '../shared/i18n'
 import { agentsRunning } from './agents'
-import { linkEnabled, setLinkAutostart, setLinkEnabled, takeFirstHideHint } from './link'
+import { linkEnabled, linkStatus, setLinkAutostart, setLinkEnabled, takeFirstHideHint } from './link'
 
 let tray: Tray | null = null
 let quitting = false
@@ -50,7 +50,6 @@ async function quit(): Promise<void> {
 export function syncTray(): void {
   if (linkEnabled() && !tray && !noTray) {
     tray = new Tray(icon)
-    tray.setToolTip('KandleOS')
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: t('Öffnen'), click: showWindow },
@@ -71,6 +70,9 @@ export function syncTray(): void {
     tray.destroy()
     tray = null
   }
+  // Port taken etc.: the icon says so, since phone access is on but not working.
+  const { error } = linkStatus()
+  tray?.setToolTip(error ? `KandleOS – ${t('Handy-Zugang funktioniert nicht')}: ${error}` : 'KandleOS')
 }
 
 /** Closing hides (or minimizes) the window while phone access is on. */

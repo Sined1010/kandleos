@@ -126,6 +126,9 @@ function normalize(out: Units, sources: Units[]): Units {
 }
 
 const norm = (s: string) => s.trim().toLocaleLowerCase()
+// The start folders carry the language of the install (an older PC has "Krypto", a new phone "Crypto"): one folder.
+const SAME_FOLDER: Record<string, string> = { krypto: 'crypto', aktien: 'stocks' }
+const folderName = (s: string) => SAME_FOLDER[norm(s)] ?? norm(s)
 
 // The id follows from tab and symbol, so a retried first sync recognizes the chart it already made.
 const chartFromTab = (s: SyncSlice, tab: ChartTab, drawings: Drawing[], name: string): SavedChart => ({
@@ -142,16 +145,20 @@ const chartFromTab = (s: SyncSlice, tab: ChartTab, drawings: Drawing[], name: st
 const drawingsOf = (s: SyncSlice, tabId: string) => Object.entries(s.drawings).filter(([k]) => k.startsWith(`${tabId}:`))
 
 /**
- * The very first sync after pairing, when there is no common base yet: folders meet by name and symbols by
+ * The very first sync after pairing, when there is no common base yet: folders meet by id or name and symbols by
  * ticker, names/indicators/tabs come from the PC, the phone's tabs with drawings are kept as saved charts,
  * saved charts and alarms of both are kept (a clashing chart name per symbol gets `clash` appended).
  */
 export function firstMerge(pc: SyncSlice, phone: SyncSlice, tabLabel: string, clash: string): { slice: SyncSlice; savedTabs: number } {
   const folders = pc.folders.map((f) => ({ ...f, symbols: [...f.symbols] }))
   for (const f of phone.folders) {
-    const same = folders.find((p) => norm(p.name) === norm(f.name))
+    // Same id (synced before, base lost) or same name: one folder, nothing of the phone's is dropped.
+    const same =
+      folders.find((p) => p.id === f.id) ??
+      folders.find((p) => norm(p.name) === norm(f.name)) ??
+      folders.find((p) => folderName(p.name) === folderName(f.name))
     if (same) same.symbols.push(...f.symbols.filter((s) => !same.symbols.includes(s)))
-    else if (!folders.some((p) => p.id === f.id)) folders.push({ ...f, symbols: [...f.symbols] })
+    else folders.push({ ...f, symbols: [...f.symbols] })
   }
   const charts = [...pc.charts]
   for (const c of phone.charts) {
@@ -290,6 +297,8 @@ export interface Base {
   units: Units
 }
 export const emptySync = (): SyncState => ({ stamps: {}, seen: {}, bases: {} })
+/** Stamps of units that are gone: never compared again (a delete never beats a change), so they are dropped. */
+const stampsOf = (stamps: Stamps, units: Units): Stamps => Object.fromEntries(Object.entries(stamps).filter(([k]) => Object.hasOwn(units, k)))
 const KEEP_BASES = 3
 
 // Same as MAX_TABS in the store (not imported: this file must run without the window).
@@ -360,11 +369,12 @@ export function answerSync(
   for (const [k, s] of Object.entries(req.stamps)) if (s + offset > (stamps[k] ?? -Infinity)) stamps[k] = s + offset
   for (const k of Object.keys(merged)) stamps[k] ??= now
   const slice = applyUnits(pc, pcUnits, merged)
+  const seen = unitsOf(slice)
   const baseId = `${now}-${crypto.randomUUID().slice(0, 8)}`
   return {
     slice,
-    sync: { stamps, seen: unitsOf(slice), bases: { ...st.bases, [device]: [{ id: baseId, units: merged }, ...known].slice(0, KEEP_BASES) } },
-    reply: { units: merged, stamps, pcNow: now, baseId }
+    sync: { stamps: stampsOf(stamps, seen), seen, bases: { ...st.bases, [device]: [{ id: baseId, units: merged }, ...known].slice(0, KEEP_BASES) } },
+    reply: { units: merged, stamps: stampsOf(stamps, merged), pcNow: now, baseId }
   }
 }
 
@@ -379,5 +389,6 @@ export function receiveSync(phone: SyncSlice, st: SyncState, pcId: string, sent:
   for (const [k, s] of Object.entries(reply.stamps)) stamps[k] = s - offset
   for (const k of new Set([...Object.keys(sent), ...Object.keys(current)])) if (sent[k] !== current[k]) stamps[k] = now
   const slice = applyUnits(phone, sent, reply.units)
-  return { slice, sync: { stamps, seen: unitsOf(slice), bases: { ...st.bases, [pcId]: [{ id: reply.baseId, units: reply.units }] } } }
+  const seen = unitsOf(slice)
+  return { slice, sync: { stamps: stampsOf(stamps, seen), seen, bases: { ...st.bases, [pcId]: [{ id: reply.baseId, units: reply.units }] } } }
 }

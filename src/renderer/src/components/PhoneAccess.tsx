@@ -79,6 +79,11 @@ export default function PhoneAccess() {
         </span>
       </label>
       {status.error && <p className="mb-2 ml-5 text-xs text-down">{status.error}</p>}
+      {status.enabled && (
+        <p className="mb-2 ml-5 text-xs text-muted">
+          {t('Handy findet den PC nicht? Andere Firewalls wie Portmaster, Norton oder Kaspersky blocken eingehende Verbindungen oft ohne Nachfrage. Erlaube dort KandleOS eingehende Verbindungen im Heimnetz (Port {port}).', { port: String(status.port) })}
+        </p>
+      )}
 
       {status.enabled && (
         <div className="ml-5 space-y-3">

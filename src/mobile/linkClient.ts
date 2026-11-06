@@ -29,7 +29,7 @@ const url = (addr: string, port: number) => `http://${addr.includes(':') ? `[${a
 export function createLinkClient(deps: LinkDeps) {
   /** Sends one sealed message to the first address that answers with a reply to exactly this message. */
   async function send(addrs: string[], port: number, key: Uint8Array<ArrayBuffer>, device: string, ctr: number, body: Record<string, unknown>) {
-    const env = await sealEnvelope(key, device, { ctr, ...body })
+    const env = await sealEnvelope(key, device, { ctr, ...body }, 'req')
     for (const addr of addrs) {
       let reply: unknown
       try {
@@ -45,12 +45,33 @@ export function createLinkClient(deps: LinkDeps) {
         continue
       }
       // Anything not sealed with our key (another PC on an old address, a stranger) is not an answer.
-      const opened = await openEnvelope(key, reply as Envelope, ctr - 1)
+      const opened = await openEnvelope(key, reply as Envelope, ctr - 1, 'res')
       // Only the answer to this very message counts (same counter), never an old one.
       if (opened.ok && opened.body.ctr === ctr) return { addr, body: opened.body }
     }
     return null
   }
+
+  async function callNow(op: string, args?: unknown): Promise<unknown> {
+    const p = await deps.load()
+    if (!p) throw new Error('not-paired')
+    const ctr = nextCtr(p.lastCtr)
+    // Saved before sending: a counter is never used twice, even if the app dies mid-request.
+    await deps.save({ ...p, lastCtr: ctr })
+    const got = await send(p.addrs, p.port, fromB64url(p.key)!, p.deviceId, ctr, { op, args })
+    if (!got) throw new Error('offline')
+    // Sealed with our own key, so it really is our PC saying it removed this phone.
+    if (got.body.error === 'removed') {
+      await deps.onRemoved()
+      throw new Error('removed')
+    }
+    if (got.addr !== p.addrs[0]) await deps.save({ ...p, lastCtr: ctr, addrs: [got.addr, ...p.addrs.filter((a) => a !== got.addr)] })
+    if (typeof got.body.error === 'string') throw new Error(got.body.error)
+    return got.body.res
+  }
+
+  // One call at a time: two at once would read the same counter, and the PC drops the later one as a replay.
+  let queue: Promise<unknown> = Promise.resolve()
 
   return {
     async pair(code: PairingCode, name: string): Promise<{ pairing: Pairing; keys: SourceKeys }> {
@@ -71,22 +92,10 @@ export function createLinkClient(deps: LinkDeps) {
       return { pairing, keys: b.keys as SourceKeys }
     },
 
-    async call(op: string, args?: unknown): Promise<unknown> {
-      const p = await deps.load()
-      if (!p) throw new Error('not-paired')
-      const ctr = nextCtr(p.lastCtr)
-      // Saved before sending: a counter is never used twice, even if the app dies mid-request.
-      await deps.save({ ...p, lastCtr: ctr })
-      const got = await send(p.addrs, p.port, fromB64url(p.key)!, p.deviceId, ctr, { op, args })
-      if (!got) throw new Error('offline')
-      // Sealed with our own key, so it really is our PC saying it removed this phone.
-      if (got.body.error === 'removed') {
-        await deps.onRemoved()
-        throw new Error('removed')
-      }
-      if (got.addr !== p.addrs[0]) await deps.save({ ...p, lastCtr: ctr, addrs: [got.addr, ...p.addrs.filter((a) => a !== got.addr)] })
-      if (typeof got.body.error === 'string') throw new Error(got.body.error)
-      return got.body.res
+    call(op: string, args?: unknown): Promise<unknown> {
+      const run = queue.then(() => callNow(op, args))
+      queue = run.catch(() => {})
+      return run
     }
   }
 }

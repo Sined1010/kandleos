@@ -940,8 +940,8 @@ export const EN: Record<string, string> = {
   'Mit Windows starten (im Infobereich)': 'Start with Windows (in the notification area)',
   'PC erreichbar': 'PC reachable',
   'PC aus': 'PC off',
-  'PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN?':
-    'PC not reachable, or the code has expired or was already used. Is the phone on the same Wi-Fi or in the VPN?',
+  'PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?':
+    'PC not reachable, or the code has expired or was already used. Is the phone on the same Wi-Fi or in the VPN? Is a firewall on the PC (e.g. Portmaster) blocking the connection?',
   'Das ist kein KandleOS-Kopplungscode.': 'This is not a KandleOS pairing code.',
   'Mit PC koppeln': 'Pair with PC',
   'Am PC: Einstellungen → Handy-Zugang einschalten → Handy koppeln. Dann den Code hier scannen.':
@@ -968,4 +968,7 @@ export const EN: Record<string, string> = {
   '(Handy)': '(phone)',
   'Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.':
     'On the first sync the phone takes over the tabs from the PC. Your phone tabs with drawings are kept as saved charts “Tab from phone”.',
+  'erreichbar · Abgleich fehlgeschlagen': 'reachable · sync failed',
+  'Handy-Zugang funktioniert nicht': 'Phone access is not working',
+  'Handy findet den PC nicht? Andere Firewalls wie Portmaster, Norton oder Kaspersky blocken eingehende Verbindungen oft ohne Nachfrage. Erlaube dort KandleOS eingehende Verbindungen im Heimnetz (Port {port}).': 'Phone can\'t find the PC? Other firewalls such as Portmaster, Norton or Kaspersky often block incoming connections without asking. Allow incoming connections on your home network for KandleOS there (port {port}).',
 }
