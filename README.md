@@ -12,6 +12,12 @@ A fast, local desktop app for technical chart analysis on **Windows and Linux**,
 AI price forecast (Chronos-2) that runs entirely on your computer. An Android app brings charts, watchlist,
 drawings and price alarms to your phone.
 
+<p align="center">
+  <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="docs/badges/windows.svg" height="48" alt="Download for Windows"></a>
+  <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="docs/badges/linux.svg" height="48" alt="Download for Linux"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22io.github.sined1010.kandleos%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSined1010%2Fkandleos%22%2C%22author%22%3A%22Sined1010%22%2C%22name%22%3A%22KandleOS%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22KandleOS-.*%5B.%5Dapk%5C%22%7D%22%7D"><img src="docs/badges/obtainium.svg" height="48" alt="Get it on Obtainium"></a>
+</p>
+
 ![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary, the values of one forecast step and colored drawings](docs/screenshot.webp)
 
 ## Why KandleOS?
