@@ -130,8 +130,8 @@ export default function PcLink() {
   const { state, pcName, lastSeen, syncFailed } = usePcStatus()
   const [pairing, setPairing] = useState(false)
   return (
-    <section className="mb-5">
-      <h3 className="mb-1 text-xs text-muted">PC</h3>
+    <section>
+      <h3 className="settings-title settings-rule">PC</h3>
       {state === 'none' ? (
         <>
           <p className="mb-2 text-xs leading-relaxed text-muted">

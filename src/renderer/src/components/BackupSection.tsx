@@ -67,7 +67,7 @@ export default function BackupSection() {
 
   return (
     <section aria-labelledby="backup-title">
-      <h3 id="backup-title" className="mb-1 mt-5 text-xs text-muted">
+      <h3 id="backup-title" className="settings-title settings-rule">
         {t('Daten sichern')}
       </h3>
       <p className="mb-2 text-xs leading-relaxed text-muted">

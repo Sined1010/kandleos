@@ -971,4 +971,7 @@ export const EN: Record<string, string> = {
   'erreichbar · Abgleich fehlgeschlagen': 'reachable · sync failed',
   'Handy-Zugang funktioniert nicht': 'Phone access is not working',
   'Handy findet den PC nicht? Andere Firewalls wie Portmaster, Norton oder Kaspersky blocken eingehende Verbindungen oft ohne Nachfrage. Erlaube dort KandleOS eingehende Verbindungen im Heimnetz (Port {port}).': 'Phone can\'t find the PC? Other firewalls such as Portmaster, Norton or Kaspersky often block incoming connections without asking. Allow incoming connections on your home network for KandleOS there (port {port}).',
+  'Allgemein': 'General',
+  'Kursdaten': 'Market data',
+  'gilt nach „Speichern“': 'applies after “Save”',
 }

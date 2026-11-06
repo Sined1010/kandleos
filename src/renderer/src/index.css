@@ -29,6 +29,13 @@
 @utility shadow-glow {
   box-shadow: 0 0 14px -3px color-mix(in srgb, var(--color-brand-from) 70%, transparent);
 }
+/* Settings: section headings; every section after the first gets a line above it. */
+@utility settings-title {
+  @apply mb-2 text-sm font-semibold text-white;
+}
+@utility settings-rule {
+  @apply mt-5 border-t border-line pt-4;
+}
 
 html,
 body,

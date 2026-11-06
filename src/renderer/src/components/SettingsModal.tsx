@@ -14,7 +14,7 @@ import { IS_MOBILE, PAGE } from '../lib/platform'
 function InstantAlarms() {
   const on = useStore((s) => s.instantAlarms)
   return (
-    <label className="mb-5 flex cursor-pointer items-start gap-2 text-xs text-muted">
+    <label className="flex cursor-pointer items-start gap-2 text-xs text-muted">
       <input
         type="checkbox"
         checked={on}
@@ -76,6 +76,7 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
           </button>
         </div>
 
+        <h3 className="settings-title">{t('Allgemein')}</h3>
         {/* Applies at once: the window redraws in the new language. */}
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs text-muted">{t('Sprache')}</span>
@@ -95,6 +96,7 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
 
         {/* Applies at once, like the language. The phone gets updates through Obtainium. */}
         {!IS_MOBILE && (<>
+        <p className="mb-1 text-xs text-muted">{t('Updates')}</p>
         <label className="mb-1 flex cursor-pointer items-start gap-2 text-xs text-muted">
           <input
             type="checkbox"
@@ -107,7 +109,7 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
           </span>
         </label>
         {/* Fills in by itself once the check (started by ticking the box) has an answer. */}
-        <p className="mb-5 ml-5 text-xs text-muted">
+        <p className="ml-5 text-xs text-muted">
           {t('Installiert: {v}', { v: __APP_VERSION__ })}
           {updateLatest &&
             (isNewer(updateLatest, __APP_VERSION__) ? (
@@ -127,6 +129,11 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
         {IS_MOBILE && <InstantAlarms />}
         {linkSection}
 
+        {/* Only this section waits for Save; everything else applies at once. */}
+        <h3 className="settings-title settings-rule flex items-baseline justify-between gap-2">
+          {t('Kursdaten')}
+          {!keysFromPc && <span className="text-xs font-normal text-muted">{t('gilt nach „Speichern“')}</span>}
+        </h3>
         <fieldset disabled={keysFromPc} className="disabled:opacity-60">
         {keysFromPc && <p className="mb-2 text-xs text-accent">{t('Vom PC übernommen – Kursquelle und Keys am PC ändern.')}</p>}
         <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>

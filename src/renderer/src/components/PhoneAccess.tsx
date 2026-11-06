@@ -64,7 +64,7 @@ export default function PhoneAccess() {
 
   return (
     <section aria-labelledby="phone-title">
-      <h3 id="phone-title" className="mb-1 mt-5 text-xs text-muted">
+      <h3 id="phone-title" className="settings-title settings-rule">
         {t('Handy-Zugang')}
       </h3>
       <label className="mb-1 flex cursor-pointer items-start gap-2 text-xs text-muted">
