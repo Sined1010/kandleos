@@ -830,6 +830,14 @@ export default function ChartArea() {
     return () => ts.unsubscribeSizeChange(sync)
   }, [api])
 
+  const fcLabel =
+    fc.state === 'shown'
+      ? t('Prognose aus')
+      : fc.state === 'loading'
+        ? fc.pct !== undefined && fc.pct < 100
+          ? t('Lade Modell {pct} %', { pct: fc.pct })
+          : t('Rechne …')
+        : t('KI-Prognose')
   const summary = fc.result && (
     <ForecastSummary
       result={fc.result}
@@ -878,7 +886,7 @@ export default function ChartArea() {
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
-          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 150 : fc.result ? 547 : 215) }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 90 : fc.result ? 547 : 215) }}
         >
           {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
           <div className="flex flex-wrap items-center gap-2">
@@ -913,6 +921,7 @@ export default function ChartArea() {
           <div className="relative flex">
             <button
               onClick={toggleForecast}
+              aria-label={fcLabel}
               disabled={fc.state === 'loading' || data.length < FORECAST_MIN_BARS}
               title={
                 data.length && data.length < FORECAST_MIN_BARS
@@ -932,13 +941,9 @@ export default function ChartArea() {
               } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'} ${pcOff && fc.state !== 'shown' ? 'opacity-40 grayscale' : ''}`}
             >
               {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
-              {fc.state === 'shown'
-                ? t('Prognose aus')
-                : fc.state === 'loading'
-                  ? fc.pct !== undefined && fc.pct < 100
-                    ? t('Lade Modell {pct} %', { pct: fc.pct })
-                    : t('Rechne …')
-                  : t('KI-Prognose')}
+              {/* The phone shows only the symbol (the feature is known from the PC it is paired with), and the
+                  model download as a bare percentage. */}
+              {IS_MOBILE ? fc.state === 'loading' && fc.pct !== undefined && fc.pct < 100 && `${fc.pct} %` : fcLabel}
             </button>
             <button
               onClick={() => setFcMenu((o) => !o)}
