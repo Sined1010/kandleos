@@ -91,6 +91,8 @@ export async function createMobileApi(): Promise<Api> {
     archive: { add: notHere, due: async () => [], settle: notHere, summary: async () => ({}), clear: notHere },
     modelReady: async () => false,
     onForecastProgress: noop,
+    // The phone notifies through KandleNative (alarmWatch.ts).
+    notify: () => {},
     agents: {
       status: notHere,
       install: notHere,
@@ -103,6 +105,16 @@ export async function createMobileApi(): Promise<Api> {
       cancel: async () => {},
       results: async () => [],
       ollamaModels: async () => null
+    },
+    // Phone access is the PC's side of the link; the phone pairs through src/mobile/link.ts instead.
+    link: {
+      status: notHere,
+      setEnabled: notHere,
+      startPairing: notHere,
+      remove: notHere,
+      setVpnHost: notHere,
+      setAutostart: notHere,
+      onRequest: noop
     }
   }
 }

@@ -14,6 +14,13 @@ export interface Alarm {
   checkedUntil?: number
 }
 
+/**
+ * "Now" for alarms (seconds), on the exchange's clock: the latest quote's time when there is one. Alarm times are
+ * compared with bar times, and a device clock may be off (the user's PC by about an hour).
+ */
+export const alarmClock = (quoteTime: number | undefined, wall = Math.floor(Date.now() / 1000)): number =>
+  quoteTime !== undefined && Number.isFinite(quoteTime) && quoteTime > 0 ? Math.floor(quoteTime) : wall
+
 /** The direction follows from where the price is now; at the current price there is nothing to wait for. */
 export function newAlarm(symbol: string, price: number, current: number, now = Math.floor(Date.now() / 1000)): Alarm | 'at-price' {
   if (price === current) return 'at-price'

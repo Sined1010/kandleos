@@ -15,6 +15,8 @@ import { useStore } from '../renderer/src/store/useStore'
 import ActionMenu from './ActionMenu'
 import AlarmPage from './AlarmPage'
 import { startAlarmWatch } from './alarmWatch'
+import { startLink, usePcStatus } from './link'
+import PcLink from './PcLink'
 import DrawTools from './DrawTools'
 import Layer from './Layer'
 import Licenses from './Licenses'
@@ -38,6 +40,8 @@ export default function MobileApp() {
   const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | null>(null)
   const [alarmFor, setAlarmFor] = useState<string | null>(null)
   useEffect(() => startAlarmWatch(), [])
+  useEffect(() => startLink(), [])
+  const pc = usePcStatus()
   const [saving, setSaving] = useState(false)
   const symbol = useStore((s) => s.symbol)
   const names = useStore((s) => s.names)
@@ -87,6 +91,16 @@ export default function MobileApp() {
           >
             {drawing ? <Check size={18} /> : <Pencil size={18} />}
           </button>
+          {/* Only while paired: green = PC reachable, grey = PC off (tap for details in the settings). */}
+          {pc.state !== 'none' && (
+            <button
+              onClick={() => setSettings(true)}
+              aria-label={pc.state === 'online' ? t('PC erreichbar') : t('PC aus')}
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${pc.state === 'online' ? 'text-up ring-up/60' : 'text-muted ring-line'}`}
+            >
+              PC
+            </button>
+          )}
           <button onClick={() => setMenu(true)} aria-label={t('Mehr')} className="mobile-icon">
             <MoreVertical size={18} />
           </button>
@@ -157,7 +171,7 @@ export default function MobileApp() {
           <Licenses />
         </Layer>
       )}
-      {settings && <SettingsModal onClose={() => setSettings(false)} />}
+      {settings && <SettingsModal onClose={() => setSettings(false)} linkSection={<PcLink />} keysFromPc={pc.state !== 'none'} />}
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAbout(true)} />}
       {about && <AboutModal onClose={() => setAbout(false)} />}
     </div>

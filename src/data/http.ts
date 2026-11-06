@@ -7,6 +7,9 @@ export interface HttpInit {
   /** 'manual': report a redirect (status 3xx) instead of following it. */
   redirect?: 'manual'
   timeoutMs: number
+  /** GET by default; the phone link POSTs JSON. */
+  method?: 'GET' | 'POST'
+  body?: string
 }
 export interface HttpRes {
   status: number
@@ -20,6 +23,8 @@ export type Http = (url: string, init: HttpInit) => Promise<HttpRes>
 
 export const fetchHttp: Http = async (url, init) => {
   const res = await fetch(url, {
+    method: init.method ?? 'GET',
+    body: init.body,
     headers: init.headers,
     redirect: init.redirect ?? 'follow',
     signal: AbortSignal.timeout(init.timeoutMs)

@@ -11,8 +11,10 @@ export const capHttp: Http = async (url, init) => {
   try {
     res = await CapacitorHttp.request({
       url,
-      method: 'GET',
+      method: init.method ?? 'GET',
       headers: init.headers,
+      // CapacitorHttp serializes objects itself by the content type.
+      data: init.body === undefined ? undefined : JSON.parse(init.body),
       connectTimeout: init.timeoutMs,
       readTimeout: init.timeoutMs,
       disableRedirects: init.redirect === 'manual',

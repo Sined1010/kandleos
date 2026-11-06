@@ -7,6 +7,7 @@ import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
 import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
+import { emptySync, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -173,12 +174,15 @@ interface State {
   deleteChart: (id: string) => void
   /** Price alarms (shared/alarms.ts); for now set and checked on the phone. */
   alarms: Alarm[]
+  /** PC ↔ phone sync bookkeeping (shared/sync.ts, services/sync.ts). */
+  sync: SyncState
   /** Phone: check alarms every 15 s with a permanent notification instead of every 15 min. */
   instantAlarms: boolean
   addAlarm: (a: Alarm) => void
   removeAlarm: (id: string) => void
   /** Arms a triggered alarm again, counting only bars from now on. */
-  rearmAlarm: (id: string) => void
+  /** `now`: seconds on the exchange's clock (alarmClock). */
+  rearmAlarm: (id: string, now: number) => void
   /** Takes in what the Android background check found (shared/alarms.ts mergeTriggered). */
   applyNative: (list: NativeTrigger[]) => void
 }
@@ -328,6 +332,7 @@ export const useStore = create<State>()(
       clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null })),
       charts: [],
       alarms: [],
+      sync: emptySync(),
       instantAlarms: false,
       saveChart: (name, overwriteId) => {
         const id = overwriteId ?? crypto.randomUUID()
@@ -386,20 +391,20 @@ export const useStore = create<State>()(
         })),
       addAlarm: (a) => set((s) => ({ alarms: [...s.alarms, a] })),
       removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
-      rearmAlarm: (id) =>
+      rearmAlarm: (id, now) =>
         set((s) => ({
           alarms: s.alarms.map((a) => {
             if (a.id !== id) return a
             const { triggeredAt, triggeredPrice, ...armed } = a
-            return { ...armed, checkedUntil: Math.floor(Date.now() / 1000) }
+            return { ...armed, checkedUntil: now }
           })
         })),
       applyNative: (list) => set((s) => ({ alarms: mergeTriggered(s.alarms, list) }))
     }),
     {
       name: 'kandleos',
-      // v6: alarms (filled in by merge, nothing to convert).
-      version: 6,
+      // v6: alarms; v7: sync bookkeeping (both filled in by merge, nothing to convert).
+      version: 7,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -449,7 +454,8 @@ export const useStore = create<State>()(
           agentsConfig: { ...current.agentsConfig, ...p.agentsConfig },
           // Files from before saved charts have none.
           charts: p.charts ?? [],
-          alarms: p.alarms ?? []
+          alarms: p.alarms ?? [],
+          sync: { ...emptySync(), ...p.sync }
         }
         // Files from before tabs hold a single chart; it becomes the first tab.
         const tabs = p.tabs?.length
@@ -481,6 +487,7 @@ export const useStore = create<State>()(
         charts,
         alarms,
         instantAlarms,
+        sync,
         stockSource,
         yahooExtra,
         disclaimerAccepted,
@@ -511,7 +518,8 @@ export const useStore = create<State>()(
         drawings,
         charts,
         alarms,
-        instantAlarms
+        instantAlarms,
+        sync
       })
     }
   )

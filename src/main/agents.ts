@@ -399,6 +399,8 @@ export function cancelAgents(): void {
   current?.kill()
 }
 
+export const agentsRunning = (): boolean => current !== null
+
 /** Saved analyses of a symbol, newest first. */
 export async function listAnalyses(symbol: unknown): Promise<SavedAnalysis[]> {
   if (typeof symbol !== 'string' || !SYMBOL_RE.test(symbol)) return []

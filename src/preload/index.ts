@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentsEvent, AgentsRequest, AgentsStatus, SavedAnalysis, SetupProgress } from '../main/agents'
 import type { BackupSummary } from '../main/backup'
+import type { LinkStatus } from '../main/link'
 import type { ArchiveEntry, Settlement, SummaryRow } from '../shared/archive'
 import type { CandleData, CompanyInfo, OlderRequest, Quote, SearchResult, Timeframe } from '../shared/types'
 
@@ -74,6 +75,8 @@ const api = {
   modelReady: (): Promise<boolean> => ipcRenderer.invoke('forecast:model-ready'),
   /** Model download progress in percent; returns an unsubscribe function. */
   onForecastProgress: (cb: (pct: number) => void): (() => void) => listen('forecast:progress', cb),
+  /** System notification (price alarms, phone access hints). */
+  notify: (title: string, body: string): void => ipcRenderer.send('app:notify', title, body),
   /** Comprehensive analysis with TradingAgents: setup, keys (stored encrypted, only their presence comes back), runs. */
   agents: {
     status: (): Promise<AgentsStatus> => ipcRenderer.invoke('agents:status'),
@@ -88,6 +91,24 @@ const api = {
     cancel: (): Promise<void> => ipcRenderer.invoke('agents:cancel'),
     results: (symbol: string): Promise<SavedAnalysis[]> => ipcRenderer.invoke('agents:results', symbol),
     ollamaModels: (url: string): Promise<string[] | null> => ipcRenderer.invoke('agents:ollama-models', url)
+  },
+  /** Phone access (main/link.ts): switch, pairing QR, paired phones. Device keys never come back to the window. */
+  link: {
+    status: (): Promise<LinkStatus> => ipcRenderer.invoke('link:status'),
+    setEnabled: (on: boolean): Promise<LinkStatus> => ipcRenderer.invoke('link:set-enabled', on),
+    startPairing: (): Promise<string> => ipcRenderer.invoke('link:start-pairing'),
+    remove: (id: string): Promise<LinkStatus> => ipcRenderer.invoke('link:remove', id),
+    setVpnHost: (host: string): Promise<LinkStatus> => ipcRenderer.invoke('link:set-vpn-host', host),
+    setAutostart: (on: boolean): Promise<LinkStatus> => ipcRenderer.invoke('link:set-autostart', on),
+    /** Requests from a paired phone that the window answers (sync); returns the unsubscribe function. */
+    onRequest: (handler: (op: string, args: unknown, device: string) => unknown): (() => void) =>
+      listen<{ id: number; op: string; args: unknown; device: string }>('link:request', async (m) => {
+        try {
+          ipcRenderer.send('link:reply', m.id, { ok: true, res: await handler(m.op, m.args, m.device) })
+        } catch (e) {
+          ipcRenderer.send('link:reply', m.id, { ok: false, error: (e as Error).message })
+        }
+      })
   }
 }
 

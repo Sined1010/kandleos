@@ -23,6 +23,8 @@ import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, modelReady } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys, useAlpacaKeyStore } from '../data/alpaca'
 import { alpacaKeysFromDisk, finnhubKey, saveAlpacaKeysToDisk, saveFinnhubKey } from './keys'
+import { configureLink, linkStatus, removeDevice, resumeLink, setLinkEnabled, setVpnHost, startPairing } from './link'
+import { hiddenStart, keepRunning, notify, setAutostart, showWindow, syncTray } from './tray'
 import {
   companyInfo,
   finnhubCheck,
@@ -43,7 +45,53 @@ const storeFile = (): string => join(app.getPath('userData'), 'kandleos-store.js
 let writeQueue = Promise.resolve()
 
 ipcMain.on('app:language', (_e, lang) => setLang(lang))
-ipcMain.on('app:stock-source', (_e, s, yahooExtra) => setStockSource(s, yahooExtra))
+// Also kept for the phone link, which hands the source choice to a paired phone.
+let source: { stockSource: string | null; yahooExtra: boolean } = { stockSource: null, yahooExtra: false }
+ipcMain.on('app:stock-source', (_e, s, yahooExtra) => {
+  setStockSource(s, yahooExtra)
+  source = { stockSource: typeof s === 'string' ? s : null, yahooExtra: yahooExtra === true }
+})
+// Phone access (link.ts). The phone gets the stock keys and source choice, never the LLM keys.
+// The window (also when hidden) holds the store, so it answers sync; main only passes it on.
+let linkReq = 0
+const pendingLink = new Map<number, (r: { ok: boolean; res?: unknown; error?: string }) => void>()
+ipcMain.on('link:reply', (_e, id, r) => {
+  pendingLink.get(id)?.(r)
+  pendingLink.delete(id)
+})
+configureLink({
+  keys: () => ({ finnhub: finnhubKey(), alpaca: alpacaKeysFromDisk(), ...source }),
+  forward: (op, args, device) =>
+    new Promise((resolve, reject) => {
+      const win = BrowserWindow.getAllWindows()[0]
+      if (op !== 'sync' || !win) return reject(new Error('unknown-op'))
+      const id = ++linkReq
+      const timer = setTimeout(() => {
+        pendingLink.delete(id)
+        reject(new Error('timeout'))
+      }, 10_000)
+      pendingLink.set(id, (r) => {
+        clearTimeout(timer)
+        if (r?.ok) resolve(r.res)
+        else reject(new Error(r?.error ?? 'failed'))
+      })
+      win.webContents.send('link:request', { id, op, args, device })
+    })
+})
+ipcMain.handle('link:status', () => linkStatus())
+ipcMain.handle('link:set-enabled', async (_e, on) => {
+  const status = await setLinkEnabled(on)
+  syncTray()
+  return status
+})
+ipcMain.handle('link:start-pairing', () => startPairing())
+ipcMain.handle('link:remove', (_e, id) => removeDevice(id))
+ipcMain.handle('link:set-vpn-host', (_e, host) => setVpnHost(host))
+ipcMain.handle('link:set-autostart', async (_e, on) => {
+  await setAutostart(on)
+  return linkStatus()
+})
+ipcMain.on('app:notify', (_e, title, body) => notify(title, body))
 // Alpaca keys only go in; the window learns whether they are set.
 ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
 ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))
@@ -132,7 +180,9 @@ ipcMain.handle('agents:results', (_e, symbol) => listAnalyses(symbol))
 ipcMain.handle('agents:ollama-models', (_e, url) => ollamaModels(url))
 
 function createWindow(): void {
+  const hidden = hiddenStart()
   const win = new BrowserWindow({
+    show: hidden !== 'hide',
     width: 1440,
     height: 900,
     minWidth: 1000,
@@ -159,6 +209,10 @@ function createWindow(): void {
   })
   if (DEV_URL) win.loadURL(DEV_URL)
   else win.loadFile(indexFile())
+  keepRunning(win)
+  if (hidden === 'minimize') win.minimize()
+  // Started hidden at login: keep timers running, like a window hidden by closing it.
+  if (hidden === 'hide') win.webContents.setBackgroundThrottling(false)
 }
 
 // The dev server (electron-vite); a packaged app ignores the variable, so it cannot be pointed at another page.
@@ -208,17 +262,16 @@ ipcMain.handle('app:latest-version', async () => {
 // A second instance would load its own copy of the store and overwrite this one's changes on its next save.
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
-  app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0]
-    if (win?.isMinimized()) win.restore()
-    win?.focus()
-  })
+  // Also brings back a window hidden in the notification area.
+  app.on('second-instance', showWindow)
   app.whenReady().then(() => {
     // KandleOS needs no camera, microphone, location, notifications etc.; refuse every such request.
     // The one exception is fullscreen, for the chart's fullscreen mode.
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'fullscreen'))
     session.defaultSession.setPermissionCheckHandler(() => false)
     createWindow()
+    resumeLink()
+    syncTray()
     app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
   })
 }

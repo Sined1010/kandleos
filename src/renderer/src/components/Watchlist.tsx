@@ -18,6 +18,7 @@ import { isCrypto } from '../../../shared/types'
 import { formatChange, formatPrice } from '../lib/format'
 import { insertTarget } from '../lib/watchlist'
 import { MAX_TABS, useQuotes, useStore, type Folder } from '../store/useStore'
+import AlarmsModal from './AlarmsModal'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
@@ -152,6 +153,7 @@ export default function Watchlist() {
   const anyOpen = folders.some((f) => !f.collapsed)
   const [menu, setMenu] = useState<RowAt | null>(null)
   const [info, setInfo] = useState<RowAt | null>(null)
+  const [alarmFor, setAlarmFor] = useState<string | null>(null)
   // Second menu of "Move to …": the other folders.
   const [moveMenu, setMoveMenu] = useState<RowAt | null>(null)
   const moveSymbol = useStore((s) => s.moveSymbol)
@@ -259,6 +261,7 @@ export default function Watchlist() {
           at={menu}
           canMove={folders.length > 1}
           onInfo={() => setInfo(menu)}
+          onAlarm={() => setAlarmFor(menu.symbol)}
           onMove={() => setMoveMenu(menu)}
           onClose={() => setMenu(null)}
         />
@@ -274,6 +277,7 @@ export default function Watchlist() {
           onClose={() => setMoveMenu(null)}
         />
       )}
+      {alarmFor && <AlarmsModal symbol={alarmFor} onClose={() => setAlarmFor(null)} />}
       {info && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setInfo(null)} />
@@ -291,8 +295,8 @@ export default function Watchlist() {
 }
 
 /** Right-click menu of a watchlist row. Unavailable entries stay visible with the reason underneath. */
-function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onMove: () => void; onClose: () => void }) {
-  const { at, canMove, onInfo, onMove, onClose } = props
+function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onAlarm: () => void; onMove: () => void; onClose: () => void }) {
+  const { at, canMove, onInfo, onAlarm, onMove, onClose } = props
   const setSymbol = useStore((s) => s.setSymbol)
   const addTab = useStore((s) => s.addTab)
   const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
@@ -310,6 +314,7 @@ function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onMov
           }
         },
     isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
+    { label: t('Kurs-Alarm …'), run: onAlarm },
     { label: t('Umbenennen'), run: at.rename },
     canMove ? { label: t('Verschieben nach …'), run: onMove } : { label: t('Verschieben nach …'), reason: t('Kein anderer Ordner') },
     { label: t('Aus Watchlist löschen'), run: () => removeSymbol(at.folderId, s), danger: true }

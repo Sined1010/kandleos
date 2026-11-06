@@ -4,6 +4,7 @@ import { t } from '../../../shared/i18n'
 import { isNewer } from '../../../shared/version'
 import { useStore } from '../store/useStore'
 import BackupSection from './BackupSection'
+import PhoneAccess from './PhoneAccess'
 import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 import { RELEASES_URL } from './UpdateBadge'
@@ -29,7 +30,11 @@ function InstantAlarms() {
   )
 }
 
-export default function SettingsModal({ onClose }: { onClose: () => void }) {
+/**
+ * linkSection: the phone's "PC" section (src/mobile/PcLink.tsx), passed in so no phone code lands in the PC bundle.
+ * keysFromPc: while paired, the stock source and keys come from the PC and are read-only here.
+ */
+export default function SettingsModal({ onClose, linkSection, keysFromPc = false }: { onClose: () => void; linkSection?: React.ReactNode; keysFromPc?: boolean }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const setFinnhubKey = useStore((s) => s.setFinnhubKey)
   const updateCheck = useStore((s) => s.updateCheck)
@@ -46,6 +51,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (keysFromPc) return onClose()
     if (!valid || !(await source.apply())) return
     setFinnhubKey(key.trim())
     onClose()
@@ -119,7 +125,10 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
         </>)}
 
         {IS_MOBILE && <InstantAlarms />}
+        {linkSection}
 
+        <fieldset disabled={keysFromPc} className="disabled:opacity-60">
+        {keysFromPc && <p className="mb-2 text-xs text-accent">{t('Vom PC übernommen – Kursquelle und Keys am PC ändern.')}</p>}
         <p className="mb-2 text-xs text-muted">{t('Datenquelle für Aktien')}</p>
         <StockSourcePicker form={source} />
 
@@ -146,7 +155,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             ? t('Der Key wird verschlüsselt im Schlüsselspeicher des Handys gespeichert.')
             : t('Der Key wird verschlüsselt auf diesem Rechner gespeichert (unter Linux nur mit gnome-keyring oder KWallet). Für einen anderen Rechner unten bei „Daten sichern“ mitexportieren oder dort neu eintragen.')}
         </p>
+        </fieldset>
 
+        {!IS_MOBILE && <PhoneAccess />}
         {!IS_MOBILE && <BackupSection />}
 
         <div className={PAGE?.foot ?? 'mt-5 flex items-center justify-end gap-2'}>
@@ -164,7 +175,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
           <button
             type="submit"
-            disabled={!valid || !source.ready || source.busy}
+            disabled={!keysFromPc && (!valid || !source.ready || source.busy)}
             className={`${PAGE?.button ?? 'rounded-lg px-3 py-1.5'} bg-brand font-medium text-white shadow-glow hover:brightness-110 disabled:opacity-40 disabled:shadow-none`}
           >
             {t('Speichern')}

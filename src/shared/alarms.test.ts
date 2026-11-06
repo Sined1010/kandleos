@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkedAfter, hit, mergeTriggered, newAlarm, type Alarm } from './alarms.ts'
+import { alarmClock, checkedAfter, hit, mergeTriggered, newAlarm, type Alarm } from './alarms.ts'
 
 test('newAlarm picks above or below from where the price is now', () => {
   assert.equal((newAlarm('AAPL', 230, 227) as Alarm).op, 'above')
@@ -58,4 +58,15 @@ test('checkedAfter never goes back before the alarm was set', () => {
   assert.equal(checkedAfter(a, 300), 500)
   assert.equal(hit({ ...a, checkedUntil: checkedAfter(a, 300) }, bars), null)
   assert.equal(checkedAfter(alarm({ checkedUntil: 600 }), 900), 900)
+})
+
+test('alarm times follow the exchange (quote time), not a device clock that is off by an hour', () => {
+  const quoteTime = 10_000
+  const pcClockBehind = quoteTime - 3600
+  assert.equal(alarmClock(quoteTime, pcClockBehind), quoteTime)
+  assert.equal(alarmClock(undefined, pcClockBehind), pcClockBehind)
+  // Created with the exchange time, a spike from before the alarm existed does not fire it.
+  const a = newAlarm('ETHUSDT', 110, 100, alarmClock(quoteTime, pcClockBehind)) as Alarm
+  assert.equal(hit(a, [{ time: quoteTime - 600, high: 120, low: 90 }]), null)
+  assert.ok(hit(a, [{ time: quoteTime + 300, high: 120, low: 90 }]))
 })

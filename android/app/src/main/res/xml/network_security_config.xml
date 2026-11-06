@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The PC link (src/mobile/linkClient.ts) talks plain HTTP to the PC on the home network or VPN: there is no CA-signed
+     certificate for a local PC. Every message is AES-256-GCM encrypted (src/shared/link.ts); stock data stays on HTTPS. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

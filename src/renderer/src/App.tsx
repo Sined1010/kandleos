@@ -11,6 +11,8 @@ import Watchlist from './components/Watchlist'
 import WelcomeModal from './components/WelcomeModal'
 import { settleDue } from './services/archive'
 import { useQuoteFeed } from './services/quoteFeed'
+import { answerPhone, startStamping } from './services/sync'
+import { startPcAlarmWatch } from './services/alarmWatch'
 import { useStore } from './store/useStore'
 
 export default function App() {
@@ -30,6 +32,13 @@ export default function App() {
     const timer = setTimeout(() => void settleDue(), 10_000)
     return () => clearTimeout(timer)
   }, [])
+  // Phone link: note local changes for sync, and answer a paired phone's sync requests (main/link.ts forwards them).
+  useEffect(() => startStamping(), [])
+  useEffect(() => startPcAlarmWatch(), [])
+  useEffect(
+    () => window.api.link.onRequest((op, args, device) => (op === 'sync' ? answerPhone(device, args) : Promise.reject(new Error('unknown-op')))),
+    []
+  )
 
   return (
     // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.
