@@ -35,12 +35,11 @@ export const BrandLoader = () => <div className="fc-loader">{BRAND_BARS}</div>
 const HEIGHT = 64
 const LIFT = HEIGHT * 1.1 * 0.17
 const GAP = 8
-// 18 candles of 5 px with 3 px between them (index.css).
-const WIDTH = CANDLES.length * 8 - 3
 
 /**
- * Candles fading in to the right of the last candle while the forecast is computed. Moved by writing its
- * transform directly (no React render), at most once a frame and only when the chart moves or the price changes.
+ * Candles fading in to the right of the last candle while the forecast is computed, starting at its price.
+ * Placed every frame by writing the transform directly (no React render): scrolling, zooming, autoscale and
+ * dragging the price axis all move it with the candle. Past the price axis it is cut off, never pulled left.
  */
 export default function ForecastLoader({ chart, series, time, price, right, bottom }: {
   chart: IChartApi
@@ -55,47 +54,25 @@ export default function ForecastLoader({ chart, series, time, price, right, bott
   const ref = useRef<HTMLDivElement>(null)
   const at = useRef({ time, price })
   at.current = { time, price }
-  const schedule = useRef(() => {})
 
   useEffect(() => {
     let frame = 0
     let shown = ''
     const place = () => {
-      frame = 0
+      frame = requestAnimationFrame(place)
       const el = ref.current
       if (!el) return
       const x = chart.timeScale().timeToCoordinate(at.current.time as Time)
       const y = series.priceToCoordinate(at.current.price)
-      const width = chart.timeScale().width()
-      // Pulled left when the space right of the last candle is narrower than the loader; hidden once the candle
-      // has scrolled out to the right, so it does not float over older candles.
-      const pos =
-        x !== null && y !== null && x <= width
-          ? `translate(${Math.round(Math.min(x + GAP, width - WIDTH))}px,${Math.round(y + LIFT - HEIGHT)}px)`
-          : ''
+      const pos = x === null || y === null ? '' : `translate(${Math.round(x + GAP)}px,${Math.round(y + LIFT - HEIGHT)}px)`
       if (pos === shown) return
       shown = pos
       el.style.visibility = pos ? '' : 'hidden'
       if (pos) el.style.transform = pos
     }
-    // After the chart has applied the change (autoscale included), and only once per frame.
-    schedule.current = () => {
-      if (!frame) frame = requestAnimationFrame(place)
-    }
     place()
-    // shortcut: dragging the price axis alone fires no event, so the loader keeps its height until the next
-    // scroll, zoom or tick; fine for a few seconds of loading.
-    const ts = chart.timeScale()
-    const onChange = () => schedule.current()
-    ts.subscribeVisibleLogicalRangeChange(onChange)
-    ts.subscribeSizeChange(onChange)
-    return () => {
-      cancelAnimationFrame(frame)
-      ts.unsubscribeVisibleLogicalRangeChange(onChange)
-      ts.unsubscribeSizeChange(onChange)
-    }
+    return () => cancelAnimationFrame(frame)
   }, [chart, series])
-  useEffect(() => schedule.current(), [time, price])
 
   return (
     <div className="pointer-events-none absolute left-0 top-0 z-10 overflow-hidden" style={{ right, bottom }} aria-hidden>
