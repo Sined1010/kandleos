@@ -100,6 +100,11 @@ const api = {
     remove: (id: string): Promise<LinkStatus> => ipcRenderer.invoke('link:remove', id),
     setVpnHost: (host: string): Promise<LinkStatus> => ipcRenderer.invoke('link:set-vpn-host', host),
     setAutostart: (on: boolean): Promise<LinkStatus> => ipcRenderer.invoke('link:set-autostart', on),
+    /** Windows: whether KandleOS's own firewall rule exists (null elsewhere); adding asks for admin rights once. */
+    firewall: (): Promise<boolean | null> => ipcRenderer.invoke('link:firewall'),
+    addFirewall: (): Promise<boolean> => ipcRenderer.invoke('link:add-firewall'),
+    /** Security suites running here that may block the phone (Portmaster, Kaspersky …), for the pairing help. */
+    otherFirewalls: (): Promise<string[]> => ipcRenderer.invoke('link:other-firewalls'),
     /** Requests from a paired phone that the window answers (sync); returns the unsubscribe function. */
     onRequest: (handler: (op: string, args: unknown, device: string) => unknown): (() => void) =>
       listen<{ id: number; op: string; args: unknown; device: string }>('link:request', async (m) => {

@@ -23,6 +23,7 @@ import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, modelReady } from './forecast'
 import { alpacaHasKeys, setAlpacaKeys, useAlpacaKeyStore } from '../data/alpaca'
 import { alpacaKeysFromDisk, finnhubKey, saveAlpacaKeysToDisk, saveFinnhubKey } from './keys'
+import { addFirewallRule, hasFirewallRule, otherFirewalls } from './firewall'
 import { configureLink, linkStatus, removeDevice, resumeLink, setLinkEnabled, setVpnHost, startPairing } from './link'
 import { hiddenStart, keepRunning, notify, setAutostart, showWindow, syncTray } from './tray'
 import {
@@ -92,6 +93,9 @@ ipcMain.handle('link:set-enabled', async (_e, on) => {
 ipcMain.handle('link:start-pairing', () => startPairing())
 ipcMain.handle('link:remove', (_e, id) => removeDevice(id))
 ipcMain.handle('link:set-vpn-host', (_e, host) => setVpnHost(host))
+ipcMain.handle('link:firewall', () => hasFirewallRule())
+ipcMain.handle('link:add-firewall', () => addFirewallRule())
+ipcMain.handle('link:other-firewalls', () => otherFirewalls())
 ipcMain.handle('link:set-autostart', async (_e, on) => {
   await setAutostart(on)
   return linkStatus()

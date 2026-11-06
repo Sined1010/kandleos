@@ -94,7 +94,7 @@ function PairPage({ onDone }: { onDone(): void }) {
 
   return (
     <Layer id="pair" title={t('Mit PC koppeln')} onClose={onDone}>
-      <p className="mb-3 text-muted">{t('Am PC: Einstellungen → Handy koppeln → einschalten → QR-Code anzeigen. Dann den Code hier scannen.')}</p>
+      <p className="mb-3 text-muted">{t('Am PC: Einstellungen → Handy koppeln → Jetzt koppeln. Dann den Code hier scannen.')}</p>
       {camera ? (
         <>
           <div className="relative mb-2">

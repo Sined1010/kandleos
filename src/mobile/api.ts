@@ -114,6 +114,9 @@ export async function createMobileApi(): Promise<Api> {
       remove: notHere,
       setVpnHost: notHere,
       setAutostart: notHere,
+      firewall: notHere,
+      addFirewall: notHere,
+      otherFirewalls: notHere,
       onRequest: noop
     }
   }
