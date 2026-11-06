@@ -174,7 +174,7 @@ function addresses(): string[] {
 }
 
 export function startPairing(): string {
-  if (!server) throw new Error(t('Handy-Zugang ist aus'))
+  if (!server) throw new Error(t('Handy-Kopplung ist aus'))
   const key = toB64url(crypto.getRandomValues(new Uint8Array(32)))
   const exp = Date.now() + PAIRING_MS
   pairing = { key, exp }

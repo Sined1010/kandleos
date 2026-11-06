@@ -919,14 +919,13 @@ export const EN: Record<string, string> = {
   'Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?':
     'Changes could not be saved ({error}). Is the phone storage full?',
   'Port {port} ist belegt': 'Port {port} is in use',
-  'Handy-Zugang ist aus': 'Phone access is off',
+  'Handy-Kopplung ist aus': 'Phone pairing is off',
   'Ungültige Adresse': 'Invalid address',
   'Beenden': 'Quit',
   'Es läuft eine Analyse. KandleOS beenden und die Analyse abbrechen?': 'An analysis is running. Quit KandleOS and cancel the analysis?',
-  'Handy-Zugang aus': 'Turn phone access off',
+  'Handy-Kopplung aus': 'Turn phone pairing off',
   'KandleOS läuft im Infobereich weiter': 'KandleOS keeps running in the notification area',
   'Über das Symbol im Infobereich öffnen oder beenden.': 'Open or quit it from its icon in the notification area.',
-  'Handy-Zugang': 'Phone access',
   'Die KandleOS-App auf dem Handy darf sich im Heimnetz oder über VPN mit diesem PC verbinden (verschlüsselt, nur gekoppelte Geräte). Beim ersten Einschalten fragt die Windows-Firewall nach; erlaube den Zugriff für private Netzwerke. Solange der Zugang an ist, läuft KandleOS beim Schließen des Fensters im Infobereich weiter.':
     'The KandleOS app on your phone may connect to this PC on your home network or over VPN (encrypted, paired devices only). When you first turn this on, the Windows firewall asks; allow access for private networks. While access is on, closing the window keeps KandleOS running in the notification area.',
   'In der KandleOS-App: Einstellungen → Mit PC koppeln, dann diesen Code scannen.': 'In the KandleOS app: Settings → Pair with PC, then scan this code.',
@@ -944,8 +943,8 @@ export const EN: Record<string, string> = {
     'PC not reachable, or the code has expired or was already used. Is the phone on the same Wi-Fi or in the VPN? Is a firewall on the PC (e.g. Portmaster) blocking the connection?',
   'Das ist kein KandleOS-Kopplungscode.': 'This is not a KandleOS pairing code.',
   'Mit PC koppeln': 'Pair with PC',
-  'Am PC: Einstellungen → Handy-Zugang einschalten → Handy koppeln. Dann den Code hier scannen.':
-    'On the PC: Settings → turn on Phone access → Pair a phone. Then scan the code here.',
+  'Am PC: Einstellungen → Handy koppeln → einschalten → QR-Code anzeigen. Dann den Code hier scannen.':
+    'On the PC: Settings → Pair a phone → turn on → Show QR code. Then scan the code here.',
   'Den ganzen Code mit etwas Rand in den Rahmen halten, nicht zu nah.': 'Hold the whole code inside the frame with some margin, not too close.',
   'Die App darf die Kamera nicht nutzen. In den Android-Einstellungen bei KandleOS die Kamera erlauben, oder den Code am PC kopieren und hier einfügen.':
     'The app may not use the camera. Allow the camera for KandleOS in the Android settings, or copy the code on the PC and paste it here.',
@@ -955,23 +954,24 @@ export const EN: Record<string, string> = {
     'Pairing syncs the watchlist, drawings, saved charts and alarms with KandleOS on your PC and takes over its stock data keys.',
   'erreichbar': 'reachable',
   'PC aus · zuletzt {when}': 'PC off · last seen {when}',
-  'Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter Handy-Zugang ebenfalls entfernen.':
-    'Unpair from the PC? The stock data keys taken over from the PC are deleted on the phone. Remove the device under Phone access on the PC as well.',
+  'Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter „Handy koppeln“ ebenfalls entfernen.':
+    'Unpair from the PC? The stock data keys taken over from the PC are deleted on the phone. Remove the device under “Pair a phone” on the PC as well.',
   'Entkoppeln': 'Unpair',
   'Vom PC übernommen – Kursquelle und Keys am PC ändern.': 'Taken over from the PC – change the stock source and keys there.',
   'Tab vom Handy': 'Tab from phone',
   'Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.':
     'Pair with the PC “{name}”? The watchlist, drawings and alarms will then sync with it.',
   'Mit „{name}“ gekoppelt.': 'Paired with “{name}”.',
-  'Geprüft wird, solange KandleOS läuft – mit Handy-Zugang auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.':
-    'Checked while KandleOS runs – with phone access also from the notification area. A paired phone checks on its own as well.',
+  'Geprüft wird, solange KandleOS läuft – mit Handy-Kopplung auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.':
+    'Checked while KandleOS runs – with phone pairing also from the notification area. A paired phone checks on its own as well.',
   '(Handy)': '(phone)',
   'Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.':
     'On the first sync the phone takes over the tabs from the PC. Your phone tabs with drawings are kept as saved charts “Tab from phone”.',
   'erreichbar · Abgleich fehlgeschlagen': 'reachable · sync failed',
-  'Handy-Zugang funktioniert nicht': 'Phone access is not working',
+  'Handy-Kopplung funktioniert nicht': 'Phone pairing is not working',
   'Handy findet den PC nicht? Andere Firewalls wie Portmaster, Norton oder Kaspersky blocken eingehende Verbindungen oft ohne Nachfrage. Erlaube dort KandleOS eingehende Verbindungen im Heimnetz (Port {port}).': 'Phone can\'t find the PC? Other firewalls such as Portmaster, Norton or Kaspersky often block incoming connections without asking. Allow incoming connections on your home network for KandleOS there (port {port}).',
   'Allgemein': 'General',
   'Kursdaten': 'Market data',
   'gilt nach „Speichern“': 'applies after “Save”',
+  'QR-Code anzeigen': 'Show QR code',
 }

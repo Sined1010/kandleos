@@ -79,7 +79,7 @@ configureLink({
     }),
   onError: (message) => {
     // With the window in view, the settings show the error; hidden (in the tray, started at login) only this does.
-    if (!BrowserWindow.getAllWindows()[0]?.isVisible()) notify(t('Handy-Zugang funktioniert nicht'), message)
+    if (!BrowserWindow.getAllWindows()[0]?.isVisible()) notify(t('Handy-Kopplung funktioniert nicht'), message)
     syncTray()
   }
 })

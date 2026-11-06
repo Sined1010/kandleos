@@ -29,7 +29,7 @@ export default function AlarmsModal({ symbol, onClose }: { symbol: string; onClo
         </div>
         <AlarmList
           symbol={symbol}
-          hint={t('Geprüft wird, solange KandleOS läuft – mit Handy-Zugang auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.')}
+          hint={t('Geprüft wird, solange KandleOS läuft – mit Handy-Kopplung auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.')}
         />
       </div>
     </div>

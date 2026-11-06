@@ -94,7 +94,7 @@ function PairPage({ onDone }: { onDone(): void }) {
 
   return (
     <Layer id="pair" title={t('Mit PC koppeln')} onClose={onDone}>
-      <p className="mb-3 text-muted">{t('Am PC: Einstellungen → Handy-Zugang einschalten → Handy koppeln. Dann den Code hier scannen.')}</p>
+      <p className="mb-3 text-muted">{t('Am PC: Einstellungen → Handy koppeln → einschalten → QR-Code anzeigen. Dann den Code hier scannen.')}</p>
       {camera ? (
         <>
           <div className="relative mb-2">
@@ -151,7 +151,7 @@ export default function PcLink() {
           <button
             type="button"
             className="ml-auto text-muted active:text-down"
-            onClick={() => confirm(t('Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter Handy-Zugang ebenfalls entfernen.')) && void unpair()}
+            onClick={() => confirm(t('Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter „Handy koppeln“ ebenfalls entfernen.')) && void unpair()}
           >
             {t('Entkoppeln')}
           </button>

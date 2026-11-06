@@ -65,7 +65,7 @@ export default function PhoneAccess() {
   return (
     <section aria-labelledby="phone-title">
       <h3 id="phone-title" className="settings-title settings-rule">
-        {t('Handy-Zugang')}
+        {t('Handy koppeln')}
       </h3>
       <label className="mb-1 flex cursor-pointer items-start gap-2 text-xs text-muted">
         <input
@@ -112,7 +112,7 @@ export default function PhoneAccess() {
                 })
               }
             >
-              {t('Handy koppeln')}
+              {t('QR-Code anzeigen')}
             </button>
           )}
 

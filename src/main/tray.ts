@@ -54,7 +54,7 @@ export function syncTray(): void {
       Menu.buildFromTemplate([
         { label: t('Öffnen'), click: showWindow },
         {
-          label: t('Handy-Zugang aus'),
+          label: t('Handy-Kopplung aus'),
           click: async () => {
             await setLinkEnabled(false)
             syncTray()
@@ -72,7 +72,7 @@ export function syncTray(): void {
   }
   // Port taken etc.: the icon says so, since phone access is on but not working.
   const { error } = linkStatus()
-  tray?.setToolTip(error ? `KandleOS – ${t('Handy-Zugang funktioniert nicht')}: ${error}` : 'KandleOS')
+  tray?.setToolTip(error ? `KandleOS – ${t('Handy-Kopplung funktioniert nicht')}: ${error}` : 'KandleOS')
 }
 
 /** Closing hides (or minimizes) the window while phone access is on. */
