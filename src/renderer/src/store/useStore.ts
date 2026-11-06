@@ -282,7 +282,7 @@ export const useStore = create<State>()(
       setRange: (range) => set((s) => syncTab(s, { range, timeframe: rangeById(range).tf })),
       extendedHours: false,
       toggleExtendedHours: () => set((s) => ({ extendedHours: !s.extendedHours })),
-      forecastView: { style: 'line', band50: true, band80: true, band90: true, hover: true },
+      forecastView: { style: 'candles', band50: true, band80: true, band90: true, hover: true },
       setForecastView: (patch) => set((s) => ({ forecastView: { ...s.forecastView, ...patch } })),
       forecastRun: { horizon: 'auto', backtestRuns: 30, calibrate: false, autoUpdate: false, archive: true },
       setForecastRun: (patch) => set((s) => ({ forecastRun: { ...s.forecastRun, ...patch } })),
@@ -403,8 +403,8 @@ export const useStore = create<State>()(
     }),
     {
       name: 'kandleos',
-      // v6: alarms; v7: sync bookkeeping (both filled in by merge, nothing to convert).
-      version: 7,
+      // v6: alarms; v7: sync bookkeeping (both filled in by merge, nothing to convert); v8: candles as the forecast view.
+      version: 8,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
         const p = persisted as Record<string, unknown>
@@ -436,6 +436,11 @@ export const useStore = create<State>()(
         if (version < 5) {
           const run = p.forecastRun as Partial<ForecastRun> | undefined
           if (run && [3, 5, 10].includes(run.backtestRuns as number)) run.backtestRuns = 30
+        }
+        // Candles became the default view in v8; the old default 'line' switches over once, a later choice stays.
+        if (version < 8) {
+          const view = p.forecastView as Partial<ForecastView> | undefined
+          if (view?.style === 'line') view.style = 'candles'
         }
         return p as unknown as State
       },
