@@ -382,19 +382,20 @@ async function yahooQuote(symbol: string): Promise<Quote> {
   return quote
 }
 
-export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Record<string, Quote>> {
+/** Latest prices; `error` says why Alpaca sent none (key rejected, offline), for the source badge. */
+export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<{ quotes: Record<string, Quote>; error: string | null }> {
   const out: Record<string, Quote> = {}
-  if (!Array.isArray(symbols)) return out
+  let error: string | null = null
+  if (!Array.isArray(symbols)) return { quotes: out, error }
   const alpaca = symbols.filter((s) => typeof s === 'string' && SYMBOL_RE.test(s) && viaAlpaca(s))
   // shortcut: with the Yahoo extra its symbols are polled at Alpaca's 5 s pace; throttle here if Yahoo starts refusing.
   const yahoo = yahooOn() ? symbols.filter((s) => !alpaca.includes(s)) : []
-  if (!yahoo.length) return alpaca.length ? alpacaQuotes(alpaca) : out
   await Promise.all([
     // One failing source must not drop the other's prices.
     alpaca.length &&
       alpacaQuotes(alpaca).then(
         (q) => Object.assign(out, q),
-        (e) => console.warn((e as Error).message)
+        (e) => void (error = (e as Error).name === 'TimeoutError' ? t('Alpaca nicht erreichbar') : (e as Error).message)
       ),
     ...yahoo.map(async (s) => {
       try {
@@ -408,7 +409,7 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<Re
       }
     })
   ])
-  return out
+  return { quotes: out, error }
 }
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)

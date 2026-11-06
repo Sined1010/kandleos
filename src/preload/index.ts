@@ -33,7 +33,7 @@ const api = {
    */
   stockCandles: (symbol: string, tf: Timeframe, key: string, extended = false, older?: OlderRequest): Promise<CandleData> =>
     ipcRenderer.invoke('stocks:candles', symbol, tf, key, extended, older),
-  stockQuotes: (symbols: string[], key: string): Promise<Record<string, Quote>> =>
+  stockQuotes: (symbols: string[], key: string): Promise<{ quotes: Record<string, Quote>; error: string | null }> =>
     ipcRenderer.invoke('stocks:quotes', symbols, key),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),

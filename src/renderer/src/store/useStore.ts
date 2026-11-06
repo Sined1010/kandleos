@@ -526,10 +526,13 @@ export const useStore = create<State>()(
 )
 
 /** Live quotes change several times per second, so they live outside the persisted store. */
-export const useQuotes = create<{ quotes: Record<string, Quote>; feed: FeedStatus }>(() => ({
+/** stockError: why the stock source (Alpaca) sent no prices on the last poll, else null. */
+export const useQuotes = create<{ quotes: Record<string, Quote>; feed: FeedStatus; stockError: string | null }>(() => ({
   quotes: {},
-  feed: { state: 'off' }
+  feed: { state: 'off' },
+  stockError: null
 }))
+export const setStockError = (stockError: string | null): void => useQuotes.setState({ stockError })
 export const setFeedStatus = (feed: FeedStatus): void => useQuotes.setState({ feed })
 // Finnhub ticks name no exchange; keep the time zone an earlier Yahoo quote reported.
 export const setQuote = (symbol: string, q: Quote): void =>

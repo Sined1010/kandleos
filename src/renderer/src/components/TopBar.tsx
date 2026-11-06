@@ -147,7 +147,7 @@ export function TimeframePicker() {
   )
 }
 
-/** The badge always names the stock source; with a Finnhub key its connection follows. */
+/** The badge always names the stock source (red with the reason when Alpaca sends nothing); with a Finnhub key its connection follows. */
 const SOURCE: Record<StockSource, [dot: string, label: string, hint: string]> = {
   alpaca: ['bg-up', msg('Alpaca · IEX'), msg('Aktienkurse über Alpaca: Echtzeit von der Börse IEX, alle 5 s. Klicken für die Einstellungen.')],
   yahoo: ['bg-muted', msg('Yahoo · verzögert'), msg('Aktienkurse alle 15 s über Yahoo Finance (nur für private Zwecke). Klicken für die Einstellungen.')],
@@ -165,11 +165,14 @@ const FEED: Record<Exclude<FeedStatus['state'], 'off'>, [dot: string, label: str
 function FeedBadge({ onClick }: { onClick: () => void }) {
   const feed = useQuotes((s) => s.feed)
   const source = useStore((s) => s.stockSource) ?? 'none'
+  const stockError = useQuotes((s) => (source === 'alpaca' ? s.stockError : null))
   const yahooExtra = useStore((s) => s.yahooExtra)
-  const [dot, label, hint] = SOURCE[source]
+  const [okDot, label, hint] = SOURCE[source]
+  const dot = stockError ? 'bg-down' : okDot
   const finnhub = feed.state === 'off' ? null : FEED[feed.state]
   const details = [
     t(hint),
+    stockError,
     yahooExtra && t('Indizes, Rohstoffe und Börsen außerhalb der USA über Yahoo Finance (nur für private Zwecke).'),
     finnhub && t(finnhub[2]),
     feed.detail,
@@ -187,6 +190,7 @@ function FeedBadge({ onClick }: { onClick: () => void }) {
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden />
       {t(label)}
       {yahooExtra && ' + Yahoo'}
+      {stockError && <span className="ml-1 text-down">({stockError})</span>}
       {finnhub && (
         <>
           <span className={`ml-2 h-2 w-2 rounded-full ${finnhub[0]}`} aria-hidden />

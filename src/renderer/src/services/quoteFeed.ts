@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { watchQuotes } from './marketData'
-import { setFeedStatus, setQuote, useStore } from '../store/useStore'
+import { setFeedStatus, setQuote, setStockError, useStore } from '../store/useStore'
 
 /** Live prices for the watchlist and the chart symbol (desktop App and phone MobileApp). */
 export function useQuoteFeed(): void {
@@ -16,9 +16,10 @@ export function useQuoteFeed(): void {
   // keeps the Finnhub and Binance connections open instead of reconnecting.
   const feed = [...new Set([...folders.flatMap((f) => f.symbols), symbol, ...(alarmSymbols ? alarmSymbols.split(',') : [])])].sort().join(',')
 
-  useEffect(
-    () => watchQuotes(feed.split(','), finnhubKey, stockSource, setQuote, setFeedStatus),
+  useEffect(() => {
+    // A new source starts without the old error; the next poll tells.
+    setStockError(null)
+    return watchQuotes(feed.split(','), finnhubKey, stockSource, setQuote, setFeedStatus, setStockError)
     // yahooExtra: main routes by it, so the first poll after switching must see it.
-    [feed, finnhubKey, stockSource, yahooExtra]
-  )
+  }, [feed, finnhubKey, stockSource, yahooExtra])
 }

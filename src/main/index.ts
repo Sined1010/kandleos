@@ -274,6 +274,9 @@ else {
     // The one exception is fullscreen, for the chart's fullscreen mode.
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'fullscreen'))
     session.defaultSession.setPermissionCheckHandler(() => false)
+    // Started from source the process is electron.exe, whose icon Windows puts on the taskbar button; with an
+    // own app id the button takes the window's icon. The installed KandleOS.exe carries its icon itself.
+    if (process.platform === 'win32' && !app.isPackaged) app.setAppUserModelId('KandleOS.Source')
     createWindow()
     resumeLink()
     syncTray()

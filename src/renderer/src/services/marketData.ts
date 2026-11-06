@@ -14,6 +14,7 @@ import {
   type StockSource,
   type Timeframe
 } from '../../../shared/types'
+import { ipcError } from '../lib/format'
 
 const BINANCE = 'https://api.binance.com/api/v3'
 const BINANCE_WS = 'wss://stream.binance.com:9443'
@@ -172,14 +173,15 @@ export interface FeedStatus {
 /**
  * Live quotes: Binance ticker for crypto; for stocks polling of the chosen source via IPC (Alpaca every 5 s,
  * its free real-time IEX prices; Yahoo every 15 s), plus Finnhub trades with a valid key.
- * `onStatus` reports the Finnhub connection for the status badge.
+ * `onStatus` reports the Finnhub connection, `onStockError` why the stock source sent nothing, for the status badge.
  */
 export function watchQuotes(
   symbols: string[],
   finnhubKey: string,
   source: StockSource | null,
   onQuote: (s: string, q: Quote) => void,
-  onStatus: (s: FeedStatus) => void
+  onStatus: (s: FeedStatus) => void,
+  onStockError: (e: string | null) => void
 ): () => void {
   const crypto = symbols.filter(isCrypto)
   // Without a stock source there are no stock prices; Finnhub trades need a polled quote to build on.
@@ -217,14 +219,15 @@ export function watchQuotes(
     window.api
       // A rejected key is not sent again, so quotes come straight from the chosen source.
       .stockQuotes(list, error ? '' : finnhubKey)
-      .then((quotes) => {
+      .then(({ quotes, error: sourceError }) => {
         if (!active) return
+        onStockError(sourceError)
         for (const [s, q] of Object.entries(quotes)) {
           polled[s] = q
           onQuote(s, q)
         }
       })
-      .catch((e) => console.warn('Aktienkurse:', e))
+      .catch((e) => active && onStockError(ipcError(e)))
   const startPolling = (list = stocks) => {
     if (!list.length) return
     const id = setInterval(() => poll(list), source === 'alpaca' ? 5_000 : 15_000)
