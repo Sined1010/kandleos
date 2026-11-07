@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, GripVertical, ListChecks, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { t } from '../shared/i18n'
 import { isCrypto } from '../shared/types'
@@ -22,6 +22,7 @@ type Drop = { folder: string; before: string | null }
 /** The watchlist as a sheet below the chart, with the search on top (layout C). */
 export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; onPos(p: SheetPos): void; extraItems?: (symbol: string) => ActionItem[] }) {
   const folders = useStore((s) => s.folders)
+  const count = new Set(folders.flatMap((f) => f.symbols)).size
   // Actions and values read when a menu opens; the lists below subscribe on their own.
   const s = useStore.getState()
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -149,10 +150,25 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
               onPick={picked}
               inputClassName="w-full rounded-xl bg-bg px-3 py-2.5 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
             />
-            {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. */}
-            <p className="flex items-center gap-1.5 px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-              <ListChecks size={14} aria-hidden /> Watchlist
-            </p>
+            {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. Not a
+                <button>: the sheet's head is dragged from here and a tap on it opens or folds the sheet (Sheet.tsx). */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={pos !== 'low'}
+              // Touches toggle through the sheet's own tap (Sheet.tsx); keyboard and TalkBack clicks come without a pointer (detail 0).
+              onClick={(e) => e.detail === 0 && onPos(pos === 'low' ? 'half' : 'low')}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return
+                e.preventDefault()
+                onPos(pos === 'low' ? 'half' : 'low')
+              }}
+              className="flex min-h-8 w-fit items-center gap-1.5 px-1 pt-0.5 text-sm font-bold text-white"
+            >
+              Watchlist
+              {pos === 'low' ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
+              <span className="text-xs font-medium text-muted">{count === 1 ? t('{n} Wert', { n: count }) : t('{n} Werte', { n: count })}</span>
+            </div>
           </div>
         }
       >

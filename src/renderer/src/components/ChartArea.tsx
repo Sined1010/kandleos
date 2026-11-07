@@ -16,6 +16,7 @@ import {
 } from 'lightweight-charts'
 import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
 import { HISTORY_LIMIT, mayLoadOlder, OLDER_RETRY_MS, prependOlder } from '../../../shared/history'
@@ -43,7 +44,9 @@ import { sessionLine } from '../lib/sessionLine'
 import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
 import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
+import MobileKiButton from '../../../mobile/MobileKiButton'
 import { useBack } from '../../../mobile/useBack'
+import { metaFor, useChartMeta } from '../store/chartMeta'
 import { useQuotes, useStore } from '../store/useStore'
 import AgentsPanel from './AgentsPanel'
 import ForecastQuality from './ForecastQuality'
@@ -124,10 +127,10 @@ export default function ChartArea() {
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
   const [legend, setLegend] = useState<LegendGroup[]>([])
   const [status, setStatus] = useState<string | null>(null)
-  const [currency, setCurrency] = useState('')
-  // Exchange time zone of the loaded symbol; the forecast's time axis follows that exchange's calendar.
+  // Currency and exchange time zone of the loaded candles; the phone's header reads them too. The forecast's time
+  // axis follows that exchange's calendar.
+  const { currency, timeZone: exchangeZone } = metaFor(useChartMeta(), symbol)
   const timezoneRef = useRef<string | undefined>(undefined)
-  const [exchangeZone, setExchangeZone] = useState<string | undefined>()
   const [fc, setFc] = useState<{
     state: 'idle' | 'loading' | 'shown' | 'error'
     pct?: number
@@ -148,6 +151,11 @@ export default function ChartArea() {
   useBack('agents', agentsOpen, () => setAgentsOpen(false))
   useBack('quality', qualityOpen, () => setQualityOpen(false))
   const pcOff = usePcStatus((s) => IS_MOBILE && s.state !== 'online')
+  // The phone header's cell for the forecast button; the header is drawn before the chart.
+  const [kiSlot, setKiSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (IS_MOBILE) setKiSlot(document.getElementById('mobile-ki'))
+  }, [])
   const [agentsSetup, setAgentsSetup] = useState(false)
   const [agentLevels, setAgentLevels] = useState<Decision | null>(null)
   // Bumped whenever a forecast becomes stale, so a late result is dropped instead of drawn on the wrong chart.
@@ -245,8 +253,7 @@ export default function ChartArea() {
     // Dragging a price axis turns its auto-scale off; a new symbol or candle size would keep the old price range.
     api.chart.panes().forEach((p) => p.priceScale('right').applyOptions({ autoScale: true }))
     setStatus(t('Lade {symbol} …', { symbol }))
-    setCurrency('')
-    setExchangeZone(undefined)
+    useChartMeta.setState({ symbol, currency: '', timeZone: undefined })
 
     const push = (bar: Candle) => {
       const arr = dataRef.current
@@ -280,9 +287,8 @@ export default function ChartArea() {
         const shownFrom = showRange(bars, useStore.getState().range)
         dataRef.current = bars
         setData([...bars])
-        setCurrency(currency)
         timezoneRef.current = timezone
-        setExchangeZone(timezone)
+        useChartMeta.setState({ symbol, currency, timeZone: timezone })
         setStatus(null)
         older.current.provider = provider
         if (!fresh) return
@@ -838,6 +844,15 @@ export default function ChartArea() {
           ? t('Lade Modell {pct} %', { pct: fc.pct })
           : t('Rechne …')
         : t('KI-Prognose')
+  const settingsMenu = fcMenu && (
+    <ForecastSettings
+      onClose={() => setFcMenu(false)}
+      onOpenAnalysis={() => {
+        setQualityOpen(false)
+        setAgentsOpen(true)
+      }}
+    />
+  )
   const summary = fc.result && (
     <ForecastSummary
       result={fc.result}
@@ -886,15 +901,20 @@ export default function ChartArea() {
         <div
           className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
-          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 90 : fc.result ? 547 : 215) }}
+          style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 12 : fc.result ? 547 : 215) }}
         >
-          {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them. */}
+          {/* One flex row, centred: the chips differ in content (icons, dots), so baseline alignment would stagger them.
+              The phone shows symbol, price and market state in its header instead. */}
           <div className="flex flex-wrap items-center gap-2">
-            <span>
-              <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
-            </span>
-            <QuoteChip quote={quote} />
-            <MarketBadge symbol={symbol} timeZone={exchangeZone} />
+            {!IS_MOBILE && (
+              <>
+                <span>
+                  <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
+                </span>
+                <QuoteChip quote={quote} />
+                <MarketBadge symbol={symbol} timeZone={exchangeZone} />
+              </>
+            )}
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}
           </div>
           {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main />}
@@ -912,12 +932,13 @@ export default function ChartArea() {
             {summary}
           </div>
         )}
+        {!IS_MOBILE && (
         <div
           className="absolute top-2 z-30 flex items-start gap-2"
           style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + 12 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {!IS_MOBILE && summary}
+          {summary}
           <div className="relative flex">
             <button
               onClick={toggleForecast}
@@ -941,9 +962,7 @@ export default function ChartArea() {
               } ${fc.state === 'loading' ? 'animate-pulse disabled:cursor-wait disabled:opacity-90' : 'disabled:cursor-not-allowed'} ${pcOff && fc.state !== 'shown' ? 'opacity-40 grayscale' : ''}`}
             >
               {fc.state === 'shown' ? <X size={15} /> : <Sparkles size={15} className="text-amber-200" />}
-              {/* The phone shows only the symbol (the feature is known from the PC it is paired with), and the
-                  model download as a bare percentage. */}
-              {IS_MOBILE ? fc.state === 'loading' && fc.pct !== undefined && fc.pct < 100 && `${fc.pct} %` : fcLabel}
+              {fcLabel}
             </button>
             <button
               onClick={() => setFcMenu((o) => !o)}
@@ -959,17 +978,25 @@ export default function ChartArea() {
             >
               <SlidersHorizontal size={15} />
             </button>
-            {fcMenu && (
-              <ForecastSettings
-                onClose={() => setFcMenu(false)}
-                onOpenAnalysis={() => {
-                  setQualityOpen(false)
-                  setAgentsOpen(true)
-                }}
-              />
-            )}
+            {settingsMenu}
           </div>
         </div>
+        )}
+        {/* The phone shows the forecast button in its header (src/mobile/MobileHeader.tsx), not over the chart. */}
+        {IS_MOBILE &&
+          kiSlot &&
+          createPortal(
+            <MobileKiButton
+              state={fc.state}
+              pct={fc.pct}
+              disabled={data.length < FORECAST_MIN_BARS}
+              pcOff={pcOff}
+              onToggle={() => void toggleForecast()}
+              onSettings={() => setFcMenu(true)}
+              settings={settingsMenu}
+            />,
+            kiSlot
+          )}
         {fc.result && fcHover && (
           <ForecastTip
             result={fc.result}
@@ -1013,7 +1040,8 @@ export default function ChartArea() {
         />
       </div>
       {agentsSetup && <AgentsSetup onClose={() => setAgentsSetup(false)} />}
-      <div className="flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
+      {/* mobile-ranges: hidden in the phone's full screen (mobile.css). */}
+      <div className="mobile-ranges flex h-8 shrink-0 items-center border-t border-line bg-panel px-2">
         <div className="flex gap-0.5 overflow-x-auto" role="group" aria-label={t('Zeitraum')}>
           {RANGES.map((r) => (
             <button

@@ -1,4 +1,6 @@
+import { X } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { t } from '../shared/i18n'
 import { useBack } from './useBack'
 
 export interface ActionItem {
@@ -6,6 +8,8 @@ export interface ActionItem {
   danger?: boolean
   disabled?: boolean
   onPick(): void
+  /** Shows an × at the end of the item (e.g. closing a tab); the menu stays open, its items follow the change. */
+  onRemove?(): void
 }
 
 /** A menu sliding up from the bottom: the phone's stand-in for right-click menus. Swiping it down closes it. */
@@ -52,21 +56,31 @@ export default function ActionMenu({ title, items, onClose }: { title: string; i
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-brand opacity-60" />
         <p className="truncate px-5 pb-2 text-xs uppercase tracking-wider text-muted">{title}</p>
-        {items.map((item) => (
-          <button
-            key={item.label}
-            role="menuitem"
-            disabled={item.disabled}
-            onClick={() => {
-              onClose()
-              item.onPick()
-            }}
-            className={`flex min-h-12 w-full items-center px-5 text-left text-base active:bg-bg disabled:opacity-40 ${
-              item.danger ? 'text-down' : 'text-white'
-            }`}
-          >
-            {item.label}
-          </button>
+        {items.map((item, i) => (
+          <div key={`${i}:${item.label}`} className="flex items-center">
+            <button
+              role="menuitem"
+              disabled={item.disabled}
+              onClick={() => {
+                onClose()
+                item.onPick()
+              }}
+              className={`flex min-h-12 min-w-0 flex-1 items-center px-5 text-left text-base active:bg-bg disabled:opacity-40 ${
+                item.danger ? 'text-down' : 'text-white'
+              }`}
+            >
+              <span className="truncate">{item.label}</span>
+            </button>
+            {item.onRemove && (
+              <button
+                onClick={() => item.onRemove!()}
+                aria-label={t('{name} schließen', { name: item.label })}
+                className="mr-2 flex h-12 w-12 shrink-0 items-center justify-center text-muted active:bg-bg active:text-white"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>

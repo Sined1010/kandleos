@@ -1,4 +1,3 @@
-import { Check, MoreVertical, Pencil, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { t } from '../shared/i18n'
 import AboutModal from '../renderer/src/components/AboutModal'
@@ -7,9 +6,7 @@ import { SaveDialog, SavedChartsPanel } from '../renderer/src/components/SavedCh
 import { isCrypto } from '../shared/types'
 import ChartArea from '../renderer/src/components/ChartArea'
 import ChartBoundary from '../renderer/src/components/ChartBoundary'
-import ChartTabs from '../renderer/src/components/ChartTabs'
 import SettingsModal from '../renderer/src/components/SettingsModal'
-import { IndicatorMenu, TimeframePicker } from '../renderer/src/components/TopBar'
 import WelcomeModal from '../renderer/src/components/WelcomeModal'
 import { useQuoteFeed } from '../renderer/src/services/quoteFeed'
 import { useStore } from '../renderer/src/store/useStore'
@@ -21,6 +18,8 @@ import PcLink from './PcLink'
 import DrawTools from './DrawTools'
 import Layer from './Layer'
 import Licenses from './Licenses'
+import MobileHeader, { FullscreenBar } from './MobileHeader'
+import { setFullscreen } from './statusBar'
 import { shareChart } from './share'
 import type { SheetPos } from './sheetSnap'
 import { useBack } from './useBack'
@@ -33,11 +32,11 @@ export default function MobileApp() {
   const disclaimerAccepted = useStore((s) => s.disclaimerAccepted)
   const stockSource = useStore((s) => s.stockSource)
   const [menu, setMenu] = useState(false)
-  const [indicators, setIndicators] = useState(false)
   const [settings, setSettings] = useState(false)
   const [about, setAbout] = useState(false)
   const [sheet, setSheet] = useState<SheetPos>('low')
   const [drawing, setDrawing] = useState(false)
+  const [full, setFull] = useState(false)
   const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | null>(null)
   const [alarmFor, setAlarmFor] = useState<string | null>(null)
   useEffect(() => startAlarmWatch(), [])
@@ -63,50 +62,29 @@ export default function MobileApp() {
   }
   useQuoteFeed()
   useBack('draw', drawing, endDrawing)
-  useBack('indicators', indicators, () => setIndicators(false))
   useBack('settings', settings, () => setSettings(false))
   useBack('about', about, () => setAbout(false))
+  useBack('fullscreen', full, () => setFull(false))
+  useEffect(() => setFullscreen(full), [full])
 
   return (
-    <div key={language} className="mobile-app flex h-dvh flex-col bg-bg text-sm text-slate-300">
-      <header className="mobile-chrome flex shrink-0 flex-col bg-panel">
-        <div className="flex items-center gap-1 px-2 pt-1">
-          <div className="min-w-0 flex-1 overflow-x-auto">
-            <TimeframePicker />
-          </div>
-          <div className="relative">
-            <button onClick={() => setIndicators((o) => !o)} aria-label={t('Indikatoren')} className="mobile-icon">
-              <SlidersHorizontal size={18} />
-            </button>
-            {indicators && (
-              <div className="fixed inset-x-2 top-24 z-40">
-                <IndicatorMenu onClose={() => setIndicators(false)} />
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => (drawing ? endDrawing() : (setDrawing(true), setSheet('low')))}
-            aria-label={drawing ? t('Zeichnen beenden') : t('Zeichnen')}
-            aria-pressed={drawing}
-            className={`mobile-icon ${drawing ? 'bg-brand text-white' : ''}`}
-          >
-            {drawing ? <Check size={18} /> : <Pencil size={18} />}
-          </button>
-          {/* Only while paired: green = PC reachable, grey = PC off (tap for details in the settings). */}
-          {pc.state !== 'none' && (
-            <button
-              onClick={() => setSettings(true)}
-              aria-label={pc.state === 'online' ? t('PC erreichbar') : t('PC aus')}
-              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${pc.state === 'online' ? 'text-up ring-up/60' : 'text-muted ring-line'}`}
-            >
-              PC
-            </button>
-          )}
-          <button onClick={() => setMenu(true)} aria-label={t('Mehr')} className="mobile-icon">
-            <MoreVertical size={18} />
-          </button>
-        </div>
-        <ChartTabs />
+    <div key={language} className={`mobile-app flex h-dvh flex-col bg-bg text-sm text-slate-300 ${full ? 'mobile-full' : ''}`}>
+      <header className="mobile-chrome flex shrink-0 flex-col border-b border-line bg-panel">
+        <MobileHeader
+          drawing={drawing}
+          onDraw={() => (drawing ? endDrawing() : (setDrawing(true), setSheet('low')))}
+          onMenu={() => setMenu(true)}
+          onPc={() => setSettings(true)}
+          onAlarm={() => {
+            setAlarmFor(symbol)
+            setPage('alarms')
+          }}
+          onFull={() => {
+            // Full screen is for looking; drawing goes on outside it.
+            if (drawing) endDrawing()
+            setFull(true)
+          }}
+        />
       </header>
       {/* The low sheet (grip + search) and the drawing tools both cover the bottom 96 px; the chart ends above
           them and keeps its size when drawing starts. */}
@@ -133,6 +111,7 @@ export default function MobileApp() {
           ]}
         />
       </div>
+      {full && <FullscreenBar onExit={() => setFull(false)} />}
       {menu && (
         <ActionMenu
           title="KandleOS"

@@ -152,6 +152,9 @@ interface State {
   /** Whether the disclaimer shown on first start has been confirmed. */
   disclaimerAccepted: boolean
   acceptDisclaimer: () => void
+  /** The phone's one-time hint that a long press on the tab button lists all tabs. */
+  tabHintSeen: boolean
+  setTabHintSeen: () => void
   /** Ask GitHub once a day for a newer release; off unless the user turns it on. */
   updateCheck: boolean
   /** Newest release found by the last check (automatic or clicked), and when the automatic one last succeeded. */
@@ -257,6 +260,8 @@ export const useStore = create<State>()(
         set({ stockSource, yahooExtra: stockSource === 'alpaca' && yahooExtra }),
       disclaimerAccepted: false,
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
+      tabHintSeen: false,
+      setTabHintSeen: () => set({ tabHintSeen: true }),
       updateCheck: false,
       updateLatest: null,
       updateCheckedAt: 0,
@@ -496,6 +501,7 @@ export const useStore = create<State>()(
         stockSource,
         yahooExtra,
         disclaimerAccepted,
+        tabHintSeen,
         updateCheck,
         updateLatest,
         updateCheckedAt
@@ -512,6 +518,7 @@ export const useStore = create<State>()(
         forecastView,
         forecastRun,
         disclaimerAccepted,
+        tabHintSeen,
         names,
         symbol,
         timeframe,

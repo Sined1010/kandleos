@@ -54,6 +54,14 @@ textarea {
     margin-bottom: 0 !important;
   }
 }
+/* Full screen (the header's button): the chart alone, like landscape, and without the range bar. */
+.mobile-full .mobile-chrome,
+.mobile-full .mobile-ranges {
+  display: none !important;
+}
+.mobile-full main {
+  margin-bottom: 0 !important;
+}
 /* Start window and settings as phone pages (PAGE in lib/platform.ts): readable text, finger-sized controls. */
 .mobile-page .text-xs {
   font-size: 0.875rem;

@@ -90,7 +90,7 @@ export default function Sheet({ pos, onPos, head, children }: { pos: SheetPos; o
         }}
         {...follow}
       >
-        <div className="mx-auto mb-1 mt-2 h-1 w-10 rounded-full bg-brand opacity-60" />
+        <div className="mx-auto mb-1 mt-2 h-[5px] w-14 rounded-full bg-brand shadow-[0_0_10px_-2px_var(--color-brand-to)]" />
         {head}
       </div>
       <div

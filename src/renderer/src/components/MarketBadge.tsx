@@ -66,18 +66,18 @@ function describe(symbol: string, timeZone: string | undefined) {
 }
 
 /** Open/closed badge for the chart legend; `timeZone` is the exchange zone reported with the candles. */
-export default function MarketBadge({ symbol, timeZone }: { symbol: string; timeZone?: string }) {
+export default function MarketBadge({ symbol, timeZone, plain }: { symbol: string; timeZone?: string; plain?: boolean }) {
   useTick()
   const d = describe(symbol, timeZone)
   if (!d) return null
   return (
     <span
       title={d.title}
-      className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md bg-line px-1.5 py-0.5 font-medium text-slate-200"
+      className={`pointer-events-auto inline-flex items-center gap-1.5 font-medium text-slate-200 ${plain ? 'min-w-0' : 'rounded-md bg-line px-1.5 py-0.5'}`}
     >
       <span className={`h-2 w-2 rounded-full ${d.dot}`} aria-hidden />
       {d.label}
-      {d.detail && <span className="font-normal text-muted">· {d.detail}</span>}
+      {d.detail && <span className={`font-normal text-muted ${plain ? 'truncate' : ''}`}>· {d.detail}</span>}
     </span>
   )
 }
