@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { forecastCandles, probabilityAbove, Q, trend, type BacktestResult } from '../../../shared/forecast'
 import { locale, msg, t } from '../../../shared/i18n'
+import { ask } from '../../../mobile/MessageBox'
 import { formatPrice } from '../lib/format'
 import { IS_MOBILE } from '../lib/platform'
 import { useStore, type ForecastView } from '../store/useStore'
@@ -549,8 +550,8 @@ export function ForecastSettings({ onClose, onOpenAnalysis }: { onClose: () => v
         </label>
         {/* The archive lives on the PC; clearing it stays there. */}
         {!IS_MOBILE && <button
-          onClick={() => {
-            if (confirm(t('Alle archivierten Prognosen und die Bilanz löschen?'))) void window.api.archive.clear()
+          onClick={async () => {
+            if (await ask(t('Alle archivierten Prognosen und die Bilanz löschen?'), t('Löschen'), { danger: true })) void window.api.archive.clear()
           }}
           className="ml-6 rounded px-1 py-0.5 text-[11px] text-muted underline-offset-2 hover:text-white hover:underline"
         >

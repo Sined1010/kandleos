@@ -22,6 +22,7 @@ import AlarmsModal from './AlarmsModal'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
+import { ask } from '../../../mobile/MessageBox'
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
 /** Marks drags that started on a watchlist symbol. */
@@ -33,13 +34,14 @@ const DRAG_TYPE = 'application/x-kandleos-symbol'
 type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number; rename: () => void }
 type MenuItem = { label: string; run?: () => void; reason?: string; danger?: boolean }
 
-const deleteFolder = (f: Folder) =>
-  (!f.symbols.length || confirm(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }))) &&
+const deleteFolder = async (f: Folder) => {
+  if (f.symbols.length && !(await ask(t('Ordner „{name}“ mit {count} Symbolen löschen?', { name: f.name, count: f.symbols.length }), t('Löschen'), { danger: true }))) return
   useStore.getState().removeFolder(f.id)
+}
 
-const removeSymbol = (folderId: string, symbol: string) => {
+const removeSymbol = async (folderId: string, symbol: string) => {
   const { names, removeFromFolder } = useStore.getState()
-  if (confirm(t('„{name}“ aus der Watchlist löschen?', { name: names[symbol] ?? symbol }))) removeFromFolder(folderId, symbol)
+  if (await ask(t('„{name}“ aus der Watchlist löschen?', { name: names[symbol] ?? symbol }), t('Löschen'), { danger: true })) removeFromFolder(folderId, symbol)
 }
 
 /** Folder menu shared by the list heading, the open folder's bar and the folder tile; only the first entry differs. */

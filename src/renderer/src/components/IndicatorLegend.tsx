@@ -43,16 +43,19 @@ export default function IndicatorLegend({ chart, groups, fmt, main }: Props) {
 
   const row = (g: LegendGroup) => (
     // Semi-opaque background so drawings and lines running under the label do not make it unreadable.
-    <div key={g.label} className="flex items-center gap-1.5 whitespace-nowrap rounded bg-bg/70 px-1">
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: g.color }} />
-      <span className="text-slate-300">{g.label}</span>
+    // Wraps between its values when narrow (phone, large font) instead of running into the price axis.
+    <div key={g.label} className="flex min-w-0 flex-wrap items-center gap-x-1.5 rounded bg-bg/70 px-1">
+      <span className="flex items-center gap-1.5 whitespace-nowrap">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: g.color }} />
+        <span className="text-slate-300">{g.label}</span>
+      </span>
       {g.series.map((s, i) => {
         const p = ((hover ? hover.get(s) : s.dataByIndex(Number.MAX_SAFE_INTEGER, MismatchDirection.NearestLeft)) ?? {}) as Point
         if (p.value === undefined) return null
         // Supertrend hides the jump at a trend flip with a transparent point; the value still needs a colour.
         const color = p.color && p.color !== 'transparent' ? p.color : (s.options() as { color?: string }).color
         return (
-          <span key={i} className="tabular-nums" style={{ color }}>
+          <span key={i} className="whitespace-nowrap tabular-nums" style={{ color }}>
             {g.osc ? p.value.toFixed(1) : fmt(p.value)}
           </span>
         )
@@ -72,7 +75,7 @@ export default function IndicatorLegend({ chart, groups, fmt, main }: Props) {
     return (
       i > 0 &&
       rows.length > 0 && (
-        <div key={i} className="pointer-events-none absolute left-3 z-10 flex flex-wrap gap-x-3 text-xs" style={{ top: y + 4 }}>
+        <div key={i} className="pointer-events-none absolute left-3 z-10 flex flex-wrap gap-x-3 text-xs" style={{ top: y + 4, right: chart.priceScale('right').width() + 12 }}>
           {rows.map(row)}
         </div>
       )

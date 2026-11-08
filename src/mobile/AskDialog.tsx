@@ -44,14 +44,14 @@ export default function AskDialog({ ask, onClose }: { ask: Ask; onClose(): void 
           enterKeyHint="done"
           className="w-full rounded-xl bg-bg px-3 py-3 text-base text-white outline-none ring-1 ring-line focus:ring-accent"
         />
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="h-11 rounded-xl px-4 text-base text-muted active:bg-line">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={onClose} className="min-h-11 rounded-xl px-4 py-2 text-base leading-tight text-muted active:bg-line">
             {t('Abbrechen')}
           </button>
           <button
             type="submit"
             disabled={!name && !ask.allowEmpty}
-            className="h-11 rounded-xl bg-brand px-5 text-base font-medium text-white shadow-glow disabled:opacity-40 disabled:shadow-none"
+            className="min-h-11 rounded-xl bg-brand px-5 py-2 text-base font-medium leading-tight text-white shadow-glow disabled:opacity-40 disabled:shadow-none"
           >
             {ask.ok}
           </button>

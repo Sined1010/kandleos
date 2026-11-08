@@ -158,7 +158,7 @@ export default function StockSourcePicker({ form }: { form: Form }) {
           />
           <span>
             <span className="font-medium text-white">{title}</span>
-            {badge && <span className="ml-2 rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">{badge}</span>}
+            {badge && <span className="ml-2 inline-block whitespace-nowrap rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">{badge}</span>}
             <span className="mt-0.5 block text-muted">{text}</span>
           </span>
         </label>

@@ -23,6 +23,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import { msg, t } from '../../../shared/i18n'
+import { ask } from '../../../mobile/MessageBox'
 import { drawingsKey, useStore, type Tool } from '../store/useStore'
 
 export const TOOLS: [Tool, LucideIcon, string][] = [
@@ -88,7 +89,7 @@ export default function DrawingToolbar() {
         </button>
       )}
       <button
-        onClick={() => count && confirm(t('Alle {count} Zeichnungen für {symbol} löschen?', { count, symbol })) && clearDrawings()}
+        onClick={async () => count && (await ask(t('Alle {count} Zeichnungen für {symbol} löschen?', { count, symbol }), t('Löschen'), { danger: true })) && clearDrawings()}
         disabled={!count}
         title={t('Alle Zeichnungen für {symbol} löschen', { symbol })}
         aria-label={t('Alle Zeichnungen löschen')}

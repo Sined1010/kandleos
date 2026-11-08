@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LinkStatus } from '../../../main/link'
 import { t } from '../../../shared/i18n'
+import { ask } from '../../../mobile/MessageBox'
 import { ipcError } from '../lib/format'
 import { forgetPartner } from '../services/sync'
 import PairWizard from './PairWizard'
@@ -65,8 +66,8 @@ export default function PhoneAccess() {
               <button
                 type="button"
                 className="ml-auto text-muted hover:text-down"
-                onClick={() =>
-                  confirm(t('„{name}“ entkoppeln? Das Handy verliert sofort den Zugang.', { name: d.name })) &&
+                onClick={async () =>
+                  (await ask(t('„{name}“ entkoppeln? Das Handy verliert sofort den Zugang.', { name: d.name }), t('Entfernen'), { danger: true })) &&
                   run(async () => {
                     forgetPartner(d.id)
                     return window.api.link.remove(d.id)

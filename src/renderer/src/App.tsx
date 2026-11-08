@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import MessageBox from '../../mobile/MessageBox'
 import AboutModal from './components/AboutModal'
 import ChartArea from './components/ChartArea'
 import ChartBoundary from './components/ChartBoundary'
@@ -59,6 +60,8 @@ export default function App() {
               </ChartBoundary>
             </main>
           </div>
+          {/* Questions and notices in KandleOS style; in here so they also show in fullscreen. */}
+          <MessageBox />
         </div>
         <Watchlist />
       </div>
