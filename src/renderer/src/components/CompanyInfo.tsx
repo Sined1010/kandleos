@@ -44,8 +44,11 @@ export default function CompanyInfoButton({ symbol }: { symbol: string }) {
   )
 }
 
-/** The info panel itself; also opened from the watchlist's context menu. */
-export function InfoPanel({ symbol }: { symbol: string }) {
+const POPOVER =
+  'absolute left-0 top-full z-20 mt-1 w-96 rounded-lg border border-line bg-panel/95 p-3 text-xs text-slate-300 shadow-2xl shadow-black/50 backdrop-blur'
+
+/** The info panel itself; also opened from the watchlist's context menu. `page`: a full page on the phone, not a popover. */
+export function InfoPanel({ symbol, page = false }: { symbol: string; page?: boolean }) {
   const key = useStore((s) => s.finnhubKey)
   const [info, setInfo] = useState<CompanyInfo | null>(null)
   const [error, setError] = useState('')
@@ -85,11 +88,7 @@ export function InfoPanel({ symbol }: { symbol: string }) {
     : []
 
   return (
-    <div
-      role="dialog"
-      aria-label={t('Infos zum Unternehmen')}
-      className="absolute left-0 top-full z-20 mt-1 w-96 rounded-lg border border-line bg-panel/95 p-3 text-xs text-slate-300 shadow-2xl shadow-black/50 backdrop-blur"
-    >
+    <div role="dialog" aria-label={t('Infos zum Unternehmen')} className={page ? 'text-slate-300' : POPOVER}>
       {error ? (
         <p className="text-down">{error}</p>
       ) : !info ? (
@@ -122,7 +121,8 @@ export function InfoPanel({ symbol }: { symbol: string }) {
           {info.description && (
             <>
               <p className="mb-1 mt-3 text-[10px] uppercase tracking-wider text-muted">{t('Beschreibung (auf Englisch)')}</p>
-              <p className="max-h-40 overflow-y-auto leading-relaxed">{info.description}</p>
+              {/* The page scrolls as a whole; an inner scroll box would hide the rest (no scrollbars on phones). */}
+              <p className={`leading-relaxed ${page ? '' : 'max-h-40 overflow-y-auto'}`}>{info.description}</p>
             </>
           )}
           <p className="mt-3 text-[10px] text-muted">

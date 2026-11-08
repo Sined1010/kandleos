@@ -202,7 +202,7 @@ export default function Watchlist() {
           {view === 'list' && folders.length > 0 && (
             // Closes all while any is open, otherwise opens all.
             <button
-              onClick={() => useStore.setState((s) => ({ folders: s.folders.map((f) => ({ ...f, collapsed: anyOpen })) }))}
+              onClick={() => useStore.getState().setAllCollapsed(anyOpen)}
               title={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
               aria-label={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
               className="rounded p-0.5 text-muted hover:bg-line hover:text-white"

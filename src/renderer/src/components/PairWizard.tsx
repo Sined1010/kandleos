@@ -143,7 +143,7 @@ export default function PairWizard({ onClose, onStatus }: { onClose: () => void;
           <>
             <div className="mx-auto mb-3 w-64 rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qrSvg(step.code) }} />
             <p className="mb-1 text-center leading-relaxed text-slate-200">
-              {t('Scanne den Code mit der Kamera deines Handys – oder in der KandleOS-App: Einstellungen → Mit PC koppeln.')}
+              {t('Scanne den Code mit der Kamera deines Handys – oder in der KandleOS-App: Menü ⋮ → Mit PC koppeln.')}
             </p>
             {left > 0 ? (
               <p className="text-center text-xs text-muted">{t('Gültig noch {s} s.', { s: String(left) })}</p>

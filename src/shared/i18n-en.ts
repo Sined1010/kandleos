@@ -955,6 +955,9 @@ export const EN: Record<string, string> = {
   'Code einfügen und koppeln': 'Paste code and pair',
   'Koppeln gleicht Watchlist, Zeichnungen, Chart-Stände und Alarme mit KandleOS am PC ab und übernimmt dessen Kurs-Keys.':
     'Pairing syncs the watchlist, drawings, saved charts and alarms with KandleOS on your PC and takes over its stock data keys.',
+  'KandleOS am PC öffnen; Handy und PC im selben WLAN.': 'Open KandleOS on the PC; phone and PC on the same Wi-Fi.',
+  'Am PC: Einstellungen → Handy koppeln → Jetzt koppeln. Ein QR-Code erscheint.': 'On the PC: Settings → Pair a phone → Pair now. A QR code appears.',
+  'Hier auf „Mit PC koppeln“ tippen und den Code scannen.': 'Tap “Pair with PC” here and scan the code.',
   'erreichbar': 'reachable',
   'PC aus · zuletzt {when}': 'PC off · last seen {when}',
   'Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter „Handy koppeln“ ebenfalls entfernen.':
@@ -987,7 +990,7 @@ export const EN: Record<string, string> = {
   'Trotzdem weiter': 'Continue anyway',
   'Nochmal versuchen': 'Try again',
   'Weiter': 'Continue',
-  'Scanne den Code mit der Kamera deines Handys – oder in der KandleOS-App: Einstellungen → Mit PC koppeln.': 'Scan the code with your phone\'s camera – or in the KandleOS app: Settings → Pair with PC.',
+  'Scanne den Code mit der Kamera deines Handys – oder in der KandleOS-App: Menü ⋮ → Mit PC koppeln.': 'Scan the code with your phone\'s camera – or in the KandleOS app: menu ⋮ → Pair with PC.',
   'Gültig noch {s} s.': 'Valid for {s} s.',
   'Neuen Code anzeigen': 'Show a new code',
   'Klappt nicht?': 'Not working?',
@@ -1008,11 +1011,19 @@ export const EN: Record<string, string> = {
   'Einrichten geht nur am PC: Prognose-Menü → Umfassende Analyse → Einrichten.': 'Setup is only possible on the PC: forecast menu → Comprehensive analysis → Set up.',
   'Am PC gestartet: Analyse von {symbol} läuft · {time}': 'Started on the PC: analysis of {symbol} running · {time}',
   'Vom Handy gestartet: Analyse von {symbol} läuft · {time}': 'Started from the phone: analysis of {symbol} running · {time}',
-  'Die Analyse läuft auf deinem PC. Koppeln: am PC Einstellungen → Handy koppeln.': 'The analysis runs on your PC. To pair: on the PC, Settings → Pair a phone.',
+  'Die Analyse läuft auf deinem PC. Dafür das Handy mit dem PC koppeln: Menü ⋮ → „Mit PC koppeln“.':
+    'The analysis runs on your PC. For that, pair the phone with the PC: menu ⋮ → “Pair with PC”.',
   'PC nicht erreichbar – die Analyse läuft auf dem PC. Gespeicherte Analysen siehst du trotzdem.': 'PC not reachable – the analysis runs on the PC. Saved analyses are still shown.',
-  'Die KI-Prognose rechnet dein PC. Koppeln: am PC Einstellungen → Handy koppeln.': 'Your PC computes the AI forecast. To pair: on the PC, Settings → Pair a phone.',
+  'Die KI-Prognose rechnet KandleOS auf deinem PC. Dafür das Handy einmal mit dem PC koppeln. Jetzt koppeln?':
+    'KandleOS on your PC computes the AI forecast. For that, pair the phone with the PC once. Pair now?',
   'PC nicht erreichbar. Die KI-Prognose rechnet dein PC – ist er an und im selben WLAN oder VPN?': 'PC not reachable. Your PC computes the AI forecast – is it on and in the same Wi-Fi or VPN?',
   'Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?': 'The forecast model is missing on the PC. Download it on the PC now (about 480 MB)?',
+  Laden: 'Download',
+  Koppeln: 'Pair',
+  Verwerfen: 'Discard',
+  'Neu laden': 'Reload',
+  Ersetzen: 'Replace',
+  Überschreiben: 'Overwrite',
   // Chart error boundary
   'Der Chart konnte nicht angezeigt werden.': 'The chart could not be shown.',
   'Erneut versuchen': 'Try again'

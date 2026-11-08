@@ -18,6 +18,7 @@ import { t } from '../shared/i18n'
 import { checkAnalyses } from '../shared/savedAnalysis'
 import { FINNHUB_KEY_RE, SYMBOL_RE } from '../shared/types'
 import { capHttp } from './capHttp'
+import { tell } from './MessageBox'
 import { appFiles } from './files'
 import { KandleNative } from './native'
 import { readStore, writeAtomic } from './storeFile'
@@ -90,7 +91,7 @@ export async function createMobileApi(): Promise<Api> {
       } catch (e) {
         if (storeWarned) return
         storeWarned = true
-        alert(t('Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?', { error: (e as Error).message }))
+        tell(t('Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?', { error: (e as Error).message }))
       }
     },
     setLanguage: () => {},

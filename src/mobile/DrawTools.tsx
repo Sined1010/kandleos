@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { t } from '../shared/i18n'
 import { TOOLS } from '../renderer/src/components/DrawingToolbar'
 import { drawingsKey, useStore } from '../renderer/src/store/useStore'
+import { ask } from './MessageBox'
 
 /** Drawing tools along the bottom edge (thumb reach) while drawing; the active tool's name above them. */
 export default function DrawTools() {
@@ -22,7 +23,9 @@ export default function DrawTools() {
           {active && tool !== 'cursor' ? t(active[2]).split(/ \(| – /)[0] : t('Werkzeug wählen')}
         </p>
         <button
-          onClick={() => count && confirm(t('Alle {count} Zeichnungen für {symbol} löschen?', { count, symbol })) && clearDrawings()}
+          onClick={async () =>
+            count && (await ask(t('Alle {count} Zeichnungen für {symbol} löschen?', { count, symbol }), t('Löschen'), { danger: true })) && clearDrawings()
+          }
           disabled={!count}
           aria-label={t('Alle Zeichnungen löschen')}
           className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-down disabled:opacity-30"

@@ -385,7 +385,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
             {pcOff ? (
               <p className="rounded-lg bg-bg p-3 text-slate-200 ring-1 ring-line">
                 {pcState === 'none'
-                  ? t('Die Analyse läuft auf deinem PC. Koppeln: am PC Einstellungen → Handy koppeln.')
+                  ? t('Die Analyse läuft auf deinem PC. Dafür das Handy mit dem PC koppeln: Menü ⋮ → „Mit PC koppeln“.')
                   : t('PC nicht erreichbar – die Analyse läuft auf dem PC. Gespeicherte Analysen siehst du trotzdem.')}
               </p>
             ) : !status ? (

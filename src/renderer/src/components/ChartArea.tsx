@@ -44,6 +44,7 @@ import { sessionLine } from '../lib/sessionLine'
 import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
 import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
+import { ask, tell } from '../../../mobile/MessageBox'
 import MobileKiButton from '../../../mobile/MobileKiButton'
 import PriceTag from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
@@ -73,7 +74,7 @@ const OLDER_HINT = {
 }
 // Width of the analysis panel (w-[400px] in AgentsPanel).
 const AGENTS_WIDTH = 400
-const PC_NONE = msg('Die KI-Prognose rechnet dein PC. Koppeln: am PC Einstellungen → Handy koppeln.')
+const PC_NONE = msg('Die KI-Prognose rechnet KandleOS auf deinem PC. Dafür das Handy einmal mit dem PC koppeln. Jetzt koppeln?')
 const PC_OFF = msg('PC nicht erreichbar. Die KI-Prognose rechnet dein PC – ist er an und im selben WLAN oder VPN?')
 // Some exchanges quote in a minor unit (London: pence), which is easy to misread as the main currency.
 export const MINOR_UNITS: Record<string, string> = { GBp: 'GBp (Pence)', ZAc: 'ZAc (Cent)', ILA: 'ILA (Agorot)' }
@@ -493,8 +494,17 @@ export default function ChartArea() {
       // On the phone the PC computes; the model (480 MB) only loads there after a yes.
       if (IS_MOBILE) {
         const pc = usePcStatus.getState().state
-        if (pc !== 'online') return alert(t(pc === 'none' ? PC_NONE : PC_OFF))
-        if (!(await window.api.modelReady()) && !confirm(t('Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?'))) return
+        const title = t('KI-Prognose')
+        if (pc === 'none') {
+          if (await ask(t(PC_NONE), t('Jetzt koppeln'), { title })) window.dispatchEvent(new Event('kandleos:pair'))
+          return
+        }
+        if (pc !== 'online') return tell(t(PC_OFF), { title })
+        if (
+          !(await window.api.modelReady()) &&
+          !(await ask(t('Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?'), t('Laden'), { title }))
+        )
+          return
       }
       return void runForecast()
     }

@@ -4,6 +4,7 @@ import { ANALYSTS, modelsFor, PROVIDERS, providerById } from '../../../shared/ag
 import { t } from '../../../shared/i18n'
 import { ipcError } from '../lib/format'
 import { useStore } from '../store/useStore'
+import { ask } from '../../../mobile/MessageBox'
 
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
 type Setup = Parameters<Parameters<typeof window.api.agents.onSetup>[0]>[0]
@@ -118,7 +119,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
     }
   }
   const remove = async () => {
-    if (confirm(t('Python-Umgebung der umfassenden Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.')))
+    if (await ask(t('Python-Umgebung der umfassenden Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.'), t('Entfernen'), { danger: true }))
       setStatus(await window.api.agents.remove())
   }
   const setModel = (tier: 'deep' | 'quick', value: string) =>

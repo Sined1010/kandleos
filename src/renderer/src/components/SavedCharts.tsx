@@ -6,6 +6,7 @@ import { findByName, groupCharts, isDirty, linkedChart, loadTarget, toolCounts }
 import { drawingsKey, MAX_TABS, useStore, type Drawing, type SavedChart } from '../store/useStore'
 import { TOOLS } from './DrawingToolbar'
 import { IS_MOBILE } from '../lib/platform'
+import { ask, tell } from '../../../mobile/MessageBox'
 
 /** "1× Elliott impulse 0-1-2-3-4-5, 3× Trend line": the toolbar's labels without their click hints, in toolbar order. */
 export function toolSummary(drawings: Drawing[]): string {
@@ -122,19 +123,21 @@ function ChartList({ onDone }: { onDone: () => void }) {
   const groups = groupCharts(charts, symbol, query, label)
   const linked = tab && linkedChart(tab, charts)
 
-  const load = (c: SavedChart) => {
+  const load = async (c: SavedChart) => {
     const target = loadTarget(c, useStore.getState(), MAX_TABS)
     if (target.kind === 'switch') selectTab(target.tabId)
     else if (target.kind === 'revert') {
-      if (!confirm(t('Zeichnungen seit dem Speichern gehen verloren. „{name}“ wieder laden?', { name: c.name }))) return
+      if (!(await ask(t('Zeichnungen seit dem Speichern gehen verloren. „{name}“ wieder laden?', { name: c.name }), t('Neu laden'), { danger: true }))) return
       loadChart(c.id, 'here')
     } else if (target.kind !== 'confirm') loadChart(c.id, target.kind)
     else if (
-      confirm(
+      await ask(
         t('Alle {max} Tabs sind belegt. Die Zeichnungen im aktuellen Tab werden durch „{name}“ ersetzt. Fortfahren?', {
           max: MAX_TABS,
           name: c.name
-        })
+        }),
+        t('Ersetzen'),
+        { danger: true }
       )
     )
       loadChart(c.id, 'here')
@@ -197,7 +200,7 @@ function ChartList({ onDone }: { onDone: () => void }) {
                           // One name per symbol, as "Save as …" keeps it; a clash keeps the old name.
                           const other = findByName(charts, c.symbol, e.target.value)
                           if (other && other.id !== c.id)
-                            alert(t('Für {symbol} gibt es schon einen Chart-Stand „{name}“.', { symbol: label(c.symbol), name: other.name }))
+                            tell(t('Für {symbol} gibt es schon einen Chart-Stand „{name}“.', { symbol: label(c.symbol), name: other.name }))
                           else renameChart(c.id, e.target.value)
                           setRenaming(null)
                         }}
@@ -240,7 +243,9 @@ function ChartList({ onDone }: { onDone: () => void }) {
                         <Pencil size={12} />
                       </button>
                       <button
-                        onClick={() => confirm(t('Chart-Stand „{name}“ löschen?', { name: c.name })) && deleteChart(c.id)}
+                        onClick={async () =>
+                          (await ask(t('Chart-Stand „{name}“ löschen?', { name: c.name }), t('Löschen'), { danger: true })) && deleteChart(c.id)
+                        }
                         className="rounded p-0.5 text-muted hover:text-down"
                         title={t('Löschen')}
                         aria-label={t('{name} löschen', { name: c.name })}
@@ -293,10 +298,10 @@ export function SaveDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return
     const existing = findByName(charts, symbol, name)
-    if (existing && !confirm(t('„{name}“ für {symbol} überschreiben?', { name: existing.name, symbol: label }))) return
+    if (existing && !(await ask(t('„{name}“ für {symbol} überschreiben?', { name: existing.name, symbol: label }), t('Überschreiben'), { danger: true }))) return
     // Overwriting keeps the name the question showed.
     saveChart(existing?.name ?? name, existing?.id)
     onClose()

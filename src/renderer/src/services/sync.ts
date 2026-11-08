@@ -1,6 +1,7 @@
 // Glue between the store and the sync rules in shared/sync.ts, for both sides: stamping local changes, the PC's
 // answer to a phone, and the phone applying the PC's answer.
 import { t } from '../../../shared/i18n'
+import { tell } from '../../../mobile/MessageBox'
 import {
   answerSync,
   checkSyncReply,
@@ -103,7 +104,7 @@ export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeo
       // Once per app start, not again on every retry while the PC is unreachable.
       if (!baseId && !firstNotice && s.tabs.some((tb) => Object.entries(s.drawings).some(([k, list]) => k.startsWith(tb.id + ':') && list.length))) {
         firstNotice = true
-        alert(t('Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.'))
+        tell(t('Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.'))
       }
       const reply = checkSyncReply(await call('sync', { units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }, SYNC_TIMEOUT_MS))
       if (!reply) throw new Error('bad-reply')

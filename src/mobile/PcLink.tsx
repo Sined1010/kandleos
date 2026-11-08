@@ -4,6 +4,7 @@ import { t } from '../shared/i18n'
 import { decodePairing } from '../shared/link'
 import Layer from './Layer'
 import { pairWith, unpair, usePcStatus } from './link'
+import { ask } from './MessageBox'
 
 const button = 'rounded-lg px-4 py-3 text-sm text-white ring-1 ring-line active:bg-line disabled:opacity-40'
 
@@ -34,6 +35,8 @@ function PairPage({ onDone }: { onDone(): void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [camera, setCamera] = useState(true)
+  // Android's WebView shows a grey placeholder until the first frame; the view stays hidden (space kept) until then.
+  const [live, setLive] = useState(false)
 
   const tryCode = async (text: string) => {
     const code = decodePairing(text.trim())
@@ -97,8 +100,8 @@ function PairPage({ onDone }: { onDone(): void }) {
       <p className="mb-3 text-muted">{t('Am PC: Einstellungen → Handy koppeln → Jetzt koppeln. Dann den Code hier scannen.')}</p>
       {camera ? (
         <>
-          <div className="relative mb-2">
-            <video ref={video} playsInline muted className="aspect-square w-full rounded-xl bg-black object-cover" />
+          <div className={`relative mb-2 ${live ? '' : 'invisible'}`}>
+            <video ref={video} playsInline muted onPlaying={() => setLive(true)} className="aspect-square w-full rounded-xl bg-black object-cover" />
             {/* Aim frame: the whole code with some margin inside it reads best. */}
             <div className="pointer-events-none absolute inset-[12%] rounded-lg border-2 border-white/70" />
           </div>
@@ -136,6 +139,11 @@ export default function PcLink() {
           <p className="mb-2 text-xs leading-relaxed text-muted">
             {t('Koppeln gleicht Watchlist, Zeichnungen, Chart-Stände und Alarme mit KandleOS am PC ab und übernimmt dessen Kurs-Keys.')}
           </p>
+          <ol className="mb-3 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-slate-300">
+            <li>{t('KandleOS am PC öffnen; Handy und PC im selben WLAN.')}</li>
+            <li>{t('Am PC: Einstellungen → Handy koppeln → Jetzt koppeln. Ein QR-Code erscheint.')}</li>
+            <li>{t('Hier auf „Mit PC koppeln“ tippen und den Code scannen.')}</li>
+          </ol>
           <button type="button" onClick={() => setPairing(true)} className={button}>
             {t('Mit PC koppeln')}
           </button>
@@ -150,7 +158,13 @@ export default function PcLink() {
           <button
             type="button"
             className="ml-auto text-muted active:text-down"
-            onClick={() => confirm(t('Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter „Handy koppeln“ ebenfalls entfernen.')) && void unpair()}
+            onClick={async () =>
+              (await ask(
+                t('Vom PC entkoppeln? Die vom PC übernommenen Kurs-Keys werden auf dem Handy gelöscht. Am PC das Gerät unter „Handy koppeln“ ebenfalls entfernen.'),
+                t('Entkoppeln'),
+                { danger: true }
+              )) && void unpair()
+            }
           >
             {t('Entkoppeln')}
           </button>

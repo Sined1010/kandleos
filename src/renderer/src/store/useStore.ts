@@ -139,6 +139,7 @@ interface State {
   renameFolder: (id: string, name: string) => void
   removeFolder: (id: string) => void
   toggleFolder: (id: string) => void
+  setAllCollapsed: (collapsed: boolean) => void
   addToFolder: (id: string, symbol: string) => void
   removeFromFolder: (id: string, symbol: string) => void
   /** Into folder `toId` in front of `before`, or at its end; also reorders within one folder. */
@@ -314,6 +315,7 @@ export const useStore = create<State>()(
       renameFolder: (id, name) => set((s) => mapFolder(s, id, (f) => ({ ...f, name }))),
       removeFolder: (id) => set((s) => ({ folders: s.folders.filter((f) => f.id !== id) })),
       toggleFolder: (id) => set((s) => mapFolder(s, id, (f) => ({ ...f, collapsed: !f.collapsed }))),
+      setAllCollapsed: (collapsed) => set((s) => ({ folders: s.folders.map((f) => ({ ...f, collapsed })) })),
       addToFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withSymbol({ ...f, collapsed: false }, symbol))),
       removeFromFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withoutSymbol(f, symbol))),
       moveSymbol: (symbol, fromId, toId, before) =>

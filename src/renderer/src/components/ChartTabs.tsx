@@ -3,9 +3,10 @@ import { t } from '../../../shared/i18n'
 import { tfLabel } from '../../../shared/types'
 import { drawingsKey, isDirty, linkedChart } from '../lib/charts'
 import { MAX_TABS, useStore } from '../store/useStore'
+import { ask } from '../../../mobile/MessageBox'
 
 /** Closes a tab after asking when something would be lost (unsaved changes to its saved chart, or its drawings). */
-export function closeTabAsked(tabId: string): void {
+export async function closeTabAsked(tabId: string): Promise<void> {
   const { tabs, charts, drawings, names, closeTab } = useStore.getState()
   const tab = tabs.find((x) => x.id === tabId)
   if (!tab) return
@@ -17,8 +18,8 @@ export function closeTabAsked(tabId: string): void {
   // All drawings of this tab (any symbol) go with it, except those kept in its saved chart.
   const lost = Object.entries(drawings).reduce((n, [k, d]) => n + (k.startsWith(`${tab.id}:`) && !(saved && k === key) ? d.length : 0), 0)
   const ok = changed
-    ? confirm(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }))
-    : !lost || confirm(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }))
+    ? await ask(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }), t('Verwerfen'), { danger: true })
+    : !lost || (await ask(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }), t('Tab schließen'), { danger: true }))
   if (ok) closeTab(tab.id)
 }
 
@@ -55,7 +56,7 @@ export default function ChartTabs() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  closeTabAsked(tab.id)
+                  void closeTabAsked(tab.id)
                 }}
                 aria-label={t('{name} schließen', { name })}
                 title={t('Tab schließen')}

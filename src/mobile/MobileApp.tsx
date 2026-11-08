@@ -18,6 +18,7 @@ import PcLink from './PcLink'
 import DrawTools from './DrawTools'
 import Layer from './Layer'
 import Licenses from './Licenses'
+import MessageBox from './MessageBox'
 import MobileHeader, { FullscreenBar } from './MobileHeader'
 import { setFullscreen } from './statusBar'
 import { shareChart } from './share'
@@ -52,8 +53,14 @@ export default function MobileApp() {
       setAbout(false)
       setPage('licenses')
     }
+    // The forecast button without a paired PC asks for the pairing page (ChartArea.tsx).
+    const pair = () => setPage('pc')
     window.addEventListener('kandleos:licenses', show)
-    return () => window.removeEventListener('kandleos:licenses', show)
+    window.addEventListener('kandleos:pair', pair)
+    return () => {
+      window.removeEventListener('kandleos:licenses', show)
+      window.removeEventListener('kandleos:pair', pair)
+    }
   }, [])
   useBack('save-as', saving, () => setSaving(false))
   const endDrawing = () => {
@@ -141,7 +148,7 @@ export default function MobileApp() {
       {saving && <SaveDialog onClose={() => setSaving(false)} />}
       {page === 'info' && (
         <Layer id="info" title={names[symbol] ?? symbol} onClose={() => setPage(null)}>
-          <InfoPanel symbol={symbol} />
+          <InfoPanel symbol={symbol} page />
         </Layer>
       )}
       {page === 'alarms' && alarmFor && (
@@ -164,6 +171,7 @@ export default function MobileApp() {
       {settings && <SettingsModal onClose={() => setSettings(false)} keysFromPc={pc.state !== 'none'} />}
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAbout(true)} />}
       {about && <AboutModal onClose={() => setAbout(false)} />}
+      <MessageBox />
     </div>
   )
 }

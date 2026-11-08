@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, GripVertical, Plus, Search } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { t } from '../shared/i18n'
 import { isCrypto } from '../shared/types'
@@ -11,6 +11,7 @@ import { MAX_TABS, useQuotes, useStore } from '../renderer/src/store/useStore'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
 import Layer from './Layer'
+import { ask as confirmBox } from './MessageBox'
 import Sheet from './Sheet'
 import type { SheetPos } from './sheetSnap'
 import { useLongPress } from './useLongPress'
@@ -23,6 +24,7 @@ type Drop = { folder: string; before: string | null }
 export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; onPos(p: SheetPos): void; extraItems?: (symbol: string) => ActionItem[] }) {
   const folders = useStore((s) => s.folders)
   const count = new Set(folders.flatMap((f) => f.symbols)).size
+  const anyOpen = folders.some((f) => !f.collapsed)
   // Actions and values read when a menu opens; the lists below subscribe on their own.
   const s = useStore.getState()
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -73,8 +75,9 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
               items: others.map((f) => ({ label: f.name, onPick: () => s.moveSymbol(symbol, folderId, f.id) }))
             })
         },
-        { label: t('Aus Watchlist löschen'), danger: true, onPick: () =>
-            confirm(t('„{name}“ aus der Watchlist löschen?', { name: s.names[symbol] ?? symbol })) && s.removeFromFolder(folderId, symbol)
+        { label: t('Aus Watchlist löschen'), danger: true, onPick: async () =>
+            (await confirmBox(t('„{name}“ aus der Watchlist löschen?', { name: s.names[symbol] ?? symbol }), t('Löschen'), { danger: true })) &&
+            s.removeFromFolder(folderId, symbol)
         }
       ]
     }
@@ -90,7 +93,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
       {
         label: t('Ordner löschen'),
         danger: true,
-        onPick: () => confirm(t('Ordner „{name}“ mit allen Werten löschen?', { name })) && s.removeFolder(id)
+        onPick: async () => (await confirmBox(t('Ordner „{name}“ mit allen Werten löschen?', { name }), t('Löschen'), { danger: true })) && s.removeFolder(id)
       }
     ]
   })
@@ -151,24 +154,37 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
               onPick={picked}
               inputClassName="w-full rounded-xl bg-bg py-2.5 pl-10 pr-3 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
             />
-            {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. Not a
-                <button>: the sheet's head is dragged from here and a tap on it opens or folds the sheet (Sheet.tsx). */}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-expanded={pos !== 'low'}
-              // Touches toggle through the sheet's own tap (Sheet.tsx); keyboard and TalkBack clicks come without a pointer (detail 0).
-              onClick={(e) => e.detail === 0 && onPos(pos === 'low' ? 'half' : 'low')}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter' && e.key !== ' ') return
-                e.preventDefault()
-                onPos(pos === 'low' ? 'half' : 'low')
-              }}
-              className="flex min-h-8 w-fit items-center gap-1.5 px-1 pt-0.5 text-sm font-bold text-white"
-            >
-              Watchlist
-              {pos === 'low' ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
-              <span className="text-xs font-medium text-muted">{count === 1 ? t('{n} Wert', { n: count }) : t('{n} Werte', { n: count })}</span>
+            <div className="flex items-center">
+              {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. Not a
+                  <button>: the sheet's head is dragged from here and a tap on it opens or folds the sheet (Sheet.tsx). */}
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={pos !== 'low'}
+                // Touches toggle through the sheet's own tap (Sheet.tsx); keyboard and TalkBack clicks come without a pointer (detail 0).
+                onClick={(e) => e.detail === 0 && onPos(pos === 'low' ? 'half' : 'low')}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  e.preventDefault()
+                  onPos(pos === 'low' ? 'half' : 'low')
+                }}
+                className="flex min-h-8 w-fit items-center gap-1.5 px-1 pt-0.5 text-sm font-bold text-white"
+              >
+                Watchlist
+                {pos === 'low' ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
+                <span className="text-xs font-medium text-muted">{count === 1 ? t('{n} Wert', { n: count }) : t('{n} Werte', { n: count })}</span>
+              </div>
+              {pos !== 'low' && folders.length > 0 && (
+                // Like the PC: closes all while any is open, otherwise opens all. A <button>, so the sheet ignores the tap.
+                <button
+                  type="button"
+                  onClick={() => s.setAllCollapsed(anyOpen)}
+                  aria-label={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
+                  className="mobile-icon ml-auto text-muted"
+                >
+                  {anyOpen ? <ChevronsDownUp size={18} /> : <ChevronsUpDown size={18} />}
+                </button>
+              )}
             </div>
           </div>
         }
@@ -224,7 +240,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
       {ask && <AskDialog ask={ask} onClose={() => setAsk(null)} />}
       {info && (
         <Layer id="info" title={s.names[info] ?? info} onClose={() => setInfo(null)}>
-          <InfoPanel symbol={info} />
+          <InfoPanel symbol={info} page />
         </Layer>
       )}
     </>

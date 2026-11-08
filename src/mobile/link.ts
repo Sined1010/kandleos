@@ -10,6 +10,7 @@ import { resetSync, startStamping, syncWithPc } from '../renderer/src/services/s
 import { useStore } from '../renderer/src/store/useStore'
 import { capHttp } from './capHttp'
 import { createLinkClient, type Pairing } from './linkClient'
+import { ask, tell } from './MessageBox'
 import { KandleNative } from './native'
 
 type Stored = Pairing & { keysVersion?: string }
@@ -93,12 +94,12 @@ export async function unpair(): Promise<void> {
  */
 async function openLink(url: string): Promise<void> {
   const code = decodePairing(url)
-  if (!code || !confirm(t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name }))) return
+  if (!code || !(await ask(t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name }), t('Koppeln')))) return
   try {
     await pairWith(code)
-    alert(t('Mit „{name}“ gekoppelt.', { name: code.name }))
+    tell(t('Mit „{name}“ gekoppelt.', { name: code.name }))
   } catch (e) {
-    alert((e as Error).message === 'offline' ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?') : (e as Error).message)
+    tell((e as Error).message === 'offline' ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?') : (e as Error).message)
   }
 }
 

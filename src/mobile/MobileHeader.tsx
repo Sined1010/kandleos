@@ -10,6 +10,7 @@ import { metaFor, useChartMeta } from '../renderer/src/store/chartMeta'
 import { useQuotes, useStore } from '../renderer/src/store/useStore'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
+import { ask as confirmBox } from './MessageBox'
 import TabButton from './TabButton'
 import TimeframeGrid from './TimeframeGrid'
 import { useBack } from './useBack'
@@ -38,13 +39,15 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
   const name = names[symbol] ?? symbol
   const inWatchlist = folders.some((f) => f.symbols.includes(symbol))
 
-  const star = () => {
-    const s = useStore.getState()
+  const star = async () => {
     if (inWatchlist) {
-      if (confirm(t('„{name}“ aus der Watchlist löschen?', { name })))
+      if (await confirmBox(t('„{name}“ aus der Watchlist löschen?', { name }), t('Löschen'), { danger: true })) {
+        const s = useStore.getState()
         for (const f of s.folders) if (f.symbols.includes(symbol)) s.removeFromFolder(f.id, symbol)
+      }
       return
     }
+    const s = useStore.getState()
     setMenu({
       title: t('Zur Watchlist hinzufügen …'),
       items: [
