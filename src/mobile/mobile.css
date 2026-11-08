@@ -62,6 +62,10 @@ textarea {
 .mobile-full main {
   margin-bottom: 0 !important;
 }
+/* The status bar is hidden, so the chart may reach the top edge; its full-screen buttons keep clear of the camera. */
+.mobile-full {
+  padding-top: 0 !important;
+}
 /* Start window and settings as phone pages (PAGE in lib/platform.ts): readable text, finger-sized controls. */
 .mobile-page .text-xs {
   font-size: 0.875rem;
