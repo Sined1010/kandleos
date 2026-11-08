@@ -18,6 +18,11 @@ drawings and price alarms to your phone, and paired with your PC also the AI for
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22io.github.sined1010.kandleos%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSined1010%2Fkandleos%22%2C%22author%22%3A%22Sined1010%22%2C%22name%22%3A%22KandleOS%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22KandleOS-.*%5B.%5Dapk%5C%22%7D%22%7D"><img src="docs/badges/obtainium.svg" height="48" alt="Get it on Obtainium"></a>
 </p>
 
+
+https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
+
+
+
 ![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary, the values of one forecast step and colored drawings](docs/screenshot.webp)
 
 ## Why KandleOS?
