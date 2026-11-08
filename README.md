@@ -93,7 +93,7 @@ TradingAgents analysis on the phone (your PC computes them, so it needs to be on
 
 1. On the PC: **Settings → Pair a phone → Pair now**. On Windows, KandleOS asks once for admin rights to add its own
    firewall rule (`KandleOS-Handy-Kopplung`: only KandleOS, only TCP port 47321, only from your local network).
-2. On the phone: scan the QR code in the KandleOS app (**⋯ → Settings → Pair with PC**) or with your camera app.
+2. On the phone: scan the QR code in the KandleOS app (**⋮ → Pair with PC**) or with your camera app.
 
 Phone and PC must be in the same Wi-Fi, or connected through a VPN (set the PC's VPN address under **Advanced**).
 While pairing is on, closing the PC window keeps KandleOS running in the system tray, so sync and alarms go on.
