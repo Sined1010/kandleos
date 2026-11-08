@@ -255,6 +255,32 @@ const ROWS: Record<keyof Indicators, { label: string; params: [string, string, n
   atr: { label: 'ATR', params: [['period', msg('Periode')]] }
 }
 
+/**
+ * A number field that may be empty or out of range while typing (so a value can be deleted and retyped); only valid
+ * values reach the chart, and leaving the field shows the value in use again.
+ */
+function NumberField(p: { label: string; title: string; min: number; max: number; step: number; value: number; onValue(v: number): void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <input
+      type="number"
+      title={p.title}
+      aria-label={p.label}
+      min={p.min}
+      max={p.max}
+      step={p.step}
+      value={draft ?? p.value}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        const v = Number(e.target.value)
+        if (e.target.value !== '' && v >= p.min && v <= p.max) p.onValue(v)
+      }}
+      onBlur={() => setDraft(null)}
+      className="w-12 rounded bg-bg px-1 py-0.5 text-right text-xs outline-none ring-1 ring-line focus:ring-accent"
+    />
+  )
+}
+
 export function IndicatorMenu({ onClose }: { onClose: () => void }) {
   const indicators = useStore((s) => s.indicators)
   const setIndicator = useStore((s) => s.setIndicator)
@@ -277,20 +303,15 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
                 <span className="text-white">{t(ROWS[name].label)}</span>
               </label>
               {ROWS[name].params.map(([field, label, step = 1]) => (
-                <input
+                <NumberField
                   key={field}
-                  type="number"
+                  label={`${t(ROWS[name].label)} ${t(label)}`}
                   title={t(label)}
-                  aria-label={`${t(ROWS[name].label)} ${t(label)}`}
                   min={step}
                   max={500}
                   step={step}
                   value={cfg[field] as number}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    if (v >= step && v <= 500) setIndicator(name, { [field]: v })
-                  }}
-                  className="w-12 rounded bg-bg px-1 py-0.5 text-right text-xs outline-none ring-1 ring-line focus:ring-accent"
+                  onValue={(v) => setIndicator(name, { [field]: v })}
                 />
               ))}
             </div>

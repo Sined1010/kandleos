@@ -37,7 +37,7 @@ export default function MobileApp() {
   const [sheet, setSheet] = useState<SheetPos>('low')
   const [drawing, setDrawing] = useState(false)
   const [full, setFull] = useState(false)
-  const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | null>(null)
+  const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | 'pc' | null>(null)
   const [alarmFor, setAlarmFor] = useState<string | null>(null)
   useEffect(() => startAlarmWatch(), [])
   useEffect(() => startLink(), [])
@@ -69,12 +69,12 @@ export default function MobileApp() {
 
   return (
     <div key={language} className={`mobile-app flex h-dvh flex-col bg-bg text-sm text-slate-300 ${full ? 'mobile-full' : ''}`}>
-      <header className="mobile-chrome flex shrink-0 flex-col border-b border-line bg-panel">
+      <header className="mobile-chrome flex shrink-0 flex-col border-b border-line bg-bg">
         <MobileHeader
           drawing={drawing}
           onDraw={() => (drawing ? endDrawing() : (setDrawing(true), setSheet('low')))}
           onMenu={() => setMenu(true)}
-          onPc={() => setSettings(true)}
+          onPc={() => setPage('pc')}
           onAlarm={() => {
             setAlarmFor(symbol)
             setPage('alarms')
@@ -127,6 +127,7 @@ export default function MobileApp() {
             },
             { label: t('Infos zum Wert'), disabled: isCrypto(symbol), onPick: () => setPage('info') },
             { label: t('Chart teilen'), onPick: () => void shareChart(document.querySelector('main')!, symbol).catch(() => {}) },
+            { label: t('Mit PC koppeln'), onPick: () => setPage('pc') },
             { label: t('Einstellungen'), onPick: () => setSettings(true) },
             { label: t('Über KandleOS'), onPick: () => setAbout(true) }
           ]}
@@ -153,7 +154,14 @@ export default function MobileApp() {
           <Licenses />
         </Layer>
       )}
-      {settings && <SettingsModal onClose={() => setSettings(false)} linkSection={<PcLink />} keysFromPc={pc.state !== 'none'} />}
+      {page === 'pc' && (
+        <Layer id="pc" title={t('Mit PC koppeln')} onClose={() => setPage(null)}>
+          <div className="mobile-page">
+            <PcLink />
+          </div>
+        </Layer>
+      )}
+      {settings && <SettingsModal onClose={() => setSettings(false)} keysFromPc={pc.state !== 'none'} />}
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAbout(true)} />}
       {about && <AboutModal onClose={() => setAbout(false)} />}
     </div>

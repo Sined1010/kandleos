@@ -33,7 +33,7 @@ export default function MobileKiButton(p: {
         aria-label={shown ? t('Prognose aus') : t('KI-Prognose')}
         aria-disabled={p.disabled || loading}
         className={`flex h-full w-full items-center justify-center gap-1 rounded-[10px] text-sm font-semibold text-white ${
-          shown ? 'bg-accent' : 'bg-brand'
+          shown ? 'bg-brand shadow-glow ring-2 ring-white/70' : 'bg-brand'
         } ${loading ? 'animate-pulse' : ''} ${p.disabled ? 'opacity-40' : ''} ${p.pcOff && !shown ? 'opacity-40 grayscale' : ''}`}
       >
         <Sparkles size={16} className="text-amber-200" />

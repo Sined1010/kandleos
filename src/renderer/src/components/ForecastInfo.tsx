@@ -131,7 +131,12 @@ export function ForecastSummary({ result, intraday, showCheck, symbol, timeframe
     ...(intraday && { timeStyle: 'short' })
   })
   return (
-    <div className="w-80 max-w-[calc(100vw-5.5rem)] rounded-lg border border-line bg-panel/80 px-2.5 py-2 text-xs shadow-2xl shadow-black/50 backdrop-blur">
+    // On the phone the card sits on the chart and gets a light KandleOS glow so it stands out from the candles.
+    <div
+      className={`w-80 max-w-[calc(100vw-5.5rem)] rounded-lg border px-2.5 py-2 text-xs backdrop-blur ${
+        IS_MOBILE ? 'border-indigo-400/40 bg-panel/95 shadow-[0_0_20px_-6px_rgba(99,102,241,0.7)]' : 'border-line bg-panel/80 shadow-2xl shadow-black/50'
+      }`}
+    >
       {help && <ForecastHelp onClose={() => setHelp(false)} />}
       <button
         onClick={() => setOpen(!open)}

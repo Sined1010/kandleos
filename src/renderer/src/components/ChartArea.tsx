@@ -45,6 +45,7 @@ import { cachedCandles, loadCandles, watchCandles } from '../services/marketData
 import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
 import MobileKiButton from '../../../mobile/MobileKiButton'
+import PriceTag from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
 import { useQuotes, useStore } from '../store/useStore'
@@ -811,7 +812,9 @@ export default function ChartArea() {
       downColor: DOWN,
       wickUpColor: UP,
       wickDownColor: DOWN,
-      borderVisible: false
+      borderVisible: false,
+      // The phone draws its own, rounded last-price tag (src/mobile/PriceTag.tsx).
+      lastValueVisible: !IS_MOBILE
     })
     candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } })
     const volume = chart.addSeries(HistogramSeries, {
@@ -887,6 +890,14 @@ export default function ChartArea() {
           </span>
         )}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
+        {IS_MOBILE && api && data.length > 0 && (
+          <PriceTag
+            chart={api.chart}
+            series={api.candles}
+            price={data[data.length - 1].close}
+            color={data[data.length - 1].close >= data[data.length - 1].open ? UP : DOWN}
+          />
+        )}
         {api && fc.state === 'loading' && data.length > 0 && (
           <ForecastLoader
             chart={api.chart}
@@ -1059,6 +1070,7 @@ export default function ChartArea() {
           onClick={toggleExtendedHours}
           disabled={!extendable}
           aria-pressed={extendedHours}
+          aria-label={t('Vor-/Nachbörse')}
           title={
             extendable
               ? t('Vorbörse und Nachbörse (US-Aktien, 10:00–15:30 und 22:00–02:00 deutscher Zeit) als Kerzen zeigen, grau hinterlegt')
@@ -1068,9 +1080,9 @@ export default function ChartArea() {
             extended ? 'bg-brand text-white shadow-glow' : 'text-muted enabled:hover:bg-line enabled:hover:text-white'
           }`}
         >
-          <Sunrise size={12} />
-          <Moon size={11} />
-          {t('Vor-/Nachbörse')}
+          <Sunrise size={IS_MOBILE ? 14 : 12} />
+          <Moon size={IS_MOBILE ? 13 : 11} />
+          {!IS_MOBILE && t('Vor-/Nachbörse')}
         </button>
         {!IS_MOBILE && <FullscreenButton />}
       </div>

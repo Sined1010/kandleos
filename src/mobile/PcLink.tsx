@@ -125,13 +125,12 @@ function PairPage({ onDone }: { onDone(): void }) {
   )
 }
 
-/** Settings → PC (phone): pair, see whether the PC is there, unpair. */
+/** Menu → Mit PC koppeln (phone): pair, see whether the PC is there, unpair. */
 export default function PcLink() {
   const { state, pcName, lastSeen, syncFailed } = usePcStatus()
   const [pairing, setPairing] = useState(false)
   return (
     <section>
-      <h3 className="settings-title settings-rule">PC</h3>
       {state === 'none' ? (
         <>
           <p className="mb-2 text-xs leading-relaxed text-muted">

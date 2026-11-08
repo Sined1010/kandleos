@@ -878,7 +878,7 @@ export const EN: Record<string, string> = {
   'Mehr': 'More',
   'Anzeigename': 'Display name',
   'Ordner „{name}“ mit allen Werten löschen?': 'Delete folder “{name}” with all its symbols?',
-  'Wert suchen …': 'Search symbol …',
+  'Aktien, ETF oder Krypto suchen': 'Search stocks, ETFs or crypto',
   'Verschieben': 'Move',
   'Werkzeug wählen': 'Pick a tool',
   'Zeichenwerkzeuge': 'Drawing tools',

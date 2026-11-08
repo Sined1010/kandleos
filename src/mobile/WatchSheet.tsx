@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus, Search } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { t } from '../shared/i18n'
 import { isCrypto } from '../shared/types'
@@ -143,12 +143,13 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
         pos={pos}
         onPos={onPos}
         head={
-          <div className="px-3 pb-1" onFocus={() => pos === 'low' && onPos('full')}>
+          <div className="relative px-3 pb-1" onFocus={() => pos === 'low' && onPos('full')}>
+            <Search size={18} className="pointer-events-none absolute left-6 top-3 z-10 text-muted" aria-hidden />
             <SymbolSearch
               compact
-              placeholder={t('Wert suchen …')}
+              placeholder={t('Aktien, ETF oder Krypto suchen')}
               onPick={picked}
-              inputClassName="w-full rounded-xl bg-bg px-3 py-2.5 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
+              inputClassName="w-full rounded-xl bg-bg py-2.5 pl-10 pr-3 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
             />
             {/* Same word in both languages; shows in the folded sheet too, so it is clear what is pulled up. Not a
                 <button>: the sheet's head is dragged from here and a tap on it opens or folds the sheet (Sheet.tsx). */}

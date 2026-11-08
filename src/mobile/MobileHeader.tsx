@@ -109,9 +109,9 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
         </button>
       </div>
       <div className="grid grid-cols-6 gap-2 px-2 pb-2 pt-1.5">
-        <button onClick={(e) => setGrid(below(e))} aria-label={t('Alle Kerzengrößen')} aria-expanded={grid !== null} className={`${cell} text-sm font-semibold text-white`}>
+        <button onClick={(e) => setGrid(below(e))} aria-label={t('Alle Kerzengrößen')} aria-expanded={grid !== null} className="flex h-10 min-w-0 items-center justify-center gap-1 rounded-[10px] bg-brand text-sm font-semibold text-white shadow-glow active:brightness-110">
           {tfLabel(timeframe)}
-          <ChevronDown size={16} className="text-muted" />
+          <ChevronDown size={16} className="text-white/80" />
         </button>
         <button
           onClick={p.onDraw}
@@ -122,7 +122,11 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
           {p.drawing ? <Check size={18} /> : <Pencil size={18} />}
         </button>
         <button
-          onClick={(e) => setIndicators((o) => (o === null ? below(e) : null))}
+          onClick={(e) => {
+            // Read the position now: React calls the updater later, when the event no longer has its button.
+            const top = below(e)
+            setIndicators((o) => (o === null ? top : null))
+          }}
           aria-label={t('Indikatoren')}
           aria-expanded={indicators !== null}
           className={cell}

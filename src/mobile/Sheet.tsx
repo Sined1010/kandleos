@@ -97,7 +97,11 @@ export default function Sheet({ pos, onPos, head, children }: { pos: SheetPos; o
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         // Half open, the list moves the whole sheet (up: fully open). Fully open it scrolls; scrolled to the
         // top, only scrolling down stays with the list (pan-down), so a pull downwards moves the sheet.
-        style={{ touchAction: pos === 'half' ? 'none' : pos === 'full' && atTop ? 'pan-down' : undefined }}
+        style={{
+          touchAction: pos === 'half' ? 'none' : pos === 'full' && atTop ? 'pan-down' : undefined,
+          // Folded, the gesture bar's strip would show the first folder; the list appears once the sheet moves.
+          visibility: pos === 'low' && drag === null ? 'hidden' : undefined
+        }}
         onScroll={(e) => setAtTop(e.currentTarget.scrollTop <= 0)}
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest('[data-grip]')) return
