@@ -230,7 +230,10 @@ export async function alpacaQuotes(symbols: string[]): Promise<Record<string, Qu
 }
 
 // The asset list (about 12,000 US stocks and ETFs) is loaded once per session for search and names.
-type Asset = { symbol: string; name: string; exchange: string; cusip?: string }
+type Asset = { symbol: string; name: string; exchange: string; cusip?: string; etf: boolean }
+// shortcut: Alpaca's asset list does not say which entries are ETFs, so the fund's name tells; a name without these
+// words shows as a stock. Upgrade if Alpaca adds an asset type.
+const ETF_NAME = /\b(ETF|ETN|Fund|iShares|SPDR|ProShares|Direxion|Vanguard)\b|Invesco QQQ/i
 let assets: Promise<Asset[]> | null = null
 
 function assetList(): Promise<Asset[]> {
@@ -242,7 +245,8 @@ function assetList(): Promise<Asset[]> {
         symbol: String(a.symbol),
         name: cleanName(String(a.name ?? ''), false),
         exchange: String(a.exchange ?? ''),
-        cusip: typeof a.cusip === 'string' ? a.cusip : undefined
+        cusip: typeof a.cusip === 'string' ? a.cusip : undefined,
+        etf: ETF_NAME.test(String(a.name ?? ''))
       }))
     )
     .catch((e) => {
@@ -262,7 +266,7 @@ export async function alpacaSearch(query: string): Promise<SearchResult[]> {
     .filter((a) => a.symbol.startsWith(q) || a.name.toUpperCase().includes(q))
     .sort((a, b) => rank(a) - rank(b) || a.symbol.length - b.symbol.length)
     .slice(0, 10)
-    .map((a) => ({ symbol: a.symbol.replace('.', '-'), name: a.name, exchange: a.exchange }))
+    .map((a) => ({ symbol: a.symbol.replace('.', '-'), name: a.name, exchange: a.exchange, kind: a.etf ? ('etf' as const) : ('stock' as const) }))
 }
 
 /** The asset entry (name, CUSIP) of a US stock or ETF. */

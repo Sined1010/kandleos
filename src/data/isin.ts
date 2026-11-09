@@ -72,13 +72,24 @@ async function loadXetra(): Promise<Map<string, Ids>> {
   return parseXetra(await res.text())
 }
 
-export function xetraIds(mnemonic: string): Promise<Ids | undefined> {
+function xetraList(): Promise<Map<string, Ids>> {
   xetra ??= loadXetra().catch((e) => {
     xetra = null
     throw e
   })
-  return xetra.then((m) => m.get(mnemonic))
+  return xetra
 }
+
+export const xetraIds = (mnemonic: string): Promise<Ids | undefined> => xetraList().then((m) => m.get(mnemonic))
+
+/** A six-character query with a digit may be a WKN ("716460", "A0RPWH"). */
+export const looksLikeWkn = (q: string): boolean => /^(?=.*\d)[A-Z0-9]{6}$/.test(q)
+
+/** ISIN and Xetra symbol (mnemonic) behind a WKN, from the Xetra list (German shares and the ETFs traded on Xetra). */
+export const xetraOfWkn = (wkn: string): Promise<{ isin: string; mnemonic: string } | undefined> =>
+  xetraList().then((m) => {
+    for (const [mnemonic, ids] of m) if (ids.wkn === wkn) return { isin: ids.isin, mnemonic }
+  })
 
 // Wikidata items of the exchanges behind Yahoo's suffixes ('' = US). A ticker is only looked up on its own exchange.
 const EXCHANGES: Record<string, string[]> = {

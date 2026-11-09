@@ -1,6 +1,7 @@
 import { http, type HttpRes } from './http'
 import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch } from './alpaca'
-import { isinFromCusip, wikidataIsin, wknOf, xetraIds } from './isin'
+import { isinFromCusip, looksLikeWkn, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin'
+import { matchCoins, mergeHits } from '../shared/search'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
@@ -21,6 +22,7 @@ import {
   type CompanyInfo,
   type OlderRequest,
   type Quote,
+  type SearchKind,
   type SearchResult,
   type StockSource,
   type Timeframe
@@ -98,37 +100,72 @@ async function getJson(url: string, headers: Record<string, string> = {}): Promi
   return res.json()
 }
 
+// shortcut: Binance's USDT pairs are kept for the session (one request of about 200 KB); a coin listed later shows
+// after a restart.
+let pairs: Promise<Set<string>> | null = null
+
 /**
- * Coins on Binance matching the query, without Yahoo: by name from the list of common coins, or the query as
- * a coin symbol traded against USDT (checked with one cheap Binance request).
+ * All symbols traded against USDT on Binance, so search only offers coins whose chart can load. The book ticker
+ * rather than the price list: delisted pairs keep their last price there, but have no bid.
  */
-async function coinSearch(query: string): Promise<SearchResult[]> {
-  const q = query.trim().toUpperCase().replace(/USDT$/, '')
-  const out = Object.entries(COINS)
-    .filter(([sym, name]) => sym.startsWith(q) || name.toUpperCase().startsWith(q))
-    .map(([sym, name]) => ({ symbol: sym + 'USDT', name, exchange: 'Binance' }))
-  if (/^[A-Z0-9]{2,10}$/.test(q) && !COINS[q]) {
-    const res = await http(`https://api.binance.com/api/v3/ticker/price?symbol=${q}USDT`, { timeoutMs: 5000 }).catch(
-      () => null
-    )
-    if (res?.ok) out.unshift({ symbol: q + 'USDT', name: q, exchange: 'Binance' })
-  }
-  return out.slice(0, 5)
+function binancePairs(): Promise<Set<string>> {
+  pairs ??= http('https://api.binance.com/api/v3/ticker/bookTicker', { timeoutMs: 10_000 })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Binance HTTP ${res.status}`)
+      const list: unknown = await res.json()
+      if (!Array.isArray(list)) throw new Error('Binance: no list')
+      return new Set(
+        list.filter((p) => Number(p?.bidPrice) > 0).map((p) => String(p.symbol)).filter((s) => s.endsWith('USDT') && SYMBOL_RE.test(s))
+      )
+    })
+    .catch((e) => {
+      pairs = null
+      throw e
+    })
+  return pairs
+}
+
+/** The promise's value if it comes within `ms`, else (or on an error) the fallback; the promise itself runs on. */
+function within<T, F>(p: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  return Promise.race([p.catch(() => fallback), new Promise<F>((r) => setTimeout(() => r(fallback), ms))])
+}
+
+const yahooKind: Record<string, SearchKind> = {
+  EQUITY: 'stock',
+  ETF: 'etf',
+  MUTUALFUND: 'fund',
+  CRYPTOCURRENCY: 'crypto',
+  INDEX: 'index',
+  FUTURE: 'future',
+  CURRENCY: 'currency'
 }
 
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   if (typeof query !== 'string' || !query.trim() || query.length > 40) return []
+  // Neither list may hold up the search: a slow Binance leaves only the common coins, a slow Xetra list (5 MB on its
+  // first load) only the plain search. Both keep loading for the next search.
+  const listed = within(binancePairs(), 2000, null)
+  const alpaca = source === 'alpaca' ? alpacaSearch(query).catch(() => []) : Promise.resolve([])
   if (!yahooOn()) {
-    const [coins, stocks] = await Promise.all([
-      coinSearch(query),
-      source === 'alpaca' ? alpacaSearch(query).catch(() => []) : []
-    ])
-    return [...stocks, ...coins]
+    const [us, list] = await Promise.all([alpaca, listed])
+    return mergeHits(query, us, matchCoins(query, list, COINS))
   }
-  if (source === 'yahoo') return yahooSearch(query)
-  // Alpaca's US hits first, then Yahoo's for everything else (a US symbol from Yahoo is the same symbol).
-  const [stocks, found] = await Promise.all([alpacaSearch(query).catch(() => []), yahooSearch(query).catch(() => [])])
-  return [...stocks, ...found.filter((f) => !stocks.some((s) => s.symbol === f.symbol))]
+  // A WKN is also searched as its ISIN, which Yahoo knows; the Xetra list maps one to the other. Its Xetra listing
+  // comes first, as Yahoo may answer with another exchange only (A0RPWH → London).
+  const q = query.trim().toUpperCase()
+  const byWkn = looksLikeWkn(q)
+    ? within(xetraOfWkn(q), 3000, undefined).then(async (x) =>
+        x && SYMBOL_RE.test(x.mnemonic + '.DE') ? { x, hits: await yahooSearch(x.isin).catch(() => []) } : undefined
+      )
+    : Promise.resolve(undefined)
+  const [us, yahoo, wkn, list] = await Promise.all([alpaca, yahooSearch(query).catch(() => []), byWkn, listed])
+  const found = wkn
+    ? [{ symbol: wkn.x.mnemonic + '.DE', name: wkn.hits[0]?.name ?? q, exchange: 'XETRA', kind: wkn.hits[0]?.kind }, ...wkn.hits, ...yahoo]
+    : yahoo
+  const coins = matchCoins(query, list, COINS)
+  // Alpaca's US hits first, then Yahoo's for everything else (a US symbol from Yahoo is the same symbol). Yahoo's
+  // coins only when Binance trades them; without Binance's list none, as their charts may not load.
+  return mergeHits(query, [...us, ...found.filter((f) => f.kind !== 'crypto' || list?.has(f.symbol))], coins)
 }
 
 async function yahooSearch(query: string): Promise<SearchResult[]> {
@@ -136,12 +173,14 @@ async function yahooSearch(query: string): Promise<SearchResult[]> {
   const curated: SearchResult[] = findAliases(query).map((a) => ({
     symbol: a.symbol,
     name: t(a.name),
-    exchange: a.symbol.endsWith('=F') ? 'Future' : 'Index'
+    exchange: a.symbol.endsWith('=F') ? 'Future' : 'Index',
+    kind: a.symbol.endsWith('=F') ? 'future' : 'index'
   }))
   let found: SearchResult[] = []
   try {
+    // 20 rather than 10: the search filter (stocks, ETFs, crypto) then still has hits of each kind.
     const d = await getJson(
-      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&quotesCount=10&newsCount=0&listsCount=0`
+      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&quotesCount=20&newsCount=0&listsCount=0`
     )
     found = (d.quotes ?? []).flatMap((q: any): SearchResult[] => {
       if (typeof q.symbol !== 'string') return []
@@ -150,7 +189,7 @@ async function yahooSearch(query: string): Promise<SearchResult[]> {
       const symbol = crypto ? q.symbol.replace(/-USD$/, 'USDT') : q.symbol
       if (!SYMBOL_RE.test(symbol) || crypto !== isCrypto(symbol) || curated.some((c) => c.symbol === symbol)) return []
       const name = aliasName(symbol) ?? cleanName(String(q.longname ?? q.shortname ?? ''), crypto)
-      return [{ symbol, name, exchange: crypto ? 'Binance' : (q.exchDisp ?? '') }]
+      return [{ symbol, name, exchange: crypto ? 'Binance' : (q.exchDisp ?? ''), kind: Object.hasOwn(yahooKind, q.quoteType) ? yahooKind[q.quoteType] : undefined }]
     })
   } catch (e) {
     // Curated hits still work offline or when Yahoo is down.

@@ -1030,5 +1030,15 @@ export const EN: Record<string, string> = {
   Überschreiben: 'Overwrite',
   // Chart error boundary
   'Der Chart konnte nicht angezeigt werden.': 'The chart could not be shown.',
-  'Erneut versuchen': 'Try again'
+  'Erneut versuchen': 'Try again',
+  // Symbol search: filter and kind of each hit
+  Alle: 'All',
+  Aktien: 'Stocks',
+  ETFs: 'ETFs',
+  ETF: 'ETF',
+  Fonds: 'Fund',
+  Index: 'Index',
+  Future: 'Future',
+  Währung: 'Currency',
+  'Art der Werte': 'Kind of symbols'
 }

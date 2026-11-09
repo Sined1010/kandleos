@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isinFromCusip, isinValid, parseXetra, pickIsin, wknOf, xetraPath } from './isin.ts'
+import { isinFromCusip, isinValid, looksLikeWkn, parseXetra, pickIsin, wknOf, xetraPath } from './isin.ts'
+
+test('a WKN is six letters or digits with at least one digit', () => {
+  for (const q of ['716460', 'A0RPWH']) assert.equal(looksLikeWkn(q), true, q)
+  for (const q of ['ABCDEF', 'RHM.DE', '71646', 'A0RPWH1']) assert.equal(looksLikeWkn(q), false, q)
+})
 
 test('ISIN check digits', () => {
   for (const ok of ['US0378331005', 'DE0007164600', 'DE000BASF111', 'NL0000235190', 'DE0007664039']) assert.ok(isinValid(ok), ok)

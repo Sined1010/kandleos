@@ -78,10 +78,14 @@ export function stockRoute(source: StockSource | null, yahooExtra: boolean, symb
   return source === 'yahoo' ? 'yahoo' : null
 }
 
+/** What a search hit is: shown as a tag and used by the search filter. */
+export type SearchKind = 'stock' | 'etf' | 'fund' | 'crypto' | 'index' | 'future' | 'currency'
+
 export interface SearchResult {
   symbol: string
   name: string
   exchange: string
+  kind?: SearchKind
 }
 
 /** What the info button shows about a stock; every field is optional because the sources differ. */
