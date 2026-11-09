@@ -108,6 +108,11 @@ export interface CompanyInfo {
   beta?: number
   high52?: number
   low52?: number
+  isin?: string
+  /** German securities number; for Xetra listings and German ISINs. */
+  wkn?: string
+  /** Where ISIN and WKN come from (see data/isin.ts). */
+  idSource?: 'Alpaca' | 'Deutsche Börse' | 'Wikidata'
 }
 
 // Starts with a letter, digit or ^ (indices): the symbol also names a results folder, so ".." must never pass.

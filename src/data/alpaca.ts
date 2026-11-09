@@ -230,14 +230,20 @@ export async function alpacaQuotes(symbols: string[]): Promise<Record<string, Qu
 }
 
 // The asset list (about 12,000 US stocks and ETFs) is loaded once per session for search and names.
-let assets: Promise<{ symbol: string; name: string; exchange: string }[]> | null = null
+type Asset = { symbol: string; name: string; exchange: string; cusip?: string }
+let assets: Promise<Asset[]> | null = null
 
-function assetList(): Promise<{ symbol: string; name: string; exchange: string }[]> {
+function assetList(): Promise<Asset[]> {
   // Keys of live and paper accounts each work only on their own trading endpoint.
   assets ??= request('https://api.alpaca.markets/v2/assets?status=active&asset_class=us_equity')
     .catch(() => request('https://paper-api.alpaca.markets/v2/assets?status=active&asset_class=us_equity'))
     .then((list: any[]) =>
-      list.map((a) => ({ symbol: String(a.symbol), name: cleanName(String(a.name ?? ''), false), exchange: String(a.exchange ?? '') }))
+      list.map((a) => ({
+        symbol: String(a.symbol),
+        name: cleanName(String(a.name ?? ''), false),
+        exchange: String(a.exchange ?? ''),
+        cusip: typeof a.cusip === 'string' ? a.cusip : undefined
+      }))
     )
     .catch((e) => {
       assets = null
@@ -259,8 +265,9 @@ export async function alpacaSearch(query: string): Promise<SearchResult[]> {
     .map((a) => ({ symbol: a.symbol.replace('.', '-'), name: a.name, exchange: a.exchange }))
 }
 
-export async function alpacaName(symbol: string): Promise<string | null> {
-  if (!alpacaKnows(symbol)) return null
+/** The asset entry (name, CUSIP) of a US stock or ETF. */
+export async function alpacaAsset(symbol: string): Promise<Asset | undefined> {
+  if (!alpacaKnows(symbol)) return undefined
   const s = ticker(symbol)
-  return (await assetList()).find((a) => a.symbol === s)?.name || null
+  return (await assetList()).find((a) => a.symbol === s)
 }

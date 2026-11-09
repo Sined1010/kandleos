@@ -85,6 +85,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <li>{t('Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key')}</li>
           <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
           <li>{t('Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist')}</li>
+          <li>{t('Deutsche Börse und Wikidata – ISIN und WKN, nur beim Klick auf die Infos zu einem Wert')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
           <li>{t('GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“')}</li>
         </ul>

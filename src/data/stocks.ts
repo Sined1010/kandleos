@@ -1,5 +1,6 @@
 import { http, type HttpRes } from './http'
-import { alpacaCandles, alpacaName, alpacaQuotes, alpacaSearch } from './alpaca'
+import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch } from './alpaca'
+import { isinFromCusip, wikidataIsin, wknOf, xetraIds } from './isin'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
@@ -343,7 +344,7 @@ export async function symbolName(symbolArg: unknown): Promise<string | null> {
   const crypto = isCrypto(symbol)
   if (source !== 'yahoo') {
     if (crypto) return COINS[symbol.slice(0, -cryptoQuoteAsset(symbol).length)] ?? null
-    if (viaAlpaca(symbol)) return alpacaName(symbol).catch(() => null)
+    if (viaAlpaca(symbol)) return alpacaAsset(symbol).then((a) => a?.name || null, () => null)
     if (!yahooOn()) return null
   }
   // Yahoo lists coins against USD (BTC-USD), not as exchange pairs (BTCUSDT).
@@ -422,6 +423,13 @@ const https = (v: unknown): string | undefined => str(v)?.replace(/^http:\/\//, 
 export async function companyInfo(symbolArg: unknown, keyArg: unknown): Promise<CompanyInfo> {
   const [symbol, key] = checkArgs(symbolArg, keyArg)
   if (isCrypto(symbol)) throw new Error(t('Infos gibt es nur für Aktien.'))
+  // The numbers are extra: a slow or unreachable source must not hold back the panel.
+  const ids = Promise.race([securityIds(symbol), new Promise<{}>((r) => setTimeout(() => r({}), 5000))])
+  const [info, found] = await Promise.all([profile(symbol, key), ids])
+  return { ...info, ...found }
+}
+
+async function profile(symbol: string, key: string): Promise<CompanyInfo> {
   // Finnhub's free plan covers US listings only; indices, commodities and other exchanges fall through to Yahoo.
   const finnhub = key && alpacaKnows(symbol) ? await finnhubInfo(symbol, key).catch(() => null) : null
   if (finnhub) return finnhub
@@ -433,6 +441,28 @@ export async function companyInfo(symbolArg: unknown, keyArg: unknown): Promise<
     )
   }
   return yahooInfo(symbol)
+}
+
+/** ISIN (and WKN) from the most exact source that has the symbol; none if unsure or a source fails. */
+async function securityIds(symbol: string): Promise<Pick<CompanyInfo, 'isin' | 'wkn' | 'idSource'>> {
+  if (/[\^=]/.test(symbol)) return {} // indices, futures, currencies
+  const [, base, suffix = ''] = symbol.match(/^(.+?)(?:\.([A-Z]{1,2}))?$/)!
+  try {
+    if (alpacaKnows(symbol) && alpacaHasKeys()) {
+      const isin = isinFromCusip((await alpacaAsset(symbol).catch(() => undefined))?.cusip)
+      if (isin) return { isin, idSource: 'Alpaca' }
+    }
+    if (suffix === 'DE' || suffix === 'F') {
+      const x = await xetraIds(base).catch(() => undefined)
+      if (x) return { ...x, idSource: 'Deutsche Börse' }
+    }
+    // A US share class is written BRK-B at Yahoo; anything else after a dot is an exchange suffix.
+    const isin = await wikidataIsin(alpacaKnows(symbol) ? symbol : base, alpacaKnows(symbol) ? '' : suffix)
+    return isin ? { isin, wkn: wknOf(isin), idSource: 'Wikidata' } : {}
+  } catch (e) {
+    console.warn((e as Error).message)
+    return {}
+  }
 }
 
 async function finnhubInfo(symbol: string, key: string): Promise<CompanyInfo | null> {

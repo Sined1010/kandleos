@@ -50,6 +50,8 @@ export const EN: Record<string, string> = {
     'nor a recommendation to buy or sell. All prices without guarantee: data may be delayed, incomplete or wrong. Use at your own risk; investment decisions are yours alone.',
   Datenschutz: 'Privacy',
   'Binance – Kryptokurse': 'Binance – crypto prices',
+  'Deutsche Börse und Wikidata – ISIN und WKN, nur beim Klick auf die Infos zu einem Wert':
+    'Deutsche Börse and Wikidata – ISIN and WKN, only when you open the info on a symbol',
   'Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“':
     'Hugging Face – one-time download of the forecast model on the first click on “Forecast”',
   'Nur wenn du die': 'Only when you set up and start the',

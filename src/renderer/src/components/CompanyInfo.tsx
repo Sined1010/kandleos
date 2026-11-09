@@ -65,6 +65,8 @@ export function InfoPanel({ symbol, page = false }: { symbol: string; page?: boo
 
   const rows: [string, string | undefined][] = info
     ? [
+        ['ISIN', info.isin],
+        ['WKN', info.wkn],
         [t('Marktkapitalisierung'), money(info.marketCap, info.currency, true)],
         [t('Branche'), [info.sector, info.industry].filter(Boolean).join(' · ') || undefined],
         [t('Land'), info.country],
@@ -128,6 +130,7 @@ export function InfoPanel({ symbol, page = false }: { symbol: string; page?: boo
           <p className="mt-3 text-[10px] text-muted">
             {t('Quelle: {source}', { source: info.source })}
             {info.source === 'Yahoo Finance' && ` · ${t('nur für private Zwecke')}`}
+            {info.idSource && ` · ISIN: ${info.idSource}`}
           </p>
         </>
       )}

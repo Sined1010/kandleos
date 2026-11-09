@@ -113,6 +113,7 @@ You choose the stock data source on first start; you can change it any time in t
 | [Alpaca](https://alpaca.markets/) | US stocks and ETFs (recommended for US stocks) | your own free key. Use **paper trading keys**: KandleOS only reads market data, live keys would also allow trading |
 | Yahoo Finance | Stocks worldwide, indices, commodities, pre-/post-market | not needed, opt-in |
 | [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks and company info | your own free key |
+| [Deutsche Börse](https://www.cashmarket.deutsche-boerse.com/cash-en/trading/Tradable-Instruments-Xetra), [Wikidata](https://www.wikidata.org/) | ISIN and WKN in the company info (US stocks: computed from Alpaca's CUSIP), only when you open it | not needed |
 
 **About Yahoo Finance:** Yahoo does not offer an official API for this. Like the open-source library yfinance,
 KandleOS reads the publicly available data that Yahoo's own finance website loads. Yahoo Finance data is meant for
