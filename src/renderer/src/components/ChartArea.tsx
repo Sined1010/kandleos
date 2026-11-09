@@ -46,7 +46,7 @@ import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
 import { ask, tell } from '../../../mobile/MessageBox'
 import MobileKiButton from '../../../mobile/MobileKiButton'
-import PriceTag from '../../../mobile/PriceTag'
+import PriceTags from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
 import { useQuotes, useStore } from '../store/useStore'
@@ -63,6 +63,8 @@ import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
 const SESSION_TITLE = { pre: msg('Vorbörse'), post: msg('Nachbörse'), close: msg('Schluss') }
+// Line and tag colours: orange (sunrise) before, indigo (moon) after the session, grey for the regular close.
+const SESSION_TAG = { pre: { color: '#fb923c', ink: '#0a0c16' }, post: { color: '#a5b4fc', ink: '#0a0c16' }, close: { color: '#5d6375', ink: '#fff' } }
 const FORECAST = '#ffd54f'
 // Bars left of the view at which the section before the oldest bar is loaded.
 const OLDER_MARGIN = 50
@@ -758,13 +760,13 @@ export default function ChartArea() {
   useEffect(() => {
     if (!api || !session) return
     const close = session.kind === 'close'
+    // Line only: its tag and title are drawn rounded by PriceTags, like the last price.
     const line = api.candles.createPriceLine({
       price: session.price,
-      color: close ? '#5d6375' : session.kind === 'pre' ? '#fb923c' : '#a5b4fc',
-      title: t(SESSION_TITLE[session.kind]),
+      color: SESSION_TAG[session.kind].color,
       lineStyle: close ? LineStyle.Dotted : LineStyle.LargeDashed,
       lineWidth: 1,
-      axisLabelVisible: true
+      axisLabelVisible: false
     })
     return () => api.candles.removePriceLine(line)
     // Primitives, so the 15 s quote refresh does not rebuild an unchanged line.
@@ -823,8 +825,8 @@ export default function ChartArea() {
       wickUpColor: UP,
       wickDownColor: DOWN,
       borderVisible: false,
-      // The phone draws its own, rounded last-price tag (src/mobile/PriceTag.tsx).
-      lastValueVisible: !IS_MOBILE
+      // KandleOS draws its own, rounded last-price tag (src/mobile/PriceTag.tsx).
+      lastValueVisible: false
     })
     candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } })
     const volume = chart.addSeries(HistogramSeries, {
@@ -900,12 +902,15 @@ export default function ChartArea() {
           </span>
         )}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
-        {IS_MOBILE && api && data.length > 0 && (
-          <PriceTag
+        {api && data.length > 0 && (
+          <PriceTags
             chart={api.chart}
             series={api.candles}
-            price={data[data.length - 1].close}
-            color={data[data.length - 1].close >= data[data.length - 1].open ? UP : DOWN}
+            right={sideOpen ? AGENTS_WIDTH : 0}
+            tags={[
+              { price: data[data.length - 1].close, color: data[data.length - 1].close >= data[data.length - 1].open ? UP : DOWN },
+              ...(session ? [{ price: session.price, ...SESSION_TAG[session.kind], label: t(SESSION_TITLE[session.kind]) }] : [])
+            ]}
           />
         )}
         {api && fc.state === 'loading' && data.length > 0 && (
@@ -932,7 +937,7 @@ export default function ChartArea() {
                 <span>
                   <span className="font-semibold text-white">{symbol}</span> · {tfLabel(timeframe)}
                 </span>
-                <QuoteChip quote={quote} />
+                <QuoteChip quote={quote} currency={currency} />
                 <MarketBadge symbol={symbol} timeZone={exchangeZone} />
               </>
             )}

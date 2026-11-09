@@ -114,13 +114,15 @@ export const extTitle = (ext: Ext): string =>
   })
 
 /** Regular price and change for the chart legend, plus the pre-/after-market price when there is one. */
-export function QuoteChip({ quote }: { quote?: Quote }) {
+/** `currency`: shown right after the price, as in the phone's header. */
+export function QuoteChip({ quote, currency }: { quote?: Quote; currency?: string }) {
   if (!quote) return null
   const color = (pct: number) => (pct >= 0 ? 'text-up' : 'text-down')
   return (
     <span className="pointer-events-auto inline-flex items-center gap-2 tabular-nums">
       <span title={t('Regulärer Kurs und Veränderung zum Vortag')}>
-        <span className="font-medium text-slate-200">{formatPrice(quote.price)}</span>{' '}
+        <span className="font-medium text-slate-200">{formatPrice(quote.price)}</span>
+        {currency && <span className="ml-1 text-[10px] font-semibold text-muted">{currency}</span>}{' '}
         <span className={color(quote.changePct)}>{formatChange(quote.changePct)}</span>
       </span>
       {quote.ext && (

@@ -906,6 +906,8 @@ export const EN: Record<string, string> = {
   'Kurs-Alarm von KandleOS': 'Price alarm from KandleOS',
   'Kurs-Alarm …': 'Price alarm …',
   'Kurs-Alarme': 'Price alarms',
+  'Alarme': 'Alarms',
+  'Kurs-Alarme für {symbol}': 'Price alarms for {symbol}',
   'Tab {n} von {count}': 'Tab {n} of {count}',
   Tabs: 'Tabs',
   '+ Neuer Tab': '+ New tab',

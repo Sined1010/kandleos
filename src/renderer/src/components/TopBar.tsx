@@ -1,9 +1,10 @@
-import { Activity, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
+import { Activity, Bell, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { locale, msg, t } from '../../../shared/i18n'
 import { isCrypto, tfLabel, type StockSource, type Timeframe } from '../../../shared/types'
 import type { FeedStatus } from '../services/marketData'
 import { useQuotes, useStore, type Indicators } from '../store/useStore'
+import AlarmsModal from './AlarmsModal'
 import CompanyInfoButton from './CompanyInfo'
 import Logo from './Logo'
 import SavedCharts from './SavedCharts'
@@ -14,6 +15,7 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
   const symbol = useStore((s) => s.symbol)
   const setSymbol = useStore((s) => s.setSymbol)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [alarmsOpen, setAlarmsOpen] = useState(false)
 
   return (
     <header className="relative flex h-12 shrink-0 items-center gap-3 border-b border-line bg-panel px-3">
@@ -47,6 +49,15 @@ export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings
         </button>
         {menuOpen && <IndicatorMenu onClose={() => setMenuOpen(false)} />}
       </div>
+      {/* Price alarms for the open symbol (also in the watchlist's right-click menu). */}
+      <button
+        onClick={() => setAlarmsOpen(true)}
+        title={t('Kurs-Alarme für {symbol}', { symbol })}
+        className="flex items-center gap-1.5 rounded px-2 py-1 text-muted hover:bg-line hover:text-white"
+      >
+        <Bell size={15} /> {t('Alarme')}
+      </button>
+      {alarmsOpen && <AlarmsModal symbol={symbol} onClose={() => setAlarmsOpen(false)} />}
       <SavedCharts />
 
       <UpdateBadge />

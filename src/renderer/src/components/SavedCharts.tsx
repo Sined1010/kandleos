@@ -70,7 +70,8 @@ export function SavedChartsPanel({ onDone, onSaveAs }: { onDone: () => void; onS
   const tab = useStore((s) => s.tabs.find((x) => x.id === s.activeTab))
   const saveChart = useStore((s) => s.saveChart)
   const linked = tab && linkedChart(tab, charts)
-  const item = 'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-bg'
+  // Finger-sized rows on the phone, compact in the desktop popover.
+  const item = `flex w-full items-center justify-between gap-2 rounded px-2 text-left hover:bg-bg ${IS_MOBILE ? 'min-h-12 text-base active:bg-line' : 'py-1.5'}`
   return (
     <>
             {linked && (
@@ -82,7 +83,7 @@ export function SavedChartsPanel({ onDone, onSaveAs }: { onDone: () => void; onS
                 }}
               >
                 <span className="text-white">{t('Speichern')}</span>
-                <span className="truncate text-[11px] text-muted">{t('überschreibt „{name}“', { name: linked.name })}</span>
+                <span className={`truncate text-muted ${IS_MOBILE ? 'text-xs' : 'text-[11px]'}`}>{t('überschreibt „{name}“', { name: linked.name })}</span>
               </button>
             )}
             <button
@@ -149,19 +150,20 @@ function ChartList({ onDone }: { onDone: () => void }) {
     if (menu) setHover({ id: c.id, top: el.getBoundingClientRect().top - menu.top })
   }
 
-  if (!charts.length) return <p className="px-2 py-2 text-xs text-muted">{t('Noch keine Chart-Stände – „Speichern unter …“ legt den ersten an.')}</p>
+  if (!charts.length) return <p className={`px-2 py-2 text-muted ${IS_MOBILE ? 'text-sm' : 'text-xs'}`}>{t('Noch keine Chart-Stände – „Speichern unter …“ legt den ersten an.')}</p>
   return (
     <>
       <input
-        autoFocus
+        // On the phone the keyboard would cover half the list as soon as the page opens.
+        autoFocus={!IS_MOBILE}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('Suchen (Name oder Wert) …')}
         aria-label={t('Suchen (Name oder Wert) …')}
-        className="mb-1 w-full rounded bg-bg px-2 py-1 text-xs text-white outline-none ring-1 ring-line placeholder:text-muted/60 focus:ring-accent"
+        className={`mb-1 w-full bg-bg text-white outline-none ring-1 ring-line placeholder:text-muted/60 focus:ring-accent ${IS_MOBILE ? 'rounded-xl px-3 py-2.5 text-base' : 'rounded px-2 py-1 text-xs'}`}
       />
-      <div className="max-h-[60vh] overflow-y-auto" onScroll={() => setHover(null)}>
-        {!groups.length && <p className="px-2 py-2 text-xs text-muted">{t('Keine Treffer')}</p>}
+      <div className={IS_MOBILE ? '' : 'max-h-[60vh] overflow-y-auto'} onScroll={() => setHover(null)}>
+        {!groups.length && <p className={`px-2 py-2 text-muted ${IS_MOBILE ? 'text-sm' : 'text-xs'}`}>{t('Keine Treffer')}</p>}
         {groups.map((g) => {
           const open = !!query || g.current !== toggled.has(g.symbol)
           return (
@@ -175,9 +177,9 @@ function ChartList({ onDone }: { onDone: () => void }) {
                   })
                 }
                 aria-expanded={open}
-                className="flex w-full items-center gap-1 px-1 pb-0.5 pt-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted hover:text-white"
+                className={`flex w-full items-center gap-1 px-1 text-left font-semibold uppercase tracking-wider text-muted hover:text-white ${IS_MOBILE ? 'min-h-11 pt-1 text-xs' : 'pb-0.5 pt-2 text-[10px]'}`}
               >
-                {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {open ? <ChevronDown size={IS_MOBILE ? 16 : 12} /> : <ChevronRight size={IS_MOBILE ? 16 : 12} />}
                 <span className="flex-1 truncate">{g.current ? t('{name} · aktueller Wert', { name: g.label }) : g.label}</span>
                 <span className="font-normal text-muted/60">{g.charts.length}</span>
               </button>
@@ -210,7 +212,7 @@ function ChartList({ onDone }: { onDone: () => void }) {
                           if (e.key === 'Escape') e.currentTarget.value = c.name
                           if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
                         }}
-                        className="my-1 min-w-0 flex-1 rounded bg-bg px-1 py-0.5 text-xs text-white outline-none ring-1 ring-accent"
+                        className={`my-1 min-w-0 flex-1 rounded bg-bg text-white outline-none ring-1 ring-accent ${IS_MOBILE ? 'px-2 py-2 text-base' : 'px-1 py-0.5 text-xs'}`}
                       />
                     ) : (
                       <button
@@ -218,13 +220,13 @@ function ChartList({ onDone }: { onDone: () => void }) {
                         onFocus={(e) => showDetails(c, e.currentTarget)}
                         onBlur={() => setHover(null)}
                         aria-label={t('{name} laden', { name: c.name })}
-                        className="min-w-0 flex-1 py-1 text-left"
+                        className={`min-w-0 flex-1 text-left ${IS_MOBILE ? 'py-2.5' : 'py-1'}`}
                       >
-                        <span className="block truncate text-white">
+                        <span className={`block truncate text-white ${IS_MOBILE ? 'text-base' : ''}`}>
                           {c.id === linked?.id && <span className="mr-1 text-brand-to">●</span>}
                           {c.name}
                         </span>
-                        <span className="block truncate text-[10.5px] text-muted">
+                        <span className={`block truncate text-muted ${IS_MOBILE ? 'text-xs' : 'text-[10.5px]'}`}>
                           {t('{tf} · {count} Zeichnungen · {date}', {
                             tf: tfLabel(c.timeframe),
                             count: c.drawings.length,
@@ -236,21 +238,21 @@ function ChartList({ onDone }: { onDone: () => void }) {
                     <span className={`${IS_MOBILE ? 'flex' : 'hidden'} gap-1 group-focus-within/row:flex group-hover/row:flex`}>
                       <button
                         onClick={() => setRenaming(c.id)}
-                        className="rounded p-0.5 text-muted hover:text-white"
+                        className={`rounded text-muted hover:text-white ${IS_MOBILE ? 'flex h-11 w-11 items-center justify-center active:bg-line' : 'p-0.5'}`}
                         title={t('Umbenennen')}
                         aria-label={t('{name} umbenennen', { name: c.name })}
                       >
-                        <Pencil size={12} />
+                        <Pencil size={IS_MOBILE ? 18 : 12} />
                       </button>
                       <button
                         onClick={async () =>
                           (await ask(t('Chart-Stand „{name}“ löschen?', { name: c.name }), t('Löschen'), { danger: true })) && deleteChart(c.id)
                         }
-                        className="rounded p-0.5 text-muted hover:text-down"
+                        className={`rounded text-muted hover:text-down ${IS_MOBILE ? 'flex h-11 w-11 items-center justify-center active:bg-line' : 'p-0.5'}`}
                         title={t('Löschen')}
                         aria-label={t('{name} löschen', { name: c.name })}
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={IS_MOBILE ? 18 : 12} />
                       </button>
                     </span>
                   </div>
@@ -308,13 +310,13 @@ export function SaveDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="save-chart-title"
-        className="w-[380px] rounded-xl border border-line bg-panel/95 p-5 text-sm shadow-2xl backdrop-blur"
+        className={`w-[380px] max-w-full border border-line bg-panel/95 p-5 shadow-2xl backdrop-blur ${IS_MOBILE ? 'rounded-2xl text-base' : 'rounded-xl text-sm'}`}
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 id="save-chart-title" className="text-base font-semibold text-white">
@@ -335,7 +337,7 @@ export function SaveDialog({ onClose }: { onClose: () => void }) {
           onChange={(e) => setName(e.target.value)}
           onFocus={(e) => e.target.select()}
           onKeyDown={(e) => e.key === 'Enter' && save()}
-          className="mb-4 w-full rounded bg-bg px-2 py-1.5 text-white outline-none ring-1 ring-line focus:ring-accent"
+          className={`mb-4 w-full bg-bg text-white outline-none ring-1 ring-line focus:ring-accent ${IS_MOBILE ? 'rounded-xl px-3 py-3' : 'rounded px-2 py-1.5'}`}
         />
         <div className="mb-1 text-xs text-muted">{t('Gespeichert wird')}</div>
         <div className="mb-4 rounded-md border border-line bg-bg px-3 py-2 text-xs leading-relaxed text-slate-300">
@@ -352,14 +354,14 @@ export function SaveDialog({ onClose }: { onClose: () => void }) {
             )}
           </div>
         </div>
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded px-3 py-1.5 text-muted hover:bg-line hover:text-white">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button onClick={onClose} className={`text-muted hover:bg-line hover:text-white ${IS_MOBILE ? 'min-h-11 rounded-xl px-4 py-2' : 'rounded px-3 py-1.5'}`}>
             {t('Abbrechen')}
           </button>
           <button
             onClick={save}
             disabled={!name.trim()}
-            className="rounded bg-brand px-3 py-1.5 font-medium text-white shadow-glow disabled:opacity-40"
+            className={`bg-brand font-medium text-white shadow-glow disabled:opacity-40 ${IS_MOBILE ? 'min-h-11 rounded-xl px-5 py-2' : 'rounded px-3 py-1.5'}`}
           >
             {t('Speichern')}
           </button>
