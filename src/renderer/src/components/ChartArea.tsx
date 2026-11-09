@@ -46,7 +46,7 @@ import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
 import { ask, tell } from '../../../mobile/MessageBox'
 import MobileKiButton from '../../../mobile/MobileKiButton'
-import PriceTags from '../../../mobile/PriceTag'
+import PriceTags, { type Tag } from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
 import { useQuotes, useStore } from '../store/useStore'
@@ -66,6 +66,7 @@ const SESSION_TITLE = { pre: msg('Vorbörse'), post: msg('Nachbörse'), close: m
 // Line and tag colours: orange (sunrise) before, indigo (moon) after the session, grey for the regular close.
 const SESSION_TAG = { pre: { color: '#fb923c', ink: '#0a0c16' }, post: { color: '#a5b4fc', ink: '#0a0c16' }, close: { color: '#5d6375', ink: '#fff' } }
 const FORECAST = '#ffd54f'
+const ALARM = '#a78bfa'
 // Bars left of the view at which the section before the oldest bar is loaded.
 const OLDER_MARGIN = 50
 const OLDER_HINT = {
@@ -105,6 +106,16 @@ function tickMark(time: Time, type: TickMarkType): string {
   return fmtTime(time, { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Price target, entry and stop of a TradingAgents analysis: price, colour, title, line style. */
+function agentLevelList(d: Decision | null): [number | null, string, string, LineStyle][] {
+  if (!d) return []
+  return [
+    [d.priceTarget, THEME.brandTo, t('KI-Ziel'), LineStyle.Dashed],
+    [d.entry, THEME.drawing, t('Einstieg'), LineStyle.Dotted],
+    [d.stopLoss, THEME.down, t('Stop'), LineStyle.Dashed]
+  ]
+}
+
 export default function ChartArea() {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
@@ -130,6 +141,7 @@ export default function ChartArea() {
   const [data, setData] = useState<Candle[]>([])
   const [indicatorSeries, setIndicatorSeries] = useState<IndicatorSeries[]>([])
   const [legend, setLegend] = useState<LegendGroup[]>([])
+  const [valueTags, setValueTags] = useState<Tag[]>([])
   const [status, setStatus] = useState<string | null>(null)
   // Currency and exchange time zone of the loaded candles; the phone's header reads them too. The forecast's time
   // axis follows that exchange's calendar.
@@ -390,8 +402,11 @@ export default function ChartArea() {
       list.push({ series, calc })
       return series
     }
-    const guides = (series: ISeriesApi<SeriesType>, levels: number[]) => {
-      series.applyOptions({ lastValueVisible: true })
+    // Latest value as a rounded tag on the pane's axis (PriceTags), dark text on the light indicator colours.
+    const tags: Tag[] = []
+    const valueTag = (series: ISeriesApi<SeriesType>, color: string) => tags.push({ series, color, ink: THEME.bg })
+    const guides = (series: ISeriesApi<SeriesType>, color: string, levels: number[]) => {
+      valueTag(series, color)
       for (const price of levels)
         series.createPriceLine({ price, color: '#5d6375', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false })
     }
@@ -440,7 +455,7 @@ export default function ChartArea() {
     let pane = 1
     if (r.on) {
       const series = line('#b388ff', (c) => rsi(c, r.period), pane)
-      guides(series, [70, 30])
+      guides(series, '#b388ff', [70, 30])
       legend(pane++, `RSI ${r.period}`, '#b388ff', [series], true)
     }
     if (m.on) {
@@ -453,17 +468,18 @@ export default function ChartArea() {
     if (stoch.on) {
       const calc = (d: Candle[]) => stochastic(d, stoch.period, stoch.smoothK, stoch.smoothD)
       const k = line('#42a5f5', (_, d) => calc(d).k, pane)
-      guides(k, [80, 20])
+      guides(k, '#42a5f5', [80, 20])
       legend(pane, `${t('Stochastik')} ${stoch.period} ${stoch.smoothK} ${stoch.smoothD}`, '#42a5f5', [k, line('#ff9800', (_, d) => calc(d).d, pane++)], true)
     }
     if (at.on) {
       const series = line('#b0bec5', (_, d) => atr(d, at.period), pane)
-      series.applyOptions({ lastValueVisible: true })
+      valueTag(series, '#b0bec5')
       legend(pane++, `ATR ${at.period}`, '#b0bec5', [series])
     }
     chart.panes().forEach((p, i) => i > 0 && p.setStretchFactor(0.3))
     setIndicatorSeries(list)
     setLegend(groups)
+    setValueTags(tags)
     return () => {
       list.forEach((i) => chart.removeSeries(i.series))
       while (chart.panes().length > 1) chart.removePane(chart.panes().length - 1)
@@ -728,15 +744,12 @@ export default function ChartArea() {
   }, [api, fc.result, forecastView])
 
   // Price target, entry and stop of the TradingAgents analysis as labelled lines on the price axis.
+  const levels = agentLevelList(agentLevels)
   useEffect(() => {
     if (!api || !agentLevels) return
-    const levels: [number | null, string, string, LineStyle][] = [
-      [agentLevels.priceTarget, THEME.brandTo, t('KI-Ziel'), LineStyle.Dashed],
-      [agentLevels.entry, THEME.drawing, t('Einstieg'), LineStyle.Dotted],
-      [agentLevels.stopLoss, THEME.down, t('Stop'), LineStyle.Dashed]
-    ]
-    const lines = levels.flatMap(([price, color, title, lineStyle]) =>
-      price === null ? [] : [api.candles.createPriceLine({ price, color, title, lineStyle, lineWidth: 1, axisLabelVisible: true })]
+    // Lines only: their tags and titles are drawn rounded by PriceTags.
+    const lines = levels.flatMap(([price, color, , lineStyle]) =>
+      price === null ? [] : [api.candles.createPriceLine({ price, color, lineStyle, lineWidth: 1, axisLabelVisible: false })]
     )
     // Keep the levels in view: the price scale also spans them, not only the candles.
     const prices = levels.flatMap(([p]) => (p === null ? [] : [p]))
@@ -777,7 +790,7 @@ export default function ChartArea() {
   useEffect(() => {
     if (!api || !alarmPrices) return
     const lines = alarmPrices.split(',').map((p) =>
-      api.candles.createPriceLine({ price: Number(p), color: '#a78bfa', title: '⏰', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true })
+      api.candles.createPriceLine({ price: Number(p), color: ALARM, lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false })
     )
     return () => lines.forEach((l) => api.candles.removePriceLine(l))
   }, [api, alarmPrices])
@@ -808,11 +821,11 @@ export default function ChartArea() {
         panes: { separatorColor: LINE, separatorHoverColor: THEME.brandFrom + '55' }
       },
       grid: { vertLines: { color: THEME.grid }, horzLines: { color: THEME.grid } },
-      // Crosshair in the icon's indigo, its axis labels filled with it.
+      // Crosshair in the icon's indigo; its axis labels are drawn rounded by PriceTags.
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: THEME.brandFrom + '99', labelBackgroundColor: THEME.brandFrom },
-        horzLine: { color: THEME.brandFrom + '99', labelBackgroundColor: THEME.brandFrom }
+        vertLine: { color: THEME.brandFrom + '99', labelVisible: false },
+        horzLine: { color: THEME.brandFrom + '99', labelVisible: false }
       },
       rightPriceScale: { borderColor: LINE },
       // 0.3 px per bar (default 0.5): about 1,100 bars on a phone, 4,000 on a wide window.
@@ -907,9 +920,13 @@ export default function ChartArea() {
             chart={api.chart}
             series={api.candles}
             right={sideOpen ? AGENTS_WIDTH : 0}
+            crossColor={THEME.brandFrom}
             tags={[
               { price: data[data.length - 1].close, color: data[data.length - 1].close >= data[data.length - 1].open ? UP : DOWN },
-              ...(session ? [{ price: session.price, ...SESSION_TAG[session.kind], label: t(SESSION_TITLE[session.kind]) }] : [])
+              ...(session ? [{ price: session.price, ...SESSION_TAG[session.kind], label: t(SESSION_TITLE[session.kind]) }] : []),
+              ...(alarmPrices ? alarmPrices.split(',').map((p) => ({ price: Number(p), color: ALARM, ink: THEME.bg, label: '⏰' })) : []),
+              ...levels.flatMap(([price, color, label]) => (price === null ? [] : [{ price, color, label }])),
+              ...valueTags
             ]}
           />
         )}
