@@ -42,7 +42,7 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
 - **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
 - **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
 - **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu
-- **Up to 3 chart tabs**, full-screen mode, symbol search by name or ticker, company info
+- **Up to 3 chart tabs**, full-screen mode (drawing works there too), symbol search by name, ticker, ISIN or WKN with filters for stocks, ETFs and crypto, company info with ISIN and WKN
 - **AI forecast ([Chronos-2](https://huggingface.co/amazon/chronos-2)):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
 - **Forecast quality:** up to 30 backtests per forecast (older candles are loaded for them) show how often the price stayed inside
   the 90 % range and whether "higher price" calls were right. A local forecast archive settles your own forecasts once their time
@@ -109,7 +109,7 @@ You choose the stock data source on first start; you can change it any time in t
 
 | Source | What | Key |
 |---|---|---|
-| [Binance](https://www.binance.com/) | Crypto prices | not needed |
+| [Binance](https://www.binance.com/) | Crypto prices and the list of tradable crypto pairs for the search | not needed |
 | [Alpaca](https://alpaca.markets/) | US stocks and ETFs (recommended for US stocks) | your own free key. Use **paper trading keys**: KandleOS only reads market data, live keys would also allow trading |
 | Yahoo Finance | Stocks worldwide, indices, commodities, pre-/post-market | not needed, opt-in |
 | [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks and company info | your own free key |
