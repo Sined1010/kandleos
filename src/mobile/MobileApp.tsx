@@ -67,6 +67,8 @@ export default function MobileApp() {
     useStore.getState().setTool('cursor')
     setDrawing(false)
   }
+  // The sheet goes low, so after drawing it does not pop up at the height it had before.
+  const toggleDraw = () => (drawing ? endDrawing() : (setDrawing(true), setSheet('low')))
   useQuoteFeed()
   useBack('draw', drawing, endDrawing)
   useBack('settings', settings, () => setSettings(false))
@@ -75,22 +77,18 @@ export default function MobileApp() {
   useEffect(() => setFullscreen(full), [full])
 
   return (
-    <div key={language} className={`mobile-app flex h-dvh flex-col bg-bg text-sm text-slate-300 ${full ? 'mobile-full' : ''}`}>
+    <div key={language} className={`mobile-app flex h-dvh flex-col bg-bg text-sm text-slate-300 ${full ? 'mobile-full' : ''} ${drawing ? 'mobile-drawing' : ''}`}>
       <header className="mobile-chrome flex shrink-0 flex-col border-b border-line bg-bg">
         <MobileHeader
           drawing={drawing}
-          onDraw={() => (drawing ? endDrawing() : (setDrawing(true), setSheet('low')))}
+          onDraw={toggleDraw}
           onMenu={() => setMenu(true)}
           onPc={() => setPage('pc')}
           onAlarm={() => {
             setAlarmFor(symbol)
             setPage('alarms')
           }}
-          onFull={() => {
-            // Full screen is for looking; drawing goes on outside it.
-            if (drawing) endDrawing()
-            setFull(true)
-          }}
+          onFull={() => setFull(true)}
         />
       </header>
       {/* The low sheet (grip + search) and the drawing tools both cover the bottom 96 px; the chart ends above
@@ -118,7 +116,7 @@ export default function MobileApp() {
           ]}
         />
       </div>
-      {full && <FullscreenBar onExit={() => setFull(false)} />}
+      {full && <FullscreenBar drawing={drawing} onDraw={toggleDraw} onExit={() => setFull(false)} />}
       {menu && (
         <ActionMenu
           title="KandleOS"

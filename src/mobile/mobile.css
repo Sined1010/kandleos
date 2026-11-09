@@ -62,6 +62,17 @@ textarea {
 .mobile-full main {
   margin-bottom: 0 !important;
 }
+/* Drawing in full screen: the tools show at the bottom and the chart ends above them, as outside full screen. */
+.mobile-full.mobile-drawing .draw-tools {
+  display: block !important;
+}
+/* The full-screen buttons (FullscreenBar, 36 px high) sit at the top right; the legend starts below them. */
+.mobile-full .chart-legend {
+  top: calc(max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px)) + 52px) !important;
+}
+.mobile-full.mobile-drawing main {
+  margin-bottom: 6rem !important;
+}
 /* The status bar is hidden, so the chart may reach the top edge; its full-screen buttons keep clear of the camera. */
 .mobile-full {
   padding-top: 0 !important;

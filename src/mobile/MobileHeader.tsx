@@ -157,17 +157,25 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
   )
 }
 
-/** In full screen only the candle size and the way out stay, small and see-through at the top right. */
-export function FullscreenBar({ onExit }: { onExit(): void }) {
+/** In full screen only the candle size, drawing and the way out stay, small and see-through left of the price axis. */
+export function FullscreenBar({ drawing, onDraw, onExit }: { drawing: boolean; onDraw(): void; onExit(): void }) {
   const timeframe = useStore((s) => s.timeframe)
   const [grid, setGrid] = useState<number | null>(null)
   const small = 'flex h-9 items-center justify-center gap-0.5 rounded-[10px] bg-panel/70 text-slate-200 ring-1 ring-line backdrop-blur active:bg-line'
   return (
     <>
-      <div className="fixed right-2 z-30 flex gap-1.5" style={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}>
+      <div className="fixed z-30 flex gap-1.5" style={{ top: 'calc(max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px)) + 8px)', right: 'calc(var(--axis-w, 56px) + 8px)' }}>
         <button onClick={(e) => setGrid(below(e))} aria-label={t('Alle Kerzengrößen')} className={`${small} px-2.5 text-sm font-semibold`}>
           {tfLabel(timeframe)}
           <ChevronDown size={15} className="text-muted" />
+        </button>
+        <button
+          onClick={onDraw}
+          aria-label={drawing ? t('Zeichnen beenden') : t('Zeichnen')}
+          aria-pressed={drawing}
+          className={`${small} w-9 ${drawing ? 'bg-brand text-white' : ''}`}
+        >
+          {drawing ? <Check size={17} /> : <Pencil size={17} />}
         </button>
         <button onClick={onExit} aria-label={t('Vollbild beenden')} className={`${small} w-9`}>
           <Minimize size={17} />

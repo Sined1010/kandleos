@@ -859,7 +859,12 @@ export default function ChartArea() {
   useEffect(() => {
     if (!api) return
     const ts = api.chart.timeScale()
-    const sync = () => setAxisWidth(api.chart.priceScale('right').width())
+    const sync = () => {
+      const w = api.chart.priceScale('right').width()
+      setAxisWidth(w)
+      // The phone's full-screen buttons (MobileApp, outside the chart) keep left of the axis.
+      if (IS_MOBILE) document.documentElement.style.setProperty('--axis-w', `${w}px`)
+    }
     ts.subscribeSizeChange(sync)
     return () => ts.unsubscribeSizeChange(sync)
   }, [api])
@@ -942,7 +947,7 @@ export default function ChartArea() {
         )}
         {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
-          className="pointer-events-none absolute left-3 top-2 text-xs text-muted"
+          className="chart-legend pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
           style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 12 : fc.result ? 547 : 215) }}
         >

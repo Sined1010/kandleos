@@ -15,7 +15,7 @@ export default function DrawTools() {
   return (
     // Same 96 px as the low watchlist sheet it replaces, so the chart above keeps its size.
     <div
-      className="mobile-chrome fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel px-2 pt-1"
+      className="mobile-chrome draw-tools fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel px-2 pt-1"
       style={{ height: 'calc(6rem + var(--sab, 0px))', paddingBottom: 'var(--sab, 0px)' }}
     >
       <div className="flex items-center gap-2 px-1 pb-1">
