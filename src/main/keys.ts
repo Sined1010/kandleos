@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { readFileSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AlpacaKeys } from '../data/alpaca'
 import { writeFileAtomic } from './atomicFile'
@@ -16,6 +16,8 @@ export async function save(encrypted: string, plain: string, value: string): Pro
     await rm(file(plain), { force: true })
     return
   }
+  // A file that cannot be decrypted now is kept aside, not overwritten: it may hold keys a later start can read again.
+  if (decryptFails(encrypted)) await rename(file(encrypted), file(encrypted + '.unreadable')).catch(() => {})
   // The new file first, in one step; only then the other variant goes. A crash never leaves no file at all.
   if (safeStorage.isEncryptionAvailable()) {
     await writeFileAtomic(file(encrypted), safeStorage.encryptString(value))
@@ -27,19 +29,50 @@ export async function save(encrypted: string, plain: string, value: string): Pro
   }
 }
 
-export function read(encrypted: string, plain: string): string | null {
+/**
+ * The encrypted file is there but cannot be decrypted: on Linux the keyring may still be locked right after login,
+ * or the data folder came from another PC. Not the same as "no file", or the next save would wipe what is in it.
+ */
+export class Unreadable extends Error {}
+
+function decryptFails(encrypted: string): boolean {
   try {
-    return safeStorage.decryptString(readFileSync(file(encrypted)))
-  } catch {
-    try {
-      return readFileSync(file(plain), 'utf8')
-    } catch {
-      return null
-    }
+    read(encrypted, '')
+    return false
+  } catch (e) {
+    return e instanceof Unreadable
   }
 }
 
-export const finnhubKey = (): string => read('finnhub-key.bin', 'finnhub-key.txt') ?? ''
+export function read(encrypted: string, plain: string): string | null {
+  let data: Buffer | undefined
+  try {
+    data = readFileSync(file(encrypted))
+  } catch {
+    // no encrypted file: maybe the plain one
+  }
+  if (data) {
+    try {
+      return safeStorage.decryptString(data)
+    } catch {
+      throw new Unreadable(encrypted)
+    }
+  }
+  if (!plain) return null
+  try {
+    return readFileSync(file(plain), 'utf8')
+  } catch {
+    return null
+  }
+}
+
+export function finnhubKey(): string {
+  try {
+    return read('finnhub-key.bin', 'finnhub-key.txt') ?? ''
+  } catch {
+    return ''
+  }
+}
 
 /** Stores the key (empty removes it); the caller has checked it against FINNHUB_KEY_RE. */
 export const saveFinnhubKey = (key: string): Promise<void> => save('finnhub-key.bin', 'finnhub-key.txt', key)

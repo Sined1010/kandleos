@@ -63,7 +63,8 @@ export const xetraPath = (html: string): string | undefined =>
 let xetra: Promise<Map<string, Ids>> | null = null
 
 async function loadXetra(): Promise<Map<string, Ids>> {
-  const headers = { 'User-Agent': 'Mozilla/5.0' }
+  // An honest name: the public download needs no browser disguise.
+  const headers = { 'User-Agent': 'KandleOS' }
   const page = await http(PAGE, { headers, timeoutMs: 10_000 })
     .then((r) => (r.ok ? r.text() : ''))
     .catch(() => '')
@@ -74,13 +75,17 @@ async function loadXetra(): Promise<Map<string, Ids>> {
 
 function xetraList(): Promise<Map<string, Ids>> {
   xetra ??= loadXetra().catch((e) => {
-    xetra = null
+    // A minute before the next try: on a slow line every search keystroke would start the 5 MB download anew.
+    setTimeout(() => (xetra = null), 60_000)
     throw e
   })
   return xetra
 }
 
 export const xetraIds = (mnemonic: string): Promise<Ids | undefined> => xetraList().then((m) => m.get(mnemonic))
+
+/** Starts loading the list early, so a WKN search finds it ready; a failure only shows in the search itself. */
+export const warmXetra = (): void => void xetraList().catch(() => {})
 
 /** A six-character query with a digit may be a WKN ("716460", "A0RPWH"). */
 export const looksLikeWkn = (q: string): boolean => /^(?=.*\d)[A-Z0-9]{6}$/.test(q)

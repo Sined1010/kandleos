@@ -7,7 +7,7 @@ import { moveSymbolTo } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
 import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
-import { emptySync, type SyncState } from '../../../shared/sync'
+import { cleanIndicators, emptySync, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
 
 export type Point = { time: number; price: number }
@@ -459,7 +459,7 @@ export const useStore = create<State>()(
         const s = {
           ...current,
           ...p,
-          indicators: { ...current.indicators, ...p.indicators },
+          indicators: cleanIndicators(current.indicators, p.indicators),
           forecastView: { ...current.forecastView, ...view },
           // The backtest used to be a display switch of its own; switched off, it now means depth 0.
           forecastRun: { ...current.forecastRun, ...(backtest === false && { backtestRuns: 0 as const }), ...p.forecastRun },

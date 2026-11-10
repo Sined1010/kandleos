@@ -35,7 +35,8 @@ import {
   setStockSource,
   stockCandles,
   stockQuotes,
-  symbolName
+  symbolName,
+  warmSearch
 } from '../data/stocks'
 
 useAlpacaKeyStore(alpacaKeysFromDisk, saveAlpacaKeysToDisk)
@@ -192,6 +193,7 @@ ipcMain.handle('backup:apply', async (e, password) => {
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended, older) => stockCandles(symbol, tf, key, extended, older))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
+ipcMain.on('symbols:warm', () => warmSearch())
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
 ipcMain.handle('stocks:info', (_e, symbol, key) => companyInfo(symbol, key))

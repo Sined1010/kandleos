@@ -341,3 +341,18 @@ test('a first sync retried after a lost reply does not save the phone tabs twice
   }
   assert.equal(pc.charts.filter((c) => c.name === 'Tab vom Handy').length, 1)
 })
+
+test('sliceOf keeps this device whole against odd units from another version', () => {
+  const keep = slice({ indicators: { sma: { on: false, period: 20 }, atr: { on: false, period: 14 } } as unknown as SyncSlice['indicators'] })
+  const u = unitsOf(slice())
+  // An older phone without ATR, a fractional period, a range preset this version lacks, an id list that is no list.
+  u.indicators = JSON.stringify({ sma: { on: true, period: 14.6 } })
+  u['tab:t1'] = JSON.stringify({ symbol: 'BTCUSDT', timeframe: '1h', range: '10J' })
+  u['order:f1'] = '{}'
+  u['alarm:a2'] = JSON.stringify({ id: 'a2', symbol: 'BTCUSDT', price: 1 }) // no op, no createdAt
+  const out = sliceOf(u, keep)
+  assert.deepEqual(out.indicators, { sma: { on: true, period: 15 }, atr: { on: false, period: 14 } })
+  assert.equal(out.tabs[0].range, null)
+  assert.deepEqual(out.folders[0].symbols, [])
+  assert.deepEqual(out.alarms.map((a) => a.id), ['a1'])
+})

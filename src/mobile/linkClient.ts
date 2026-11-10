@@ -65,7 +65,11 @@ export function createLinkClient(deps: LinkDeps) {
       await deps.onRemoved()
       throw new Error('removed')
     }
-    if (got.addr !== p.addrs[0]) await deps.save({ ...p, lastCtr: ctr, addrs: [got.addr, ...p.addrs.filter((a) => a !== got.addr)] })
+    if (got.addr !== p.addrs[0]) {
+      // Read again: while a long call ran, the phone may have been unpaired or paired with another PC.
+      const now = await deps.load()
+      if (now?.deviceId === p.deviceId) await deps.save({ ...now, addrs: [got.addr, ...now.addrs.filter((a) => a !== got.addr)] })
+    }
     if (typeof got.body.error === 'string') throw new Error(got.body.error)
     return got.body.res
   }

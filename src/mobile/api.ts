@@ -11,7 +11,8 @@ import {
   setStockSource,
   stockCandles,
   stockQuotes,
-  symbolName
+  symbolName,
+  warmSearch
 } from '../data/stocks'
 import { checkAgentsConfig } from '../shared/agents'
 import { t } from '../shared/i18n'
@@ -108,6 +109,7 @@ export async function createMobileApi(): Promise<Api> {
     stockCandles: (symbol, tf, key, extended = false, older) => stockCandles(symbol, tf, key, extended, older),
     stockQuotes: (symbols, key) => stockQuotes(symbols, key),
     searchSymbols: (query) => searchSymbols(query),
+    warmSearch,
     finnhubCheck: (key) => finnhubCheck(key),
     symbolName: (symbol) => symbolName(symbol),
     companyInfo: (symbol, key) => companyInfo(symbol, key),

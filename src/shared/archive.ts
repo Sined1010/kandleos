@@ -1,5 +1,6 @@
 // Forecast archive: every shown forecast is kept and later settled against the real closes, so KandleOS can
 // say how well its forecasts did, not only what they said. Pure functions; main stores, the window settles.
+import { barZone, periodIndex, periodStart, wall } from './calendar.ts'
 import { probabilityAbove, Q, scaleBands } from './forecast.ts'
 import { SYMBOL_RE, TF_MONTHS, TF_SECONDS, TIMEFRAMES, type Candle, type CandleProvider, type Timeframe } from './types.ts'
 
@@ -73,12 +74,19 @@ const GIVE_UP = 30 * 86400
 export const summaryKey = (e: { symbol: string; timeframe: Timeframe; steps: unknown[] }): string =>
   `${e.symbol}|${e.timeframe}|${e.steps.length}`
 
+// The calendar's cached formatter: one per candle would be built thousands of times per settle run.
 const dayParts = (time: number, timeZone: string): [number, number, number] => {
-  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-    .format(new Date(time * 1000))
-    .split('-')
-    .map(Number)
+  const [y, m, d] = wall(time, timeZone).date.split('-').map(Number)
   return [y, m, d]
+}
+
+/** When the forecast's last bar closes: for month-based bars the next calendar period, a month is not 30 days. */
+export function closesAt(e: Pick<ArchiveEntry, 'times' | 'timeframe' | 'timeZone'>): number {
+  const end = e.times[e.times.length - 1]
+  const months = TF_MONTHS[e.timeframe]
+  if (!months) return end + TF_SECONDS[e.timeframe]
+  const zone = barZone(e.times, e.timeZone)
+  return periodStart(periodIndex(end, months, zone) + 1, months, zone)
 }
 
 /**
@@ -113,8 +121,8 @@ export function shouldArchive(e: Span & Pick<ArchiveEntry, 'auto'>, previous: Sp
 const inside = (real: number, q: number[], lo: number, hi: number) => real >= q[lo] && real <= q[hi]
 
 /** More than 30 days past its last bar: a forecast still open then is dropped, even if its source keeps failing. */
-export const givenUp = (e: Pick<ArchiveEntry, 'times' | 'timeframe'>, now: number): boolean =>
-  now - (e.times[e.times.length - 1] + TF_SECONDS[e.timeframe]) > GIVE_UP
+export const givenUp = (e: Pick<ArchiveEntry, 'times' | 'timeframe' | 'timeZone'>, now: number): boolean =>
+  now - closesAt(e) > GIVE_UP
 
 /**
  * End of the section that settling asks for: just past the last target bar, but never in the future, which main
@@ -125,9 +133,7 @@ export const settleBefore = (e: Pick<ArchiveEntry, 'times' | 'timeframe'>, now: 
 
 /** Compares an archived forecast with the real bars; 'pending' until they are all there (or given up on). */
 export function settleEntry(e: ArchiveEntry, candles: Candle[], now: number): Settlement | 'pending' | 'unsettleable' {
-  const end = e.times[e.times.length - 1]
-  const closedAt = end + TF_SECONDS[e.timeframe]
-  if (now < closedAt) return 'pending'
+  if (now < closesAt(e)) return 'pending'
   const real = new Map<number, number>()
   for (const c of candles) real.set(slotOf(c.time, e.timeframe, e.timeZone), c.close)
   const shown = e.factor ? scaleBands(e.steps, e.factor) : e.steps
@@ -160,7 +166,7 @@ export function settleEntry(e: ArchiveEntry, candles: Candle[], now: number): Se
     rose: lastReal > e.base,
     dir: Math.sign(e.steps[last][Q.median] - e.base) === Math.sign(lastReal - e.base),
     steps: idx.length,
-    end
+    end: e.times[e.times.length - 1]
   }
 }
 

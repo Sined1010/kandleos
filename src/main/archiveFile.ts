@@ -3,8 +3,7 @@
 // tests can point it at a temporary folder.
 import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { addToSummary, parseEntry, shouldArchive, summaryKey, type ArchiveEntry, type Bands, type Settlement, type SummaryRow } from '../shared/archive.ts'
-import { TF_SECONDS } from '../shared/types.ts'
+import { addToSummary, closesAt, parseEntry, shouldArchive, summaryKey, type ArchiveEntry, type Bands, type Settlement, type SummaryRow } from '../shared/archive.ts'
 
 /** Raw lines above this are thinned out, oldest settled forecasts first; their results stay in the summary. */
 export const ARCHIVE_RAW_LIMIT = 20 * 1024 * 1024
@@ -192,7 +191,7 @@ export function createArchive(dir: string, rawLimit = ARCHIVE_RAW_LIMIT) {
       serial(async () =>
         [...entries.values()]
           .filter((e) => !closed.has(e.id) && (!symbol || e.symbol === symbol))
-          .filter((e) => e.times[e.times.length - 1] + TF_SECONDS[e.timeframe] <= now)
+          .filter((e) => closesAt(e) <= now)
           .sort((a, b) => a.baseTime - b.baseTime)
       ),
     /** Records the result of a forecast, or that it cannot be settled. */

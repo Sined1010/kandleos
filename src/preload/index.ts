@@ -36,6 +36,8 @@ const api = {
   stockQuotes: (symbols: string[], key: string): Promise<{ quotes: Record<string, Quote>; error: string | null }> =>
     ipcRenderer.invoke('stocks:quotes', symbols, key),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
+  /** A digit was typed into the search: loads what a WKN search needs ahead of it. */
+  warmSearch: (): void => ipcRenderer.send('symbols:warm'),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
   /** Profile of a stock for the info button: Finnhub with a key, otherwise Yahoo if switched on. */

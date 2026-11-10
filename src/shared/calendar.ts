@@ -253,14 +253,20 @@ export function futureTimes(times: number[], seconds: number, count: number, tim
   const dateLabels = seconds >= 86400 && times.every((t) => t % 86400 === 0)
   const zone = dateLabels ? 'UTC' : timeZone
   const walls = history.map((t) => wall(t, zone))
-  const weekdays = new Set(walls.map((w) => weekday(w.date)))
+  // A known exchange trades Monday to Friday, even if a short history (Alpaca's 5 days of 1-minute bars) misses one;
+  // weekend sessions (futures, forex on Sunday evening) still come from the history.
+  const weekdays = new Set([...walls.map((w) => weekday(w.date)), ...(MARKETS[timeZone] ? [1, 2, 3, 4, 5] : [])])
   const end = wall(last, zone)
   // Daily bars keep the last bar's wall-clock time; intraday bars use every time of day the session has.
   const slots = seconds >= 86400 ? [end.sec] : [...new Set(walls.map((w) => w.sec))].sort((a, b) => a - b)
   const out: number[] = []
   for (let date = end.date, guard = 0; out.length < count && guard < 4000; date = nextDate(date), guard++) {
     if (!weekdays.has(weekday(date)) || isHoliday(timeZone, date)) continue
+    // shortcut: on a half day the bars after the early close are left out, after-market ones too; fine unless
+    // extended-hours forecasts on those few days matter.
+    const close = seconds < 86400 ? earlyClose(timeZone, date) : undefined
     for (const s of slots) {
+      if (close !== undefined && s >= close) continue
       const t = fromWall(date, s, zone)
       if (t > last && out.length < count) out.push(t)
     }

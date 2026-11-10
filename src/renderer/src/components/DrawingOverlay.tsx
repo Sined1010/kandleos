@@ -1,7 +1,7 @@
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { futureTimes } from '../../../shared/calendar'
+import { barZone, futureTimes } from '../../../shared/calendar'
 import { CLICKS } from '../../../shared/drawings'
 import { locale, t } from '../../../shared/i18n'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
@@ -146,7 +146,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       }
       raf = requestAnimationFrame(loop)
     }
-    loop()
+    // From the next frame on: flushSync inside this effect would only warn ("called from inside a lifecycle method").
+    raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [chart, series])
 
@@ -352,7 +353,12 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           <line x1={x} x2={x} y1={0} y2={height} stroke={stroke} strokeWidth={selected ? 2 : 1} />
           {hit('ew-resize') && <line x1={x} x2={x} y1={0} y2={height} {...hit('ew-resize')} />}
           <text x={x + 4} y={height - 6} fill={stroke} fontSize={11}>
-            {new Date(d.time * 1000).toLocaleString(locale(), { dateStyle: 'short', timeStyle: step < 86400 ? 'short' : undefined })}
+            {new Date(d.time * 1000).toLocaleString(locale(), {
+              dateStyle: 'short',
+              timeStyle: step < 86400 ? 'short' : undefined,
+              // Day and longer bars: the date they carry, as on the time axis (ChartArea).
+              timeZone: step < 86400 ? undefined : barZone(times.slice(-50), timeZone ?? 'UTC')
+            })}
           </text>
         </g>
       )

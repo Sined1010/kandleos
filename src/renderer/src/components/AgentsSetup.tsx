@@ -102,8 +102,13 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (config.provider !== 'ollama') return
     setOllama(undefined)
-    const timer = setTimeout(() => window.api.agents.ollamaModels(config.ollamaUrl).then(setOllama), 400)
-    return () => clearTimeout(timer)
+    // A slow answer for the previous address must not fill in its models for the new one.
+    let live = true
+    const timer = setTimeout(() => window.api.agents.ollamaModels(config.ollamaUrl).then((m) => live && setOllama(m)), 400)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
   }, [config.provider, config.ollamaUrl])
 
   const install = async () => {

@@ -39,6 +39,9 @@ win:
     - out/**
     - '!node_modules/onnxruntime-node/bin/napi-v*/{linux,darwin}/**'
     - '!node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**'
+    # DirectML and its shader compiler (Microsoft's own licence terms) are for GPU inference; the forecast runs on the
+    # CPU and never loads them (checked: only onnxruntime.dll and the binding are loaded).
+    - '!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/{DirectML,dxcompiler,dxil}.dll'
 nsis:
   artifactName: KandleOS-Setup-${version}.${ext}
   oneClick: false

@@ -14,9 +14,14 @@ export const appFiles: Files = {
     await Filesystem.writeFile({ path, data, ...at, encoding: Encoding.UTF8, recursive: true })
   },
   rename: async (from, to) => {
-    // Some platforms refuse to rename onto an existing file; the finished temp file survives either way.
-    await Filesystem.deleteFile({ path: to, ...at }).catch(() => {})
-    await Filesystem.rename({ from, to, ...at, toDirectory: Directory.Data })
+    // Replacing in one step first: deleting before would leave only the temp file between the two steps. Some
+    // platforms refuse to rename onto an existing file; then delete and retry (the finished temp file survives).
+    try {
+      await Filesystem.rename({ from, to, ...at, toDirectory: Directory.Data })
+    } catch {
+      await Filesystem.deleteFile({ path: to, ...at }).catch(() => {})
+      await Filesystem.rename({ from, to, ...at, toDirectory: Directory.Data })
+    }
   },
   remove: async (path) => {
     await Filesystem.deleteFile({ path, ...at })

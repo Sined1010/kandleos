@@ -1,6 +1,6 @@
 import { http, type HttpRes } from './http'
 import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch } from './alpaca'
-import { isinFromCusip, looksLikeWkn, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin'
+import { isinFromCusip, looksLikeWkn, warmXetra, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin'
 import { matchCoins, mergeHits } from '../shared/search'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
@@ -138,6 +138,12 @@ const yahooKind: Record<string, SearchKind> = {
   INDEX: 'index',
   FUTURE: 'future',
   CURRENCY: 'currency'
+}
+
+/** The search box got a digit, so a WKN may follow: the Xetra list (5 MB, slow on a phone) starts loading now
+ *  instead of with the search, which waits only 3 s for it. */
+export function warmSearch(): void {
+  if (yahooOn()) warmXetra()
 }
 
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {

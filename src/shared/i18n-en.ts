@@ -50,8 +50,8 @@ export const EN: Record<string, string> = {
     'nor a recommendation to buy or sell. All prices without guarantee: data may be delayed, incomplete or wrong. Use at your own risk; investment decisions are yours alone.',
   Datenschutz: 'Privacy',
   'Binance – Kryptokurse': 'Binance – crypto prices',
-  'Deutsche Börse und Wikidata – ISIN und WKN, nur beim Klick auf die Infos zu einem Wert':
-    'Deutsche Börse and Wikidata – ISIN and WKN, only when you open the info on a symbol',
+  'Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste für die Suche nach einer WKN lädt, sobald du in der Suche eine Ziffer tippst':
+    'Deutsche Börse and Wikidata – ISIN and WKN in the info on a symbol; the Xetra list for searching by WKN loads once you type a digit into the search',
   'Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“':
     'Hugging Face – one-time download of the forecast model on the first click on “Forecast”',
   'Nur wenn du die': 'Only when you set up and start the',
@@ -165,8 +165,8 @@ export const EN: Record<string, string> = {
   'Einmalig rund 350 MB': 'A one-time download',
   'Download (Python und TradingAgents). Alles bleibt im Datenordner von KandleOS und lässt sich jederzeit wieder entfernen.':
     'of about 350 MB (Python and TradingAgents). Everything stays in the KandleOS data folder and can be removed at any time.',
-  'Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.':
-    'During an analysis, the symbol and the collected data go to the chosen AI provider. Language models can be wrong – the analysis is not investment advice. TradingAgents is an open-source project by Tauric Research (Apache-2.0); KandleOS is not an official product of that project.',
+  'Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Die Kurs- und Unternehmensdaten holt TradingAgents u. a. von Yahoo Finance, auch wenn in KandleOS eine andere Kursquelle gewählt ist. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.':
+    'During an analysis, the symbol and the collected data go to the chosen AI provider. TradingAgents fetches prices and company data from Yahoo Finance among others, even if another price source is chosen in KandleOS. Language models can be wrong – the analysis is not investment advice. TradingAgents is an open-source project by Tauric Research (Apache-2.0); KandleOS is not an official product of that project.',
 
   // Comprehensive analysis setup
   gespeichert: 'saved',
@@ -482,8 +482,8 @@ export const EN: Record<string, string> = {
     'Indices, commodities and exchanges outside the US via Yahoo Finance (for private use only).',
   'Aktienkurse sind ausgeschaltet. In den Einstellungen eine Datenquelle für Aktien wählen.':
     'Stock prices are switched off. Choose a data source for stocks in the settings.',
-  'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:':
-    'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; API keys are stored encrypted. To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
+  'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert (unter Linux nur mit gnome-keyring oder KWallet, sonst nur für deinen Benutzer lesbar). Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:':
+    'KandleOS collects no usage data and sends nothing to its maker (no telemetry). Watchlist, drawings and settings stay on this computer; API keys are stored encrypted (on Linux only with gnome-keyring or KWallet, otherwise readable by your user only). To load prices, the app connects directly to these providers, which necessarily receive your IP address; their privacy policies apply, and some servers are in the USA:',
   'Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key':
     'Alpaca – stock prices, symbol search and names, only with your own API key',
   'Datenquelle für Aktien': 'Data source for stocks',
@@ -921,7 +921,7 @@ export const EN: Record<string, string> = {
   '{n} Wert': '{n} symbol',
   KI: 'AI',
   'Sofort-Alarme': 'Instant alarms',
-  'Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku.': 'Check price alarms every 15 seconds instead of about every 15 minutes. While alarms are armed, Android shows a permanent notification for it; this uses more battery.',
+  'Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku. Bei ausgeschaltetem Bildschirm kann Android die Prüfung verzögern.': 'Check price alarms every 15 seconds instead of about every 15 minutes. While alarms are armed, Android shows a permanent notification for it; this uses more battery. With the screen off, Android may delay the checks.',
   'Gespeicherter Stand, keine neuen Kurse: {error}': 'Stored data, no new prices: {error}',
   'Die Sicherung wäre größer als 50 MB (zu viele gespeicherte Analysen).': 'The backup would be larger than 50 MB (too many saved analyses).',
   'Alle löschen': 'Delete all',
@@ -972,6 +972,9 @@ export const EN: Record<string, string> = {
   'Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.':
     'Pair with the PC “{name}”? The watchlist, drawings and alarms will then sync with it.',
   'Mit „{name}“ gekoppelt.': 'Paired with “{name}”.',
+  'Neue Adressen für den PC „{name}“ übernehmen?': 'Take over new addresses for the PC “{name}”?',
+  'Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.':
+    'The phone is paired with “{current}”. Pair with “{name}” instead? The watchlist, drawings and alarms then go to that PC. Only pair with codes your own PC is showing right now.',
   'Geprüft wird, solange KandleOS läuft – mit Handy-Kopplung auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.':
     'Checked while KandleOS runs – with phone pairing also from the notification area. A paired phone checks on its own as well.',
   '(Handy)': '(phone)',

@@ -112,12 +112,13 @@ public final class AlarmStore {
     public static int checkAll(Context c) {
         AlarmStore store = new AlarmStore(c);
         JSONArray armed = store.armed();
-        int left = 0;
         for (int i = 0; i < armed.length(); i++) {
             JSONObject a = armed.optJSONObject(i);
             if (a == null) continue;
             try {
-                long from = a.optLong("checkedUntil");
+                // Without a start (bad data from the app) only bars from now on count, never years of old ones.
+                long from = a.optLong("checkedUntil", 0);
+                if (from <= 0) from = System.currentTimeMillis() / 1000;
                 List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
                 double price = a.getDouble("price");
                 long at = AlarmCheck.hit(a.getString("op"), price, from, false, bars);
@@ -125,14 +126,14 @@ public final class AlarmStore {
                     if (store.record(a.getString("id"), at, true, price))
                         Notifier.show(c, Notifier.idOf(a.getString("id")), a.optString("title", a.getString("symbol")), c.getString(R.string.alarm_body));
                 } else {
-                    left++;
                     // The newest bar may still move, so it is looked at again next time.
                     if (!bars.isEmpty()) store.record(a.getString("id"), bars.get(bars.size() - 1).time, false, price);
                 }
             } catch (Exception e) {
-                left++; // offline or source error: tried again next time
+                // offline, source error or a broken entry: tried again next time
             }
         }
-        return left;
+        // Read again: an alarm the app armed during this pass counts too, so the checks do not stop without it.
+        return store.armed().length();
     }
 }

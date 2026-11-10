@@ -215,6 +215,8 @@ export function watchQuotes(
 
   // Latest polled quote per stock: the previous close for live changes, the regular price for extended hours.
   const polled: Record<string, Quote> = {}
+  // Time of the latest Finnhub trade per stock: a slower poll must not put an older price over it.
+  const traded: Record<string, number> = {}
   const poll = (list = stocks) =>
     window.api
       // A rejected key is not sent again, so quotes come straight from the chosen source.
@@ -224,15 +226,16 @@ export function watchQuotes(
         onStockError(sourceError)
         for (const [s, q] of Object.entries(quotes)) {
           polled[s] = q
-          onQuote(s, q)
+          if (!(traded[s] > q.time)) onQuote(s, q)
         }
       })
       .catch((e) => active && onStockError(ipcError(e)))
-  const startPolling = (list = stocks) => {
+  const startPolling = (list = stocks, ms = source === 'alpaca' ? 5_000 : 15_000) => {
     if (!list.length) return
-    const id = setInterval(() => poll(list), source === 'alpaca' ? 5_000 : 15_000)
+    const id = setInterval(() => poll(list), ms)
     cleanups.push(() => clearInterval(id))
   }
+  let fellBack = false
   const openFinnhub = () =>
     cleanups.push(
       socket(
@@ -240,6 +243,11 @@ export function watchQuotes(
         (msg) => {
           if (msg.type === 'error') {
             error = msg.msg ?? t('Finnhub-Fehler')
+            // E.g. too many symbols for the free plan: the US stocks go back to normal polling.
+            if (!fellBack) {
+              fellBack = true
+              startPolling(stocks.filter(alpacaKnows))
+            }
             return report()
           }
           if (msg.type !== 'trade') return
@@ -250,6 +258,7 @@ export function watchQuotes(
             const base = polled[s]
             const time = t.t / 1000
             if (!base?.prevClose) continue
+            traded[s] = time
             // Trades outside the regular session update the extra pre-/after-market price, not the regular one.
             const phase = phaseAt(s, base.timezone ?? timeZoneForSymbol(s), time)
             if (phase === 'pre' || phase === 'post')
@@ -290,6 +299,9 @@ export function watchQuotes(
           openFinnhub()
           // Finnhub's free stream has US listings only; other exchanges, indices and commodities keep being polled.
           startPolling(stocks.filter((s) => !alpacaKnows(s)))
+          // The trades build on the polled quote: a slow poll keeps its previous close current (the app left open
+          // overnight) and covers stocks without trades and a dropped stream.
+          startPolling(stocks.filter(alpacaKnows), 60_000)
         }
       })
   }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addToSummary, givenUp, parseEntry, roundSig, settleBefore, settleEntry, shouldArchive, slotOf, type ArchiveEntry, type SummaryRow } from './archive.ts'
+import { addToSummary, closesAt, givenUp, parseEntry, roundSig, settleBefore, settleEntry, shouldArchive, slotOf, type ArchiveEntry, type SummaryRow } from './archive.ts'
 import { QUANTILES } from './forecast.ts'
 import type { Candle } from './types.ts'
 
@@ -135,4 +135,12 @@ test('parseEntry rejects what main must not store', () => {
   assert.equal(parseEntry({ ...entry(), timeZone: 'Not/AZone' }), null)
   assert.equal(parseEntry({ ...entry(), factor: 50 }), null)
   assert.equal(parseEntry(null), null)
+})
+
+test('closesAt ends month-based bars at the next calendar period, not after 30-day blocks', () => {
+  const oct = Date.UTC(2026, 9, 1) / 1000 // Binance: October's bar at 00:00 UTC
+  const months = (tf: ArchiveEntry['timeframe'], times: number[]) => closesAt({ timeframe: tf, timeZone: 'UTC', times })
+  assert.equal(months('1M', [Date.UTC(2026, 8, 1) / 1000, oct]), Date.UTC(2026, 10, 1) / 1000) // 1 Nov, not 31 Oct
+  assert.equal(months('12M', [Date.UTC(2025, 0, 1) / 1000, Date.UTC(2026, 0, 1) / 1000]), Date.UTC(2027, 0, 1) / 1000)
+  assert.equal(closesAt(entry()), MON + 9 * DAY) // daily bars: one day after the last
 })

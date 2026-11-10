@@ -7,6 +7,7 @@ import { checkDrawing } from './drawings.ts'
 import { TIMEFRAMES, type Timeframe } from './types.ts'
 import type { ChartTab, Drawing, Folder, Indicators } from '../renderer/src/store/useStore.ts'
 import type { SavedChart } from '../renderer/src/lib/charts.ts'
+import { RANGES } from '../renderer/src/lib/ranges.ts'
 
 export type UnitKey = string
 /** Unit key → stable JSON of the unit. */
@@ -76,12 +77,38 @@ const parse = <T>(s: string | undefined, fallback: T): T => {
     return fallback
   }
 }
+/** An id list from the other device; anything but an array counts as empty. */
+const list = (s: string | undefined): unknown[] => {
+  const v = parse<unknown>(s, [])
+  return Array.isArray(v) ? v : []
+}
+
+/**
+ * Indicator settings from the other device or an older file, laid over `base`: only known fields of the right type,
+ * so a version without some indicator cannot remove it here. Numbers stay within the menu's 1–500, and all but the
+ * multipliers are whole periods (a period of 14.5 breaks the indicator math).
+ */
+export function cleanIndicators(base: Indicators, raw: unknown): Indicators {
+  if (!isObj(raw)) return base
+  const out = structuredClone(base) as unknown as Record<string, Record<string, unknown>>
+  for (const [name, cfg] of Object.entries(out)) {
+    const r = raw[name]
+    if (!isObj(r)) continue
+    for (const [field, v] of Object.entries(cfg)) {
+      const x = r[field]
+      if (typeof v === 'boolean' && typeof x === 'boolean') cfg[field] = x
+      else if (typeof v === 'number' && typeof x === 'number' && Number.isFinite(x) && x > 0)
+        cfg[field] = Math.min(500, field === 'mult' ? x : Math.max(1, Math.round(x)))
+    }
+  }
+  return out as unknown as Indicators
+}
 
 /** Order lists keep only what exists and append what is missing, so no entry is ever lost or doubled. */
 function fixOrder(u: Units, key: string, ids: string[]): void {
   const want = new Set(ids)
-  const list = parse<string[]>(u[key], []).filter((id, i, all) => want.has(id) && all.indexOf(id) === i)
-  u[key] = stable([...list, ...ids.filter((id) => !list.includes(id))])
+  const have = list(u[key]).filter((id): id is string => str(id) && want.has(id)).filter((id, i, all) => all.indexOf(id) === i)
+  u[key] = stable([...have, ...ids.filter((id) => !have.includes(id))])
 }
 
 /**
@@ -221,12 +248,12 @@ const inOrder = <T extends { id: string }>(items: T[], current: T[]) =>
  */
 export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
   const keys = Object.keys(u)
-  const folders: Folder[] = parse<string[]>(u['order:folders'], [])
+  const folders: Folder[] = list(u['order:folders'])
     .filter(str)
     .flatMap((id) => {
       const f = parse<unknown>(u[`folder:${id}`], null)
       if (!isObj(f) || !str(f.name)) return []
-      const symbols = parse<string[]>(u[`order:${id}`], []).filter((sym) => str(sym) && u[`entry:${id}:${sym}`] !== undefined)
+      const symbols = list(u[`order:${id}`]).filter((sym): sym is string => str(sym) && u[`entry:${id}:${sym}`] !== undefined)
       return [{ id, name: f.name, symbols, collapsed: keep.folders.find((k) => k.id === id)?.collapsed ?? false }]
     })
   const names: Record<string, string> = {}
@@ -234,11 +261,14 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
     const n = parse<unknown>(u[k], null)
     if (str(n)) names[k.slice(5)] = n
   }
-  const tabs: ChartTab[] = parse<string[]>(u['order:tabs'], [])
+  const tabs: ChartTab[] = list(u['order:tabs'])
     .filter(str)
     .flatMap((id) => {
       const t = parse<unknown>(u[`tab:${id}`], null)
-      return isObj(t) && str(t.symbol) && TIMEFRAMES.includes(t.timeframe as Timeframe) ? [{ ...(t as unknown as Omit<ChartTab, 'id'>), id }] : []
+      if (!isObj(t) || !str(t.symbol) || !TIMEFRAMES.includes(t.timeframe as Timeframe)) return []
+      // A range preset this version does not know (a newer one from the other device) becomes no preset.
+      const range = RANGES.find((r) => r.id === t.range)?.id ?? null
+      return [{ ...(t as unknown as Omit<ChartTab, 'id'>), range, id }]
     })
   const drawings: Record<string, Drawing[]> = {}
   for (const k of keys) if (k.startsWith('drawing:')) {
@@ -261,13 +291,13 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
   const alarms = inOrder(
     keys.filter((k) => k.startsWith('alarm:')).flatMap((k) => {
       const a = parse<unknown>(u[k], null)
-      if (!isObj(a) || !str(a.id) || !str(a.symbol) || typeof a.price !== 'number') return []
+      if (!isObj(a) || !str(a.id) || !str(a.symbol) || typeof a.price !== 'number' || (a.op !== 'above' && a.op !== 'below') || typeof a.createdAt !== 'number') return []
       const checkedUntil = keep.alarms.find((x) => x.id === a.id)?.checkedUntil
       return [{ ...(a as unknown as Alarm), ...(checkedUntil !== undefined && { checkedUntil }) }]
     }),
     keep.alarms
   )
-  return { folders, names, tabs, drawings, charts, indicators: isObj(indicators) ? (indicators as unknown as Indicators) : keep.indicators, alarms }
+  return { folders, names, tabs, drawings, charts, indicators: cleanIndicators(keep.indicators, indicators), alarms }
 }
 
 /**

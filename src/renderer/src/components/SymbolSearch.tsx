@@ -119,6 +119,7 @@ export default function SymbolSearch({
       <input
         value={query}
         onChange={(e) => {
+          if (/\d/.test(e.target.value)) window.api.warmSearch()
           setQuery(e.target.value)
           setOpen(true)
         }}

@@ -24,7 +24,7 @@ function InstantAlarms() {
       <span>
         <span className="text-slate-200">{t('Sofort-Alarme')}</span>
         {' – '}
-        {t('Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku.')}
+        {t('Kurs-Alarme alle 15 Sekunden prüfen statt etwa alle 15 Minuten. Solange Alarme aktiv sind, zeigt Android dafür einen Dauer-Hinweis; das kostet mehr Akku. Bei ausgeschaltetem Bildschirm kann Android die Prüfung verzögern.')}
       </span>
     </label>
   )

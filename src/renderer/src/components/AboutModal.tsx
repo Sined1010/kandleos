@@ -77,7 +77,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
         <h3 className={h}>{t('Datenschutz')}</h3>
         <p>
           {t(
-            'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert. Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:'
+            'KandleOS erhebt keine Nutzungsdaten und sendet nichts an den Hersteller (keine Telemetrie). Watchlist, Zeichnungen und Einstellungen bleiben auf diesem Rechner, API-Keys werden verschlüsselt gespeichert (unter Linux nur mit gnome-keyring oder KWallet, sonst nur für deinen Benutzer lesbar). Zum Laden der Kurse verbindet sich die App direkt mit diesen Anbietern, die dabei technisch bedingt deine IP-Adresse erhalten; es gelten deren Datenschutzbestimmungen, die Server stehen teils in den USA:'
           )}
         </p>
         <ul className="ml-4 mt-1 list-disc">
@@ -85,7 +85,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <li>{t('Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key')}</li>
           <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
           <li>{t('Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist')}</li>
-          <li>{t('Deutsche Börse und Wikidata – ISIN und WKN, nur beim Klick auf die Infos zu einem Wert')}</li>
+          <li>{t('Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste für die Suche nach einer WKN lädt, sobald du in der Suche eine Ziffer tippst')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
           <li>{t('GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“')}</li>
         </ul>

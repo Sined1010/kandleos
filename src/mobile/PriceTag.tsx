@@ -33,13 +33,28 @@ export default function PriceTags({ chart, series, tags, right = 0, crossColor }
   const [cross, setCross] = useState<Cross | null>(null)
   const tagsRef = useRef(tags)
   tagsRef.current = tags
-  // The chart moves without telling React (scrolling, zooming, price scale, new values); follow it each frame, re-render on change.
+  // The chart moves without telling React (scrolling, zooming, price scale, new values); follow it each frame, re-render on
+  // change. After half a second without change it looks only 10 times a second (battery), and a touch wakes it at once.
   useEffect(() => {
     let raf = 0
+    let timer = 0
+    let idle = 0
     let last = ''
+    const schedule = () => {
+      if (idle > 30) timer = window.setTimeout(() => ((timer = 0), (raf = requestAnimationFrame(loop))), 100)
+      else raf = requestAnimationFrame(loop)
+    }
+    const wake = () => {
+      idle = 0
+      if (!timer) return
+      clearTimeout(timer)
+      timer = 0
+      raf = requestAnimationFrame(loop)
+    }
     const loop = () => {
       // Next frame first: an error below must not stop the tags from following the chart for good.
-      raf = requestAnimationFrame(loop)
+      idle++
+      schedule()
       const panes = chart.panes()
       const tops = paneTops(chart)
       const raw = tagsRef.current.flatMap((g, i): Placed[] => {
@@ -63,11 +78,19 @@ export default function PriceTags({ chart, series, tags, right = 0, crossColor }
       const sig = `${at.map((a) => `${a.i}:${a.y}:${a.text}:${a.tag.color}:${a.tag.label ?? ''}`).join(',')}:${next.w}`
       if (sig !== last) {
         last = sig
+        idle = 0
         setPos(next)
       }
     }
     raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
+    const el = chart.chartElement()
+    const events = ['pointerdown', 'pointermove', 'wheel'] as const
+    events.forEach((e) => el.addEventListener(e, wake, { passive: true }))
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(timer)
+      events.forEach((e) => el.removeEventListener(e, wake))
+    }
   }, [chart, series])
 
   // The crosshair's own labels are hidden in the chart options; these replace them.

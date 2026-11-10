@@ -71,6 +71,8 @@ public class AnalysisWorker extends Worker {
         String symbol = d.getString("symbol");
         long started = d.getLong("started", 0);
         JSONObject job = ask(c, started);
+        // Cancelled while asking (the app saw the end itself, or watches a newer run): no report, no next check.
+        if (isStopped()) return Result.success();
         JSONObject last = job == null ? null : job.optJSONObject("last");
         if (last != null && last.optLong("started") == started) {
             report(c, symbol, last);

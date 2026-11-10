@@ -284,7 +284,9 @@ function NumberField(p: { label: string; title: string; min: number; max: number
       onChange={(e) => {
         setDraft(e.target.value)
         const v = Number(e.target.value)
-        if (e.target.value !== '' && v >= p.min && v <= p.max) p.onValue(v)
+        // A whole-number step means a period: 14.5 would break the indicator.
+        const whole = !Number.isInteger(p.step) || Number.isInteger(v)
+        if (e.target.value !== '' && whole && v >= p.min && v <= p.max) p.onValue(v)
       }}
       onBlur={() => setDraft(null)}
       className="w-12 rounded bg-bg px-1 py-0.5 text-right text-xs outline-none ring-1 ring-line focus:ring-accent"

@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { agentsTicker, ANALYSTS, doneFromBridge, keyEnvFor, PROVIDERS, stageOf, structuredFromBridge, type ProviderId, type Structured } from '../shared/agents'
-import { chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
+import { chronosBlock, chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
 import { read as readSecret, save as saveSecret } from './keys'
@@ -264,10 +264,15 @@ function checkRequest(req: unknown): AgentsRequest {
     (r.ollamaUrl === undefined || /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl))
   if (!ok) throw new Error(t('Ungültige Anfrage für die Analyse'))
   // An unusable forecast does not refuse the analysis; it runs without Chronos and says so.
-  return { ...r, chronos: r.chronos === undefined ? undefined : chronosOrSkip(r.chronos) }
+  const chronos = r.chronos === undefined ? undefined : chronosOrSkip(r.chronos)
+  // The prompt text is written here from the checked numbers, never taken as sent (a window or phone could put
+  // anything into the analyst's prompt).
+  return { ...r, chronos: chronos && 'block' in chronos ? { ...chronos, block: chronosBlock(chronos) } : chronos }
 }
 
-const resultsDir = (symbol: string): string => join(base(), 'results', symbol.replace(/[^A-Z0-9.=^-]/gi, '_'))
+// CON, PRN, AUX, NUL, COM1, LPT1 … are device names on Windows, not folders; CON and PRN are real tickers too.
+const resultsDir = (symbol: string): string =>
+  join(base(), 'results', symbol.replace(/[^A-Z0-9.=^-]/gi, '_').replace(/^(CON|PRN|AUX|NUL|COM\d|LPT\d)(?=\.|$)/i, '$1_'))
 let current: ChildProcess | null = null
 
 /** The run going on now, for a phone that started it or a window that did not (link ops agents.job). */
@@ -349,6 +354,8 @@ async function runChecked(req: AgentsRequest, onEvent: (e: AgentsEvent) => void,
   const workDir = join(base(), 'work')
   await mkdir(workDir, { recursive: true })
   const env: NodeJS.ProcessEnv = { ...process.env }
+  // LangSmith tracing switched on for the user's own projects would upload every prompt and the market data.
+  env.LANGSMITH_TRACING = env.LANGCHAIN_TRACING_V2 = 'false'
   if (keyEnv) env[keyEnv] = keys[req.provider]
   if (keys.fred) env.FRED_API_KEY = keys.fred
   if (req.provider === 'ollama' && req.ollamaUrl) env.OLLAMA_BASE_URL = req.ollamaUrl.replace(/\/?$/, '').replace(/(\/v1)?$/, '/v1')

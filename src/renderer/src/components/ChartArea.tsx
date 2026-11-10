@@ -96,14 +96,15 @@ interface IndicatorSeries {
 const ts = (s: number) => s as UTCTimestamp
 const toBar = (c: Candle) => ({ time: ts(c.time), open: c.open, high: c.high, low: c.low, close: c.close })
 const toVol = (c: Candle) => ({ time: ts(c.time), value: c.volume, color: (c.close >= c.open ? UP : DOWN) + '55' })
-const fmtTime = (time: Time, opts: Intl.DateTimeFormatOptions) =>
-  new Date((time as number) * 1000).toLocaleString(locale(), opts)
+/** `timeZone`: for day and longer bars the zone they are dated in; intraday times show in the local zone. */
+const fmtTime = (time: Time, opts: Intl.DateTimeFormatOptions, timeZone?: string) =>
+  new Date((time as number) * 1000).toLocaleString(locale(), { ...opts, timeZone })
 
-function tickMark(time: Time, type: TickMarkType): string {
-  if (type === TickMarkType.Year) return fmtTime(time, { year: 'numeric' })
-  if (type === TickMarkType.Month) return fmtTime(time, { month: 'short' })
-  if (type === TickMarkType.DayOfMonth) return fmtTime(time, { day: '2-digit', month: '2-digit' })
-  return fmtTime(time, { hour: '2-digit', minute: '2-digit' })
+function tickMark(time: Time, type: TickMarkType, timeZone?: string): string {
+  if (type === TickMarkType.Year) return fmtTime(time, { year: 'numeric' }, timeZone)
+  if (type === TickMarkType.Month) return fmtTime(time, { month: 'short' }, timeZone)
+  if (type === TickMarkType.DayOfMonth) return fmtTime(time, { day: '2-digit', month: '2-digit' }, timeZone)
+  return fmtTime(time, { hour: '2-digit', minute: '2-digit' }, timeZone)
 }
 
 /** Price target, entry and stop of a TradingAgents analysis: price, colour, title, line style. */
@@ -116,7 +117,8 @@ function agentLevelList(d: Decision | null): [number | null, string, string, Lin
   ]
 }
 
-export default function ChartArea() {
+/** `full`: the phone's full screen, whose buttons and legend sit over the top of the chart. */
+export default function ChartArea({ full = false }: { full?: boolean }) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
   const finnhubKey = useStore((s) => s.finnhubKey)
@@ -136,6 +138,7 @@ export default function ChartArea() {
   const forecastRun = useStore((s) => s.forecastRun)
   const maxSteps = forecastRun.horizon === 'auto' ? 64 : forecastRun.horizon
   const containerRef = useRef<HTMLDivElement>(null)
+  const legendRef = useRef<HTMLDivElement>(null)
   const dataRef = useRef<Candle[]>([])
   const [api, setApi] = useState<ChartApi | null>(null)
   const [data, setData] = useState<Candle[]>([])
@@ -252,11 +255,14 @@ export default function ChartArea() {
     const seconds = TF_SECONDS[timeframe]
     const months = TF_MONTHS[timeframe]
     const intraday = seconds < 86400
+    // A day, week or month bar carries a date, not a moment: read in the local zone west of UTC, Binance's January
+    // bar (00:00 UTC) would say "Dec". barZone: UTC for such date labels, else the exchange's zone.
+    const dateZone = () => (intraday ? undefined : barZone(dataRef.current.slice(-50).map((c) => c.time), timezoneRef.current ?? 'UTC'))
     api.chart.applyOptions({
-      timeScale: { timeVisible: intraday },
+      timeScale: { timeVisible: intraday, tickMarkFormatter: (t: Time, type: TickMarkType) => tickMark(t, type, dateZone()) },
       localization: {
         timeFormatter: (t: Time) =>
-          fmtTime(t, intraday ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' })
+          fmtTime(t, intraday ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }, dateZone())
       }
     })
     dataRef.current = []
@@ -271,6 +277,9 @@ export default function ChartArea() {
     setStatus(t('Lade {symbol} …', { symbol }))
     useChartMeta.setState({ symbol, currency: '', timeZone: undefined })
 
+    // The candle moves with every tick; the indicators and the rest that read `data` follow at most 4 times a
+    // second: a busy stock sends several trades a second, and each copy recomputes every indicator over all bars.
+    let soon: ReturnType<typeof setTimeout> | undefined
     const push = (bar: Candle) => {
       const arr = dataRef.current
       if (!active || !arr.length || bar.time < arr[arr.length - 1].time) return
@@ -278,7 +287,10 @@ export default function ChartArea() {
       else arr.push(bar)
       api.candles.update(toBar(bar))
       api.volume.update(toVol(bar))
-      setData([...arr])
+      soon ??= setTimeout(() => {
+        soon = undefined
+        if (active) setData([...dataRef.current])
+      }, 250)
     }
 
     // fresh: from the source; otherwise the phone's stored copy, shown at once until fresh candles arrive.
@@ -349,6 +361,7 @@ export default function ChartArea() {
     return () => {
       active = false
       clearTimeout(retry)
+      clearTimeout(soon)
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])
@@ -414,6 +427,12 @@ export default function ChartArea() {
     const legend = (pane: number, label: string, color: string, series: ISeriesApi<SeriesType>[], osc?: boolean) =>
       groups.push({ pane, label, color, series, osc })
     const { sma: s, ema: e, ema3, bb, vwap: vw, supertrend: st, rsi: r, macd: m, stoch, atr: at } = indicators
+    // Indicators with several lines are computed once per data change, not once per line.
+    const once = <T,>(f: (c: number[], d: Candle[]) => T) => {
+      let seen: Candle[] | undefined
+      let value: T
+      return (c: number[], d: Candle[]) => (d === seen ? value : ((seen = d), (value = f(c, d))))
+    }
     if (s.on) legend(0, `SMA ${s.period}`, '#f5c542', [line('#f5c542', (c) => sma(c, s.period))])
     if (e.on) legend(0, `EMA ${e.period}`, '#42a5f5', [line('#42a5f5', (c) => ema(c, e.period))])
     if (ema3.on) {
@@ -424,10 +443,11 @@ export default function ChartArea() {
       ])
     }
     if (bb.on) {
+      const calc = once((c) => bollinger(c, bb.period, bb.mult))
       legend(0, `BB ${bb.period} ${bb.mult}`, '#9c6ade', [
-        line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).upper),
-        line('#9c6ade88', (c) => bollinger(c, bb.period, bb.mult).mid),
-        line('#9c6ade', (c) => bollinger(c, bb.period, bb.mult).lower)
+        line('#9c6ade', (c, d) => calc(c, d).upper),
+        line('#9c6ade88', (c, d) => calc(c, d).mid),
+        line('#9c6ade', (c, d) => calc(c, d).lower)
       ])
     }
     if (vw.on) {
@@ -459,17 +479,17 @@ export default function ChartArea() {
       legend(pane++, `RSI ${r.period}`, '#b388ff', [series], true)
     }
     if (m.on) {
-      const calc = (c: number[]) => macd(c, m.fast, m.slow, m.signal)
+      const calc = once((c) => macd(c, m.fast, m.slow, m.signal))
       const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
-      list.push({ series: hist, calc: (c) => calc(c).hist, color: (v) => (v >= 0 ? UP : DOWN) + '99' })
-      const macdLine = line('#42a5f5', (c) => calc(c).line, pane)
-      legend(pane, `MACD ${m.fast} ${m.slow} ${m.signal}`, '#42a5f5', [macdLine, line('#ff9800', (c) => calc(c).signal, pane++), hist])
+      list.push({ series: hist, calc: (c, d) => calc(c, d).hist, color: (v) => (v >= 0 ? UP : DOWN) + '99' })
+      const macdLine = line('#42a5f5', (c, d) => calc(c, d).line, pane)
+      legend(pane, `MACD ${m.fast} ${m.slow} ${m.signal}`, '#42a5f5', [macdLine, line('#ff9800', (c, d) => calc(c, d).signal, pane++), hist])
     }
     if (stoch.on) {
-      const calc = (d: Candle[]) => stochastic(d, stoch.period, stoch.smoothK, stoch.smoothD)
-      const k = line('#42a5f5', (_, d) => calc(d).k, pane)
+      const calc = once((_, d) => stochastic(d, stoch.period, stoch.smoothK, stoch.smoothD))
+      const k = line('#42a5f5', (c, d) => calc(c, d).k, pane)
       guides(k, '#42a5f5', [80, 20])
-      legend(pane, `${t('Stochastik')} ${stoch.period} ${stoch.smoothK} ${stoch.smoothD}`, '#42a5f5', [k, line('#ff9800', (_, d) => calc(d).d, pane++)], true)
+      legend(pane, `${t('Stochastik')} ${stoch.period} ${stoch.smoothK} ${stoch.smoothD}`, '#42a5f5', [k, line('#ff9800', (c, d) => calc(c, d).d, pane++)], true)
     }
     if (at.on) {
       const series = line('#b0bec5', (_, d) => atr(d, at.period), pane)
@@ -853,6 +873,32 @@ export default function ChartArea() {
     return () => chart.remove()
   }, [])
 
+  // In full screen the candles start below the buttons and the legend, which would otherwise hide the newest highs.
+  useEffect(() => {
+    const box = containerRef.current
+    const leg = legendRef.current
+    if (!api || !box || !leg) return
+    const margins = (top: number) => api.candles.priceScale().applyOptions({ scaleMargins: { top, bottom: 0.25 } })
+    if (!full) return margins(0.08)
+    const fit = () => {
+      const gap = leg.getBoundingClientRect().bottom - box.getBoundingClientRect().top + 8
+      // The price pane is the top one; RSI, MACD … below it make it shorter than the chart.
+      const h = api.chart.panes()[0]?.getHeight() || box.clientHeight
+      margins(h ? Math.min(0.4, Math.max(0.08, gap / h)) : 0.08)
+    }
+    // After the chart's own layout, which sets the panes' heights. Turning the phone and a legend that wraps onto
+    // more lines change the gap.
+    const id = requestAnimationFrame(fit)
+    const watch = new ResizeObserver(fit)
+    watch.observe(box)
+    watch.observe(leg)
+    return () => {
+      cancelAnimationFrame(id)
+      watch.disconnect()
+    }
+    // indicatorSeries: a new or removed lower pane changes the price pane's height.
+  }, [api, full, indicatorSeries])
+
   // Buttons, card and currency sign sit beside the price axis, whose width is only known after the chart's first
   // layout and changes with the prices; the time scale's width changes with it, so that redraws them.
   const [, setAxisWidth] = useState(0)
@@ -947,6 +993,7 @@ export default function ChartArea() {
         )}
         {api && <IndicatorLegend chart={api.chart} groups={legend} fmt={(v) => api.candles.priceFormatter().format(v)} main={false} />}
         <div
+          ref={legendRef}
           className="chart-legend pointer-events-none absolute left-3 top-2 text-xs text-muted"
           // Wraps before the buttons at the top right (about 200 px wide, plus the 320 px summary card) instead of running under them.
           style={{ right: (sideOpen ? AGENTS_WIDTH : 0) + (api?.chart.priceScale('right').width() ?? 60) + (IS_MOBILE ? 12 : fc.result ? 547 : 215) }}

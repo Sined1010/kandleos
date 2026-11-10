@@ -6,7 +6,7 @@ import { hostname, networkInterfaces } from 'node:os'
 import { encodePairing, isPrivateAddress, LINK_PORT, toB64url } from '../shared/link'
 import { handleRequest, mergeDevices, type LinkDevice, type LinkState, type SourceKeys } from './linkHandler'
 import { t } from '../shared/i18n'
-import { read, save } from './keys'
+import { read, save, Unreadable } from './keys'
 
 interface LinkFile {
   pcId: string
@@ -36,6 +36,8 @@ const PAIRING_MS = 5 * 60 * 1000
 const FILES = ['link-devices.bin', 'link-devices.json'] as const
 
 let file: LinkFile | null = null
+// While the stored file cannot be decrypted (keyring locked): a fresh state that is not kept, so a later read finds it.
+let unread: LinkFile | null = null
 let pairing: LinkState['pairing'] = null
 let server: Server | null = null
 let error: string | null = null
@@ -46,14 +48,19 @@ let forward: (op: string, args: unknown, device: string) => Promise<unknown> = a
 }
 let onError: (message: string) => void = () => {}
 
+const fresh = (): LinkFile => ({ pcId: crypto.randomUUID(), enabled: false, vpnHost: '', autostart: false, devices: [] })
+
 function load(): LinkFile {
   if (file) return file
   try {
     file = JSON.parse(read(...FILES) ?? 'null')
-  } catch {
+  } catch (e) {
+    // Saving the fresh state (the user switches phone access on) keeps the unreadable file aside (keys.ts).
+    if (e instanceof Unreadable) return (unread ??= fresh())
     file = null
   }
-  file ??= { pcId: crypto.randomUUID(), enabled: false, vpnHost: '', autostart: false, devices: [] }
+  file ??= fresh()
+  unread = null
   return file
 }
 
@@ -90,8 +97,11 @@ async function answer(raw: string, release: () => void): Promise<string | null> 
   const f = load()
   const before = f.devices
   const open = pairing
+  // Every request changes lastSeen; the final save is skipped when nothing changed after the one in `accepted`.
+  let saved = before
   const save = async (devices: LinkDevice[]) => {
-    if (devices === before) return
+    if (devices === saved) return
+    saved = devices
     f.devices = mergeDevices(f.devices, before, devices)
     await persist()
   }
@@ -143,6 +153,10 @@ function start(): Promise<void> {
     server = null
     // Started hidden at login, nobody would see it in the settings.
     onError(error)
+  })
+  // Strangers are dropped as they connect, so they cannot hold the few slots below until their headers time out.
+  s.on('connection', (sock) => {
+    if (!isPrivateAddress(sock.remoteAddress ?? '')) sock.destroy()
   })
   // Up to 8 MB per request may be buffered before it is decrypted: few connections, and none that dawdles.
   s.maxConnections = 8

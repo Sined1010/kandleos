@@ -101,3 +101,17 @@ test('futureTimes dates Yahoo monthly bars at midnight in the exchange zone, acr
   const xetra = [utc(7, 31, 22), utc(8, 31, 22), utc(9, 30, 22)]
   assert.deepEqual(futureTimes(xetra, 2592000, 2, BERLIN, 1), [utc(10, 31, 23), utc(11, 30, 23)])
 })
+
+test('futureTimes knows the trading week even when a short history misses a day', () => {
+  // Alpaca 1-minute bars of 5 calendar days: Fri, Mon, Tue (no Wednesday or Thursday in it) -> next is Wednesday.
+  const bars = hourly([16, 19, 20])
+  assert.deepEqual(futureTimes(bars, 3600, 2, NY), [utc(10, 21, 13, 30), utc(10, 21, 14, 30)])
+})
+
+test('futureTimes ends a half day at the early close', () => {
+  // Day after Thanksgiving 2026 (Fri 27 Nov): NYSE closes at 13:00 EST = 18:00 UTC; EST session 14:30 ... 20:30 UTC.
+  const est = [14.5, 15.5, 16.5, 17.5, 18.5, 19.5, 20.5]
+  const bars = [23, 24, 25].flatMap((d) => est.map((h) => utc(11, d, Math.floor(h), (h % 1) * 60)))
+  const next = futureTimes(bars, 3600, 5, NY)
+  assert.deepEqual(next, [utc(11, 27, 14, 30), utc(11, 27, 15, 30), utc(11, 27, 16, 30), utc(11, 27, 17, 30), utc(11, 30, 14, 30)])
+})

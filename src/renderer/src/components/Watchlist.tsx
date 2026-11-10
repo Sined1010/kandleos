@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { t } from '../../../shared/i18n'
 import { isCrypto } from '../../../shared/types'
 import { formatChange, formatPrice } from '../lib/format'
@@ -75,15 +76,17 @@ function FolderNameInput({ folder: f, onDone, className }: { folder: Folder; onD
   )
 }
 
-/** Fills in readable names for symbols that have none yet (new symbols, or after a reset); shared with the phone. */
+/** Fills in readable names for symbols that have none yet (new symbols, or after a reset); shared with the phone.
+ *  Also for the charts in the tabs: a value opened from the search is often in no folder. */
 export function useSymbolNames(): RefObject<Set<string>> {
   const folders = useStore((s) => s.folders)
+  const tabs = useStore((s) => s.tabs)
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
   // Symbols already looked up this session, so a symbol Yahoo does not know is not asked for again.
   const looked = useRef(new Set<string>())
   useEffect(() => {
-    for (const s of new Set(folders.flatMap((f) => f.symbols))) {
+    for (const s of new Set([...folders.flatMap((f) => f.symbols), ...tabs.map((t) => t.symbol)])) {
       if (names[s] || looked.current.has(s)) continue
       looked.current.add(s)
       window.api
@@ -92,7 +95,7 @@ export function useSymbolNames(): RefObject<Set<string>> {
         .then((n) => n && !useStore.getState().names[s] && setName(s, n))
         .catch(() => {})
     }
-  }, [folders, names, setName])
+  }, [folders, tabs, names, setName])
   return looked
 }
 
@@ -393,7 +396,8 @@ function FolderSection(props: SectionProps) {
   const toggle = useStore((s) => s.toggleFolder)
   const addToFolder = useStore((s) => s.addToFolder)
   const moveSymbol = useStore((s) => s.moveSymbol)
-  const quotes = useQuotes((s) => s.quotes)
+  // Only this folder's quotes: a tick of any other symbol must not re-render it.
+  const folderQuotes = useQuotes(useShallow((s) => f.symbols.map((sym) => s.quotes[sym])))
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -565,7 +569,7 @@ function FolderSection(props: SectionProps) {
         // An open folder in the folder view shows its symbols as tiles, two per row.
         <div className={tiles ? 'grid grid-cols-2 gap-1.5 px-2 pb-2' : ''}>
           {f.symbols.map((s, i) => {
-            const q = quotes[s]
+            const q = folderQuotes[i]
             const last = i === f.symbols.length - 1
             const name =
               renaming === s ? (

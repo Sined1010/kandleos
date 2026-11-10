@@ -235,6 +235,9 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
   }, [running])
 
   const shown = saved.find((a) => a.id === shownId) ?? saved[0]
+  // Rendered once per report: the panel re-renders with every price tick.
+  const report = shown?.reports[tab] || shown?.reports.decision || ''
+  const reportHtml = useMemo(() => renderMarkdown(report), [report])
   const decision = useMemo(
     () => (shown ? decisionOf(shown.reports, shown.rating, shown.structured) : null),
     [shown]
@@ -543,7 +546,7 @@ export default function AgentsPanel({ open, setupOpen, symbol, price, onClose, o
             </div>
             <div
               className="md mx-3 mb-4 mt-2 select-text"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(shown.reports[tab] || shown.reports.decision || '') }}
+              dangerouslySetInnerHTML={{ __html: reportHtml }}
             />
           </div>
         )}
@@ -639,7 +642,7 @@ function Intro({ symbol, supported, onSetup }: { symbol: string; supported: bool
         </li>
       </ul>
       <p className="mt-3 rounded-lg bg-bg p-2 text-[11px] text-muted ring-1 ring-line">
-        {t('Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.')}
+        {t('Bei einer Analyse gehen das Symbol und die gesammelten Daten an den gewählten KI-Anbieter. Die Kurs- und Unternehmensdaten holt TradingAgents u. a. von Yahoo Finance, auch wenn in KandleOS eine andere Kursquelle gewählt ist. Sprachmodelle können sich irren – die Analyse ist keine Anlageberatung. TradingAgents ist ein Open-Source-Projekt von Tauric Research (Apache-2.0); KandleOS ist kein offizielles Produkt dieses Projekts.')}
       </p>
 
       {IS_MOBILE ? (

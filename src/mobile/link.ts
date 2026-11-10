@@ -72,7 +72,9 @@ export async function hello(): Promise<void> {
 /** Scanned or pasted code: a new pairing, or for the PC already paired just its new addresses. */
 export async function pairWith(code: PairingCode): Promise<void> {
   const p = await load()
-  if (p?.pcId === code.pc) await save({ ...p, addrs: code.addrs, port: code.port })
+  // The known PC's new addresses go in front of the old ones, never instead: a link with this PC's id and wrong
+  // addresses (anyone can send one) must not cut the phone off. Only answers sealed with the device key count anyway.
+  if (p?.pcId === code.pc) await save({ ...p, addrs: [...new Set([...code.addrs, ...p.addrs])].slice(0, 8), port: code.port })
   else {
     const { keys } = await client.pair(code, deviceName())
     await applyKeys(keys)
@@ -90,11 +92,19 @@ export async function unpair(): Promise<void> {
 
 /**
  * A kandleos: link opened from outside (the phone's camera app or Google Lens scanned the PC's code). Anyone can
- * send such a link, so pairing waits for the user's yes, with the PC's name in the question.
+ * send such a link, and the name in it is the sender's choice: pairing waits for the user's yes, and a link to another
+ * PC says that it replaces the current pairing.
  */
 async function openLink(url: string): Promise<void> {
   const code = decodePairing(url)
-  if (!code || !(await ask(t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name }), t('Koppeln')))) return
+  if (!code) return
+  const p = await load()
+  const question = !p
+    ? t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name })
+    : p.pcId === code.pc
+      ? t('Neue Adressen für den PC „{name}“ übernehmen?', { name: p.pcName })
+      : t('Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.', { current: p.pcName, name: code.name })
+  if (!(await ask(question, t('Koppeln'), p && p.pcId !== code.pc ? { danger: true } : undefined))) return
   try {
     await pairWith(code)
     tell(t('Mit „{name}“ gekoppelt.', { name: code.name }))

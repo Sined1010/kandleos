@@ -25,6 +25,8 @@ public class AlarmService extends Service {
     private static final String CHANNEL = "watching";
     private static final int ID = 1;
     private ScheduledExecutorService loop;
+    /** The newest start; the loop stops the service only if no later one came in. */
+    private volatile int lastStart;
 
     /** Android 12+ refuses a start from the background; WorkManager keeps checking then. */
     static void start(Context c) {
@@ -59,11 +61,13 @@ public class AlarmService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        lastStart = startId;
         if (loop == null) {
             loop = Executors.newSingleThreadScheduledExecutor();
             loop.scheduleWithFixedDelay(() -> {
                 int left = AlarmStore.checkAll(this);
-                if (left == 0 || !new AlarmStore(this).instant()) stopSelf();
+                // Only if no newer start came in meanwhile (the app armed alarms again).
+                if (left == 0 || !new AlarmStore(this).instant()) stopSelfResult(lastStart);
                 else getSystemService(NotificationManager.class).notify(ID, watching(left));
             }, 0, 15, TimeUnit.SECONDS);
         }

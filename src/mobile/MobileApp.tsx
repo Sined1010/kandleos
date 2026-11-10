@@ -95,7 +95,7 @@ export default function MobileApp() {
           them and keeps its size when drawing starts. */}
       <main className="relative mb-24 min-h-0 flex-1">
         <ChartBoundary key={activeTab}>
-          <ChartArea />
+          <ChartArea full={full} />
         </ChartBoundary>
       </main>
       {/* While drawing, the tools take the sheet's place; the sheet stays mounted (hidden), so leaving drawing
