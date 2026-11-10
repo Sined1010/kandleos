@@ -1,7 +1,7 @@
 {
   "name": "kandleos",
   "productName": "KandleOS",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "description": "Desktop-App für technische Chartanalyse",
   "author": "Sined1010 <343844815+Sined1010@users.noreply.github.com>",
