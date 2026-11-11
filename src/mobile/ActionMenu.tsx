@@ -8,6 +8,8 @@ export interface ActionItem {
   danger?: boolean
   disabled?: boolean
   onPick(): void
+  /** Starts a group: a small heading (with a line above, except for the first group). */
+  section?: string
   /** Shows an × at the end of the item (e.g. closing a tab); the menu stays open, its items follow the change. */
   onRemove?(): void
 }
@@ -57,7 +59,11 @@ export default function ActionMenu({ title, items, onClose }: { title: string; i
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-brand opacity-60" />
         <p className="truncate px-5 pb-2 text-xs uppercase tracking-wider text-muted">{title}</p>
         {items.map((item, i) => (
-          <div key={`${i}:${item.label}`} className="flex items-center">
+          <div key={`${i}:${item.label}`}>
+          {item.section && (
+            <p className={`px-5 pb-1 pt-2 text-[11px] uppercase tracking-wider text-muted ${i > 0 ? 'mt-1 border-t border-line' : ''}`}>{item.section}</p>
+          )}
+          <div className="flex items-center">
             <button
               role="menuitem"
               disabled={item.disabled}
@@ -80,6 +86,7 @@ export default function ActionMenu({ title, items, onClose }: { title: string; i
                 <X size={18} />
               </button>
             )}
+          </div>
           </div>
         ))}
       </div>

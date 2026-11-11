@@ -269,6 +269,9 @@ export async function alpacaSearch(query: string): Promise<SearchResult[]> {
     .map((a) => ({ symbol: a.symbol.replace('.', '-'), name: a.name, exchange: a.exchange, kind: a.etf ? ('etf' as const) : ('stock' as const) }))
 }
 
+/** Loads the asset list ahead of the first search. */
+export const warmAlpaca = (): void => void assetList().catch(() => {})
+
 /** The asset entry (name, CUSIP) of a US stock or ETF. */
 export async function alpacaAsset(symbol: string): Promise<Asset | undefined> {
   if (!alpacaKnows(symbol)) return undefined

@@ -14,6 +14,9 @@ import {
   symbolName,
   warmSearch
 } from '../data/stocks'
+import { bafinDeals } from '../data/events/bafin'
+import { setBafinSource, symbolEvents } from '../data/events/symbolEvents'
+import { checkDeals } from '../shared/events'
 import { checkAgentsConfig } from '../shared/agents'
 import { t } from '../shared/i18n'
 import { checkAnalyses } from '../shared/savedAnalysis'
@@ -37,6 +40,27 @@ async function secret(name: string): Promise<string | null> {
 
 // Loaded on first use: link.ts pulls in the store, which must not load before window.api exists (main.tsx).
 const pc: Call = async (op, args, timeoutMs) => (await import('./link')).call(op, args, timeoutMs)
+
+// BaFin on the phone: first directly (native HTTP); BaFin's server sends malformed headers, which Android's HTTP
+// stack may refuse, so then through the paired PC. Without a reachable PC the list says that German insider data
+// comes through the PC; data that came through it says so under the list (the WebView's console is not logged).
+setBafinSource(async (isin) => {
+  try {
+    return await bafinDeals(isin)
+  } catch {
+    // asked through the PC below
+  }
+  try {
+    const r = (await pc('events.bafin', isin, 20_000)) as { deals?: unknown; hidden?: unknown } | null
+    const hidden = typeof r?.hidden === 'number' && Number.isFinite(r.hidden) && r.hidden >= 0 ? Math.floor(r.hidden) : 0
+    return { deals: checkDeals(r?.deals), hidden, via: 'pc' as const }
+  } catch (e) {
+    const msg = (e as Error).message
+    // No PC, or one too old to know the request: say where the data would come from.
+    if (['not-paired', 'offline', 'removed', 'unknown-op'].includes(msg)) throw Object.assign(new Error(msg), { name: 'PcNeeded' })
+    throw e
+  }
+})
 const progress = new Set<(pct: number) => void>()
 const agentEvents = new Set<(e: AgentsEvent) => void>()
 // "Abbrechen" ends the wait at once, also while the PC cannot be told.
@@ -113,6 +137,7 @@ export async function createMobileApi(): Promise<Api> {
     finnhubCheck: (key) => finnhubCheck(key),
     symbolName: (symbol) => symbolName(symbol),
     companyInfo: (symbol, key) => companyInfo(symbol, key),
+    events: (symbol, key) => symbolEvents(symbol, key),
     backup: { export: notHere, pick: notHere, apply: notHere },
     // The phone shows the license texts as a page of its own (MobileApp listens).
     openLicenses: async () => {

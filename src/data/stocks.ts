@@ -1,7 +1,7 @@
 import { http, type HttpRes } from './http'
-import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch } from './alpaca'
+import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch, warmAlpaca } from './alpaca'
 import { isinFromCusip, looksLikeWkn, warmXetra, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin'
-import { matchCoins, mergeHits } from '../shared/search'
+import { matchCoins, mergeHits, withPrices } from '../shared/search'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
 import { marketStatus, phaseAt } from '../shared/market'
@@ -140,10 +140,15 @@ const yahooKind: Record<string, SearchKind> = {
   CURRENCY: 'currency'
 }
 
-/** The search box got a digit, so a WKN may follow: the Xetra list (5 MB, slow on a phone) starts loading now
- *  instead of with the search, which waits only 3 s for it. */
-export function warmSearch(): void {
-  if (yahooOn()) warmXetra()
+/**
+ * The search box got the focus: the lists the search matches against start loading now rather than with the first
+ * search, which would wait up to 2 s for Binance's pairs (a phone on mobile data takes that long). `wkn`: a digit was
+ * typed, so a WKN may follow and the Xetra list (5 MB, slow on a phone) loads too; the search waits only 3 s for it.
+ */
+export function warmSearch(wkn = false): void {
+  void binancePairs().catch(() => {})
+  if (source === 'alpaca' && alpacaHasKeys()) warmAlpaca()
+  if (wkn && yahooOn()) warmXetra()
 }
 
 export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
@@ -151,7 +156,9 @@ export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   // Neither list may hold up the search: a slow Binance leaves only the common coins, a slow Xetra list (5 MB on its
   // first load) only the plain search. Both keep loading for the next search.
   const listed = within(binancePairs(), 2000, null)
-  const alpaca = source === 'alpaca' ? alpacaSearch(query).catch(() => []) : Promise.resolve([])
+  // With Alpaca as the source, hits Alpaca has no prices for (OTC) are left out; Yahoo's home listing then leads.
+  const priced = (hits: SearchResult[]) => withPrices(hits, source === 'alpaca' ? 'alpaca' : 'yahoo')
+  const alpaca = source === 'alpaca' ? alpacaSearch(query).then(priced, () => []) : Promise.resolve([])
   if (!yahooOn()) {
     const [us, list] = await Promise.all([alpaca, listed])
     return mergeHits(query, us, matchCoins(query, list, COINS))
@@ -171,7 +178,7 @@ export async function searchSymbols(query: unknown): Promise<SearchResult[]> {
   const coins = matchCoins(query, list, COINS)
   // Alpaca's US hits first, then Yahoo's for everything else (a US symbol from Yahoo is the same symbol). Yahoo's
   // coins only when Binance trades them; without Binance's list none, as their charts may not load.
-  return mergeHits(query, [...us, ...found.filter((f) => f.kind !== 'crypto' || list?.has(f.symbol))], coins)
+  return mergeHits(query, [...us, ...priced(found).filter((f) => f.kind !== 'crypto' || list?.has(f.symbol))], coins)
 }
 
 async function yahooSearch(query: string): Promise<SearchResult[]> {

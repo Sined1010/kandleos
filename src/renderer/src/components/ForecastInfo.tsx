@@ -9,6 +9,7 @@ import { IS_MOBILE } from '../lib/platform'
 import { useStore, type ForecastView } from '../store/useStore'
 import type { Timeframe } from '../../../shared/types'
 import { useSummary } from './ForecastQuality'
+import { backdropClose } from '../lib/backdrop'
 
 export interface ForecastResult {
   /** Bar times of the forecast steps. */
@@ -366,7 +367,7 @@ function ForecastHelp({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" {...backdropClose(onClose)}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"

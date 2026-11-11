@@ -49,6 +49,9 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
   has passed and keeps a running track record per symbol and candle size
 - **Optional in-depth analysis with [TradingAgents](https://github.com/TauricResearch/TradingAgents):** AI agents using your own API keys, or fully local with Ollama.
   The market analyst gets the daily Chronos-2 forecast with its track record, and the report compares the agents' decision with it
+- **Insider deals in the chart:** buys and sells by board members (BaFin for German stocks, Finnhub for US stocks) as markers
+  at their candle and as a list in the Events tab, with clusters, the delay until publication and a short context per deal.
+  US stocks also list 8-K filings and company news. Off by default; the Events button switches them on
 - **Back up your data:** export watchlist, drawings, saved charts and settings to one file, API keys only password-encrypted
 - **Android app** with price alarms (in the app, in the background every 15 minutes, or as instant alarms every 15 seconds)
 - **Pair your phone with your PC:** watchlist, drawings, saved charts and alarms stay in sync, alarms also show up on the PC,
@@ -112,8 +115,9 @@ You choose the stock data source on first start; you can change it any time in t
 | [Binance](https://www.binance.com/) | Crypto prices and the list of tradable crypto pairs for the search | not needed |
 | [Alpaca](https://alpaca.markets/) | US stocks and ETFs (recommended for US stocks) | your own free key. Use **paper trading keys**: KandleOS only reads market data, live keys would also allow trading |
 | Yahoo Finance | Stocks worldwide, indices, commodities, pre-/post-market | not needed, opt-in |
-| [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks and company info | your own free key |
-| [Deutsche Börse](https://www.cashmarket.deutsche-boerse.com/cash-en/trading/Tradable-Instruments-Xetra), [Wikidata](https://www.wikidata.org/) | ISIN and WKN in the company info (US stocks: computed from Alpaca's CUSIP); the Xetra list for searching by WKN loads once a digit is typed into the search (Yahoo only) | not needed |
+| [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks, company info, and for US stocks insider deals, 8-K filings and company news in the Events tab | your own free key |
+| [BaFin](https://portal.mvp.bafin.de/database/DealingsInfo/) | Insider dealings of German companies, last 12 months (Events tab, asked only with events switched on). Source: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de | not needed |
+| [Deutsche Börse](https://www.cashmarket.deutsche-boerse.com/cash-en/trading/Tradable-Instruments-Xetra), [Wikidata](https://www.wikidata.org/) | ISIN and WKN in the company info (US stocks: computed from Alpaca's CUSIP); the Xetra list loads once a digit is typed into the search (Yahoo only) or, with events on, a German stock is opened; a German stock missing from it is looked up on Wikidata. With events on, Wikidata is also asked for the US listing (ADR) of a stock without an insider source | not needed |
 
 **About Yahoo Finance:** Yahoo does not offer an official API for this. Like the open-source library yfinance,
 KandleOS reads the publicly available data that Yahoo's own finance website loads. Yahoo Finance data is meant for
@@ -141,6 +145,7 @@ directly to the providers above, which see your IP address. The update check is 
 KandleOS asks GitHub once a day for the latest version number (or when you click **Check for updates** in About);
 nothing is downloaded or installed automatically. A paired phone talks to your PC directly over your local network or
 VPN; every message is encrypted with a key that only the two devices know, and nothing goes through a server.
+With events switched on (they are off by default), opening a German stock sends its ISIN to BaFin to load the insider deals of that company.
 Details are in the app under **About KandleOS**.
 
 ## Not investment advice

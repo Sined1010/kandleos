@@ -11,5 +11,11 @@ export const THEME = {
   brandTo: '#06b6d4',
   /** Drawings: indigo from the icon, the selected one in its cyan. */
   drawing: '#818cf8',
-  selected: '#22d3ee'
+  selected: '#22d3ee',
+  /** Event badges: a step lighter than the candles (up/down) so a badge stands out against the bars it sits on. */
+  eventBuy: '#34d399',
+  eventSell: '#fb7185',
+  eventNote: '#a5b4fc',
+  /** Buys and sells on one bar. */
+  eventMixed: '#f59e0b'
 } as const

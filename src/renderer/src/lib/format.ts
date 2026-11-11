@@ -1,4 +1,4 @@
-import { locale } from '../../../shared/i18n'
+import { locale } from '../../../shared/i18n.ts'
 
 export const formatPrice = (p: number): string =>
   p.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: p < 1 ? 6 : p < 10 ? 4 : 2 })

@@ -3,6 +3,7 @@ import type { AgentsEnd, AgentsEvent, AgentsJob, AgentsRequest, AgentsStatus, Sa
 import type { BackupSummary } from '../main/backup'
 import type { LinkStatus } from '../main/link'
 import type { ArchiveEntry, Settlement, SummaryRow } from '../shared/archive'
+import type { EventsResult } from '../shared/events'
 import type { CandleData, CompanyInfo, OlderRequest, Quote, SearchResult, Timeframe } from '../shared/types'
 
 /** Subscribes to a main-process event channel; returns the unsubscribe function. */
@@ -36,12 +37,14 @@ const api = {
   stockQuotes: (symbols: string[], key: string): Promise<{ quotes: Record<string, Quote>; error: string | null }> =>
     ipcRenderer.invoke('stocks:quotes', symbols, key),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
-  /** A digit was typed into the search: loads what a WKN search needs ahead of it. */
-  warmSearch: (): void => ipcRenderer.send('symbols:warm'),
+  /** The search got the focus (or, with `wkn`, a digit): loads the lists it matches against ahead of it. */
+  warmSearch: (wkn?: boolean): void => ipcRenderer.send('symbols:warm', wkn === true),
   finnhubCheck: (key: string): Promise<string | null> => ipcRenderer.invoke('finnhub:check', key),
   symbolName: (symbol: string): Promise<string | null> => ipcRenderer.invoke('symbols:name', symbol),
   /** Profile of a stock for the info button: Finnhub with a key, otherwise Yahoo if switched on. */
   companyInfo: (symbol: string, key: string): Promise<CompanyInfo> => ipcRenderer.invoke('stocks:info', symbol, key),
+  /** Insider dealings, 8-K filings and news of a symbol (BaFin or Finnhub), kept 15 minutes in main. */
+  events: (symbol: string, key: string): Promise<EventsResult> => ipcRenderer.invoke('events:get', symbol, key),
   /** Backup file: main shows the file dialogs; keys go into the file only encrypted with the password. */
   backup: {
     /** Resolves to the saved path, or null if the dialog was cancelled. */

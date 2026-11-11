@@ -22,6 +22,7 @@ function deps(over: Partial<RemoteDeps> = {}): RemoteDeps & { loads: number; pro
       cancel: () => {},
       results: async () => []
     },
+    bafin: async () => ({ deals: [], hidden: 0 }),
     ...over
   }
   return d
@@ -119,4 +120,12 @@ test('agents.job passes a numeric start time on and ignores anything else', asyn
   await op('agents.job', { evil: 1 }, 'dev')
   await op('agents.job', null, 'dev')
   assert.deepEqual(asked, [1700, undefined, undefined])
+})
+
+test('events.bafin: German ISINs only', async () => {
+  const asked: string[] = []
+  const ops = createRemoteOps(deps({ bafin: async (isin: string) => (asked.push(isin), { deals: [{ person: 'A' }], hidden: 2 }) }))
+  assert.deepEqual(await ops('events.bafin', 'DE0007164600', 'phone'), { deals: [{ person: 'A' }], hidden: 2 })
+  for (const bad of ['US0378331005', 'DE0007164601', '', null, { isin: 'DE0007164600' }]) await assert.rejects(ops('events.bafin', bad, 'phone'))
+  assert.deepEqual(asked, ['DE0007164600'])
 })

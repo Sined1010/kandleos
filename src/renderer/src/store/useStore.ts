@@ -156,6 +156,15 @@ interface State {
   /** The phone's one-time hint that a long press on the tab button lists all tabs. */
   tabHintSeen: boolean
   setTabHintSeen: () => void
+  /** Events tab: which groups the list and the markers show. */
+  eventFilters: { insider: boolean; filings: boolean; news: boolean }
+  setEventFilter: (group: 'insider' | 'filings' | 'news', on: boolean) => void
+  /** Events (insider markers, list, sources asked) are off until the user switches them on. */
+  eventsOn: boolean
+  setEventsOn: (on: boolean) => void
+  /** Ids of the important events seen per symbol (shared/events.ts unseen). */
+  eventsSeen: Record<string, string[]>
+  markEventsSeen: (symbol: string, ids: string[]) => void
   /** Ask GitHub once a day for a newer release; off unless the user turns it on. */
   updateCheck: boolean
   /** Newest release found by the last check (automatic or clicked), and when the automatic one last succeeded. */
@@ -263,6 +272,13 @@ export const useStore = create<State>()(
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
       tabHintSeen: false,
       setTabHintSeen: () => set({ tabHintSeen: true }),
+      eventFilters: { insider: true, filings: true, news: true },
+      setEventFilter: (group, on) => set((s) => ({ eventFilters: { ...s.eventFilters, [group]: on } })),
+      // Off by default, also for files from before this field (merge keeps the default when it is missing).
+      eventsOn: false,
+      setEventsOn: (eventsOn) => set({ eventsOn }),
+      eventsSeen: {},
+      markEventsSeen: (symbol, ids) => set((s) => ({ eventsSeen: { ...s.eventsSeen, [symbol]: ids } })),
       updateCheck: false,
       updateLatest: null,
       updateCheckedAt: 0,
@@ -464,6 +480,7 @@ export const useStore = create<State>()(
           // The backtest used to be a display switch of its own; switched off, it now means depth 0.
           forecastRun: { ...current.forecastRun, ...(backtest === false && { backtestRuns: 0 as const }), ...p.forecastRun },
           agentsConfig: { ...current.agentsConfig, ...p.agentsConfig },
+          eventFilters: { ...current.eventFilters, ...p.eventFilters },
           // Files from before saved charts have none.
           charts: p.charts ?? [],
           alarms: p.alarms ?? [],
@@ -504,6 +521,9 @@ export const useStore = create<State>()(
         yahooExtra,
         disclaimerAccepted,
         tabHintSeen,
+        eventFilters,
+        eventsOn,
+        eventsSeen,
         updateCheck,
         updateLatest,
         updateCheckedAt
@@ -521,6 +541,9 @@ export const useStore = create<State>()(
         forecastRun,
         disclaimerAccepted,
         tabHintSeen,
+        eventFilters,
+        eventsOn,
+        eventsSeen,
         names,
         symbol,
         timeframe,

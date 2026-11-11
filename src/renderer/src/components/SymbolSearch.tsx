@@ -51,6 +51,8 @@ export default function SymbolSearch({
   const all = found.hits
   const [active, setActive] = useState(0)
   const [filter, setFilter] = useState<Filter>('all')
+  // A search for the typed text is still running (its hits have not come yet).
+  const searching = open && !!query.trim() && query.trim() !== value && found.q !== query.trim()
   const results = filter === 'all' ? all : all.filter((r) => r.kind === filter || (filter === 'etf' && r.kind === 'fund'))
 
   useEffect(() => setQuery(value), [value])
@@ -68,7 +70,7 @@ export default function SymbolSearch({
           setActive(0)
         })
         .catch(() => !stale && setFound({ q, hits: [] }))
-    }, 250)
+    }, 150)
     return () => {
       stale = true
       clearTimeout(id)
@@ -119,13 +121,14 @@ export default function SymbolSearch({
       <input
         value={query}
         onChange={(e) => {
-          if (/\d/.test(e.target.value)) window.api.warmSearch()
+          if (/\d/.test(e.target.value)) window.api.warmSearch(true)
           setQuery(e.target.value)
           setOpen(true)
         }}
         onFocus={(e) => {
           e.target.select()
           setOpen(true)
+          window.api.warmSearch()
         }}
         onBlur={() => close()}
         onKeyDown={onKeyDown}
@@ -137,6 +140,7 @@ export default function SymbolSearch({
         spellCheck={false}
         className={inputClassName}
       />
+      {searching && <div className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 animate-pulse rounded-full bg-brand" aria-hidden />}
       {open && all.length > 0 && (
         <div
           className={`absolute top-full z-30 mt-2 overflow-hidden rounded-lg border border-line bg-panel/95 backdrop-blur shadow-2xl shadow-black/50 ${

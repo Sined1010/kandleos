@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron'
 import { readFileSync } from 'node:fs'
 import { rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -38,6 +38,8 @@ import {
   symbolName,
   warmSearch
 } from '../data/stocks'
+import { bafinDeals, setCsvLoader } from '../data/events/bafin'
+import { symbolEvents } from '../data/events/symbolEvents'
 
 useAlpacaKeyStore(alpacaKeysFromDisk, saveAlpacaKeysToDisk)
 
@@ -93,7 +95,8 @@ const remote = createRemoteOps({
     job: agentsJob,
     cancel: cancelAgents,
     results: listAnalyses
-  }
+  },
+  bafin: (isin) => bafinDeals(isin)
 })
 configureLink({
   keys: () => ({ finnhub: finnhubKey(), alpaca: alpacaKeysFromDisk(), ...source }),
@@ -193,10 +196,17 @@ ipcMain.handle('backup:apply', async (e, password) => {
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended, older) => stockCandles(symbol, tf, key, extended, older))
 ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
-ipcMain.on('symbols:warm', () => warmSearch())
+ipcMain.on('symbols:warm', (_e, wkn) => warmSearch(wkn === true))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))
 ipcMain.handle('symbols:name', (_e, symbol) => symbolName(symbol))
 ipcMain.handle('stocks:info', (_e, symbol, key) => companyInfo(symbol, key))
+ipcMain.handle('events:get', (_e, symbol, key) => symbolEvents(symbol, key))
+// BaFin's server sends malformed headers that Node's fetch rejects; Chromium's network stack accepts them.
+setCsvLoader(async (url) => {
+  const res = await net.fetch(url, { headers: { 'User-Agent': 'KandleOS' }, signal: AbortSignal.timeout(12_000) })
+  if (!res.ok) throw new Error(`BaFin HTTP ${res.status}`)
+  return res.text()
+})
 ipcMain.handle('forecast:run', (e, series, groups) => {
   let last = -1
   return forecast(series, groups, (share) => {

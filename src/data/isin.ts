@@ -113,10 +113,59 @@ const EXCHANGES: Record<string, string[]> = {
   ST: ['Q1019992'],
   HE: ['Q581755'],
   OL: ['Q909158'],
-  TO: ['Q818723']
+  TO: ['Q818723'],
+  T: ['Q217475'],
+  HK: ['Q496672']
 }
 // Nordic share classes: Yahoo writes NOVO-B, Wikidata "NOVO B".
 const NORDIC = new Set(['CO', 'ST', 'HE', 'OL'])
+
+/** A home ticker as Wikidata may write it: Nordic share classes "NOVO B" or plain "NOVO", Hong Kong without zeros. */
+export function tickerVariants(ticker: string, suffix: string): string[] {
+  const out = [ticker]
+  if (NORDIC.has(suffix)) out.push(ticker.replace('-', ' '), ticker.split('-')[0])
+  if (suffix === 'HK') out.push(ticker.replace(/^0+/, ''))
+  return [...new Set(out)]
+}
+
+/**
+ * US listings that may carry Form 4 insider filings: foreign issuers listed on NYSE or Nasdaq report since 18.03.2026,
+ * OTC ADRs do not. Which home countries are exempt: shared/events.ts NO_US_INSIDERS.
+ */
+export const ADR_EXCHANGES: Record<string, string> = { Q13677: 'NYSE', Q82059: 'Nasdaq' }
+
+/** The company's one US listing among its Wikidata listings, or none when there is none or more than one. */
+export function pickAdr(rows: { ex: string; ticker: string }[]): { symbol: string; exchange: string } | undefined {
+  const us = new Map<string, string>()
+  for (const { ex, ticker } of rows) {
+    const symbol = ticker.trim().toUpperCase().replace('.', '-')
+    if (ADR_EXCHANGES[ex] && /^[A-Z]{1,5}(-[A-Z])?$/.test(symbol)) us.set(symbol, ADR_EXCHANGES[ex])
+  }
+  if (us.size !== 1) return undefined
+  const [[symbol, exchange]] = us
+  return { symbol, exchange }
+}
+
+/**
+ * The US listing of a company listed elsewhere (Toyota 7203.T → TM): the same Wikidata item as the home listing,
+ * with a current NYSE or Nasdaq listing. Throws when Wikidata fails; the caller then shows no hint.
+ */
+export async function wikidataAdr(symbol: string): Promise<{ symbol: string; exchange: string } | undefined> {
+  const [, base, suffix] = /^(.+)\.([A-Z]{1,2})$/.exec(symbol) ?? []
+  const ex = suffix ? EXCHANGES[suffix] : undefined
+  if (!ex) return undefined
+  const tickers = tickerVariants(base, suffix).map((t) => JSON.stringify(t)).join(' ')
+  const q = `SELECT DISTINCT ?ex ?ticker WHERE { VALUES ?home { ${ex.map((e) => 'wd:' + e).join(' ')} } VALUES ?t { ${tickers} }
+    ?item p:P414 ?s . ?s pq:P249 ?t ; ps:P414 ?home . FILTER NOT EXISTS { ?s pq:P582 [] }
+    ?item p:P414 ?u . ?u ps:P414 ?ex ; pq:P249 ?ticker . FILTER NOT EXISTS { ?u pq:P582 [] } }`
+  const res = await http('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), {
+    headers: { 'User-Agent': 'KandleOS (https://github.com/Sined1010/kandleos)', Accept: 'application/sparql-results+json' },
+    timeoutMs: 10_000
+  })
+  if (!res.ok) throw new Error(`Wikidata HTTP ${res.status}`)
+  const rows: any[] = (await res.json())?.results?.bindings ?? []
+  return pickAdr(rows.map((r) => ({ ex: String(r?.ex?.value ?? '').split('/').pop()!, ticker: String(r?.ticker?.value ?? '') })))
+}
 
 /**
  * The one ISIN to show, or none: Wikidata lists every ISIN of a company (several share classes, sometimes broken
@@ -133,9 +182,8 @@ export function pickIsin(found: string[], suffix: string): string | undefined {
 export async function wikidataIsin(ticker: string, suffix: string): Promise<string | undefined> {
   const ex = EXCHANGES[suffix]
   if (!ex) return undefined
-  const t = NORDIC.has(suffix) ? ticker.replace('-', ' ') : ticker
   const q = `SELECT DISTINCT ?isin WHERE { VALUES ?ex { ${ex.map((e) => 'wd:' + e).join(' ')} }
-    ?item p:P414 ?s . ?s pq:P249 ${JSON.stringify(t)} ; ps:P414 ?ex . ?item wdt:P946 ?isin
+    ?item p:P414 ?s . ?s pq:P249 ?t ; ps:P414 ?ex . VALUES ?t { ${tickerVariants(ticker, suffix).map((v) => JSON.stringify(v)).join(' ')} } . ?item wdt:P946 ?isin
     FILTER NOT EXISTS { ?s pq:P582 [] } }` // a listing with an end date is over; its ticker may belong to another company now
   const res = await http('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), {
     // Wikidata asks every client to name itself.

@@ -55,6 +55,9 @@ import ForecastQuality from './ForecastQuality'
 import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
+import EventLayer from './EventLayer'
+import EventsButton from './EventsButton'
+import { loadEvents, useEventsData } from '../services/events'
 import ForecastLoader, { BrandLoader } from './ForecastLoader'
 import FullscreenButton from './FullscreenButton'
 import { ForecastSettings, ForecastSummary, ForecastTip, type ForecastResult } from './ForecastInfo'
@@ -122,6 +125,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   const symbol = useStore((s) => s.symbol)
   const timeframe = useStore((s) => s.timeframe)
   const finnhubKey = useStore((s) => s.finnhubKey)
+  const eventsOn = useStore((s) => s.eventsOn)
   const stockSource = useStore((s) => s.stockSource)
   const yahooExtra = useStore((s) => s.yahooExtra)
   const indicators = useStore((s) => s.indicators)
@@ -365,6 +369,25 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])
+
+  // Insider dealings, filings and news of the open symbol, refreshed every 15 minutes (main keeps them as long).
+  // A failed source is asked once more after about a minute, when main has let go of the failed answer.
+  useEffect(() => {
+    if (!eventsOn) return
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const load = (again: boolean) =>
+      loadEvents(symbol, finnhubKey).then(() => {
+        const s = useEventsData.getState()
+        const failed = s.state === 'error' || !!s.result?.notes.some((n) => n.state === 'error')
+        if (again && failed && s.symbol === symbol) retry = setTimeout(() => void load(false), 65_000)
+      })
+    void load(true)
+    const timer = setInterval(() => void load(true), 15 * 60_000)
+    return () => {
+      clearInterval(timer)
+      clearTimeout(retry)
+    }
+  }, [symbol, finnhubKey, eventsOn])
 
   // Scrolling near the oldest bar loads the section before it.
   useEffect(() => {
@@ -965,6 +988,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
             {MINOR_UNITS[currency] ?? currency}
           </span>
         )}
+        {api && eventsOn && <EventLayer chart={api.chart} series={api.candles} data={data} symbol={symbol} timeframe={timeframe} timeZone={exchangeZone} currency={currency} />}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
         {api && data.length > 0 && (
           <PriceTags
@@ -1008,6 +1032,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
                 </span>
                 <QuoteChip quote={quote} currency={currency} />
                 <MarketBadge symbol={symbol} timeZone={exchangeZone} />
+                <EventsButton />
               </>
             )}
             {fc.state === 'error' && <span className="text-down">{fc.error}</span>}

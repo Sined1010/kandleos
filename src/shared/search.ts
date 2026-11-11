@@ -32,3 +32,14 @@ export function mergeHits(query: string, stocks: SearchResult[], coins: SearchRe
     (r) => !seen.has(r.symbol) && !!seen.add(r.symbol)
   )
 }
+
+/** Exchange names of OTC listings: Alpaca's asset list says OTC, Yahoo's search OQX, OQB, PNK or "Other OTC". */
+const OTC = /^(OTC|OQX|OQB|PNK|Other OTC|OTC Markets.*)$/i
+
+/**
+ * Hits whose chart can load. With Alpaca as the stock source, US symbols load from Alpaca, which has no OTC prices
+ * (Infineon: IFNNY and IFNNF stay empty, IFX.DE comes through Yahoo), so OTC hits are left out; Yahoo has them.
+ */
+export function withPrices(hits: SearchResult[], source: 'alpaca' | 'yahoo'): SearchResult[] {
+  return source === 'alpaca' ? hits.filter((h) => !OTC.test(h.exchange ?? '')) : hits
+}

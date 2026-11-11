@@ -5,6 +5,7 @@ import { t } from '../../../shared/i18n'
 import { ipcError } from '../lib/format'
 import { useStore } from '../store/useStore'
 import { ask } from '../../../mobile/MessageBox'
+import { backdropClose } from '../lib/backdrop'
 
 type Status = Awaited<ReturnType<typeof window.api.agents.status>>
 type Setup = Parameters<Parameters<typeof window.api.agents.onSetup>[0]>[0]
@@ -132,7 +133,7 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
   const suggestions = (tier: 'deep' | 'quick') => [...new Set([...(ollama ?? []), ...provider[tier]])]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" {...backdropClose(onClose)}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"

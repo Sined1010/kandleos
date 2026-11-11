@@ -9,6 +9,7 @@ import LanguageSwitch from './LanguageSwitch'
 import StockSourcePicker, { useSourceForm } from './StockSourcePicker'
 import { RELEASES_URL } from './UpdateBadge'
 import { IS_MOBILE, PAGE } from '../lib/platform'
+import { backdropClose } from '../lib/backdrop'
 
 /** Phone: price alarms every 15 s with a permanent notification (more battery) instead of about every 15 min. */
 function InstantAlarms() {
@@ -34,7 +35,7 @@ function InstantAlarms() {
  * linkSection: the phone's "PC" section (src/mobile/PcLink.tsx), passed in so no phone code lands in the PC bundle.
  * keysFromPc: while paired, the stock source and keys come from the PC and are read-only here.
  */
-export default function SettingsModal({ onClose, linkSection, keysFromPc = false }: { onClose: () => void; linkSection?: React.ReactNode; keysFromPc?: boolean }) {
+export default function SettingsModal({ onClose, linkSection, keysFromPc = false, focus }: { onClose: () => void; linkSection?: React.ReactNode; keysFromPc?: boolean; focus?: string }) {
   const finnhubKey = useStore((s) => s.finnhubKey)
   const setFinnhubKey = useStore((s) => s.setFinnhubKey)
   const updateCheck = useStore((s) => s.updateCheck)
@@ -42,6 +43,13 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
   const [key, setKey] = useState(finnhubKey)
   const valid = key === '' || /^[A-Za-z0-9]{1,64}$/.test(key.trim())
   const source = useSourceForm()
+
+  // Opened for one field (the Events list asks for the Finnhub key): scroll to it and put the cursor there.
+  useEffect(() => {
+    const el = focus ? document.getElementById(focus) : null
+    el?.scrollIntoView({ block: 'center' })
+    el?.focus()
+  }, [focus])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -58,7 +66,7 @@ export default function SettingsModal({ onClose, linkSection, keysFromPc = false
   }
 
   return (
-    <div className={PAGE?.backdrop ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'} onClick={onClose}>
+    <div className={PAGE?.backdrop ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'} {...backdropClose(onClose)}>
       <form
         onSubmit={save}
         onClick={(e) => e.stopPropagation()}

@@ -20,6 +20,10 @@ import { formatChange, formatPrice } from '../lib/format'
 import { insertTarget } from '../lib/watchlist'
 import { MAX_TABS, useQuotes, useStore, type Folder } from '../store/useStore'
 import AlarmsModal from './AlarmsModal'
+import { useUnseen } from './EventsButton'
+import EventsPanel from './EventsPanel'
+import { openEvents } from '../services/events'
+import { useEventsUi } from '../store/eventsUi'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
 import SymbolSearch from './SymbolSearch'
@@ -103,6 +107,8 @@ export default function Watchlist() {
   const folders = useStore((s) => s.folders)
   const addFolder = useStore((s) => s.addFolder)
   const view = useStore((s) => s.watchlistView)
+  const side = useEventsUi((s) => s.side)
+  const unseenCount = useUnseen(useStore((s) => s.symbol)).length
   const setView = useStore((s) => s.setWatchlistView)
   const [editing, setEditing] = useState<string | null>(null)
   // Folder whose symbol search is open.
@@ -134,7 +140,8 @@ export default function Watchlist() {
     }
   }, [])
   useEffect(() => {
-    if (!open) return
+    // The Events tab hides the folders: Backspace must not close one unseen.
+    if (!open || side === 'events') return
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
       // Backspace while typing edits the text, it does not navigate.
@@ -145,7 +152,7 @@ export default function Watchlist() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [open])
+  }, [open, side])
   const drag = useRef<{ symbol: string; from: string } | null>(null)
   const setName = useStore((s) => s.setName)
   const looked = useSymbolNames()
@@ -182,10 +189,29 @@ export default function Watchlist() {
 
   return (
     <aside ref={asideRef} className="flex w-64 shrink-0 flex-col border-l border-line bg-panel">
-      <div className="flex items-center justify-between border-b border-line px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted">Watchlist</span>
-        <span className="flex items-center gap-1">
-          <span className="mr-1 flex overflow-hidden rounded border border-line">
+      <div className="flex flex-wrap items-center justify-between gap-y-1 border-b border-line px-2 py-2">
+        <span className="flex items-center gap-0.5">
+          {(
+            [
+              ['watchlist', 'Watchlist'],
+              ['events', t('Events')]
+            ] as const
+          ).map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => (tab === 'events' ? openEvents() : useEventsUi.setState({ side: 'watchlist' }))}
+              aria-pressed={side === tab}
+              className={`flex items-center gap-1 rounded px-1 py-0.5 text-xs font-semibold uppercase ${side === tab ? 'bg-line text-white' : 'text-muted hover:text-white'}`}
+            >
+              {label}
+              {tab === 'events' && unseenCount > 0 && (
+                <span className="animate-pulse rounded bg-amber-500 px-1 text-[10px] font-bold normal-case text-black">{unseenCount}</span>
+              )}
+            </button>
+          ))}
+        </span>
+        <span className={`ml-auto flex items-center gap-0.5 ${side === 'events' ? 'hidden' : ''}`}>
+          <span className="mr-0.5 flex overflow-hidden rounded border border-line">
             {(
               [
                 ['list', List, t('Listenansicht')],
@@ -221,14 +247,19 @@ export default function Watchlist() {
               setOpenId(null)
               setEditing(addFolder(t('Neuer Ordner')))
             }}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
+            className="flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
           >
             <FolderPlus size={15} /> {t('Ordner')}
           </button>
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6">
+      {side === 'events' && (
+        <div className="flex-1 overflow-y-auto pb-6">
+          <EventsPanel />
+        </div>
+      )}
+      <div className={`flex-1 overflow-y-auto pb-6 ${side === 'events' ? 'hidden' : ''}`}>
         {(view === 'list' ? folders : open ? [open] : []).map((f) => (
           <FolderSection
             key={f.id}

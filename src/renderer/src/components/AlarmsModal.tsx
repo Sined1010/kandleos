@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect } from 'react'
 import { t } from '../../../shared/i18n'
 import AlarmList from './AlarmList'
+import { backdropClose } from '../lib/backdrop'
 
 /** PC: price alarms in a window, opened from the watchlist's right-click menu. */
 export default function AlarmsModal({ symbol, onClose }: { symbol: string; onClose: () => void }) {
@@ -11,7 +12,7 @@ export default function AlarmsModal({ symbol, onClose }: { symbol: string; onClo
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" {...backdropClose(onClose)}>
       <div
         role="dialog"
         aria-modal="true"

@@ -1,6 +1,7 @@
 // What a paired phone may ask the PC to compute (Android Abschnitt 3), without Electron: the forecast model, the
 // forecast archive and TradingAgents. A fixed list; everything else (setup, LLM keys, clearing the archive) is
 // refused. The callees check their inputs as they do for the window's IPC.
+import { isinValid } from '../data/isin.ts'
 import { modelsFor, type ProviderId } from '../shared/agents.ts'
 import { t } from '../shared/i18n.ts'
 import { TF_SECONDS, type Timeframe } from '../shared/types.ts'
@@ -35,6 +36,8 @@ export interface RemoteDeps {
     cancel(): void
     results(symbol: unknown): Promise<unknown[]>
   }
+  /** BaFin's insider dealings of a German ISIN, fetched for a phone whose own request BaFin's headers break. */
+  bafin(isin: string): Promise<unknown>
 }
 
 export interface ModelState {
@@ -115,7 +118,11 @@ export function createRemoteOps(deps: RemoteDeps): (op: string, args: unknown, d
     },
     'agents.job': (started) => deps.agents.job(Number.isFinite(started) ? (started as number) : undefined),
     'agents.cancel': () => deps.agents.cancel(),
-    'agents.results': (symbol) => deps.agents.results(symbol)
+    'agents.results': (symbol) => deps.agents.results(symbol),
+    'events.bafin': (isin) => {
+      if (typeof isin !== 'string' || !isin.startsWith('DE') || !isinValid(isin)) throw new Error('bad-isin')
+      return deps.bafin(isin)
+    }
   }
 
   return async (op, args, device) => {

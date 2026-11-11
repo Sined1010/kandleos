@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { matchCoins, mergeHits } from './search.ts'
+import { matchCoins, mergeHits, withPrices } from './search.ts'
 
 const names = { BTC: 'Bitcoin', SOL: 'Solana', PEPE: 'Pepe' }
 const pairs = new Set(['BTCUSDT', 'SOLUSDT', 'PEPEUSDT', 'PEOPLEUSDT', 'SOLVUSDT'])
@@ -35,4 +35,13 @@ test('merge: exact names first, every symbol once', () => {
   assert.deepEqual(syms(mergeHits('bitcoin', [stock('BTC=F')], [coin('BTCUSDT', 'Bitcoin')])), ['BTCUSDT', 'BTC=F'])
   // A stock with exactly that ticker comes before a coin of the same symbol.
   assert.deepEqual(syms(mergeHits('meta', [stock('META')], [coin('METAUSDT', 'META')])), ['META', 'METAUSDT'])
+})
+
+test('with Alpaca as the stock source, OTC hits (no prices there) are left out and the home listing leads', () => {
+  const hit = (symbol: string, exchange: string) => ({ symbol, name: 'Infineon', exchange, kind: 'stock' as const })
+  const alpaca = [hit('IFNNY', 'OTC'), hit('IFNNF', 'OTC')]
+  const yahoo = [hit('IFX.DE', 'XETRA'), hit('IFNNY', 'OQX'), hit('IFXA.HA', 'Hanover'), hit('IFNNF', 'Other OTC')]
+  assert.deepEqual(syms(mergeHits('Infineon', withPrices([...alpaca, ...yahoo], 'alpaca'), [])), ['IFX.DE', 'IFXA.HA'])
+  // Yahoo has OTC prices itself
+  assert.deepEqual(syms(withPrices(yahoo, 'yahoo')), ['IFX.DE', 'IFNNY', 'IFXA.HA', 'IFNNF'])
 })

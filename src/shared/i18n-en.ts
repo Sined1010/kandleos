@@ -50,8 +50,8 @@ export const EN: Record<string, string> = {
     'nor a recommendation to buy or sell. All prices without guarantee: data may be delayed, incomplete or wrong. Use at your own risk; investment decisions are yours alone.',
   Datenschutz: 'Privacy',
   'Binance – Kryptokurse': 'Binance – crypto prices',
-  'Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste für die Suche nach einer WKN lädt, sobald du in der Suche eine Ziffer tippst':
-    'Deutsche Börse and Wikidata – ISIN and WKN in the info on a symbol; the Xetra list for searching by WKN loads once you type a digit into the search',
+  'Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste lädt, sobald du in der Suche eine Ziffer tippst oder bei eingeschalteten Events einen deutschen Wert öffnest (fehlt er darin, wird Wikidata gefragt); bei eingeschalteten Events fragt die App Wikidata außerdem für Werte ohne Insider-Quelle nach einer US-Notierung':
+    'Deutsche Börse and Wikidata – ISIN and WKN in the info on a symbol; the Xetra list loads once you type a digit into the search or, with events switched on, open a German stock (if it is not on the list, Wikidata is asked); with events switched on, the app also asks Wikidata for a US listing of stocks without an insider source',
   'Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“':
     'Hugging Face – one-time download of the forecast model on the first click on “Forecast”',
   'Nur wenn du die': 'Only when you set up and start the',
@@ -548,8 +548,10 @@ export const EN: Record<string, string> = {
     'Crypto prices from Binance, no sign-up. Stocks can be added at any time.',
   'Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)':
     'Yahoo Finance – stock prices, symbol search, names and company info, only if chosen as the data source (for private use only)',
-  'Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist':
-    'Finnhub – real-time stock prices and company info, only if you enter your own API key',
+  'Finnhub – Echtzeit-Aktienkurse, Unternehmensinfos, Insider-Geschäfte, Meldungen (8-K) und Firmen-News, nur wenn ein eigener API-Key eingetragen ist':
+    'Finnhub – real-time stock prices, company info, insider deals, filings (8-K) and company news, only if you enter your own API key',
+  'BaFin – Insider-Geschäfte (Directors’ Dealings) deutscher Werte; bei eingeschalteten Events wird beim Öffnen eines deutschen Werts seine ISIN gesendet. Quelle: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de':
+    'BaFin – insider deals (directors’ dealings) of German stocks; with events switched on, opening a German stock sends its ISIN. Source: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de',
   'Infos gibt es nur für Aktien.':
     'Info is only available for stocks.',
   'Finnhub hat keine Infos zu {symbol}.':
@@ -1043,5 +1045,81 @@ export const EN: Record<string, string> = {
   Index: 'Index',
   Future: 'Future',
   Währung: 'Currency',
-  'Art der Werte': 'Kind of symbols'
+  'Art der Werte': 'Kind of symbols',
+  // Events: short amounts on markers
+  '{n} T{cur}': '{n}K {cur}',
+  '{n} Mio {cur}': '{n}M {cur}',
+  // Events list (Watchlist tab and phone sheet)
+  'Events': 'Events',
+  'Vorstand': 'Executive board',
+  'Aufsichtsrat': 'Supervisory board',
+  'Führungskraft': 'Senior manager',
+  'nahestehend': 'closely associated',
+  '8-K': '8-K',
+  'News': 'News',
+  'Übertragung': 'Transfer',
+  'VERK.': 'SELL',
+  'KAUF': 'BUY',
+  'Cluster: {n} Insider kaufen binnen 5 Tagen': 'Cluster: {n} insiders buy within 5 days',
+  'zusammen {sum}': 'together {sum}',
+  '8-K-Meldung bei der SEC': '8-K filing with the SEC',
+  'Rolle unbekannt': 'role unknown',
+  'ca. {n} Stk.': 'approx. {n} shares',
+  '{n} Stk.': '{n} shares',
+  'Erster Kauf dieser Person im Zeitraum': 'First buy by this person in the period',
+  '{n}. Kauf dieser Person im Zeitraum': 'Buy no. {n} by this person in the period',
+  'stockt Bestand um {p} % auf': 'adds {p} % to the holding',
+  'verkauft {p} % des Bestands': 'sells {p} % of the holding',
+  'Kurs seitdem {p}': 'Price since {p}',
+  'Übertragung außerhalb der Börse': 'Transfer outside the exchange',
+  'Geschäft {a} · am selben Tag öffentlich': 'Deal {a} · public the same day',
+  'Geschäft {a} · öffentlich seit {b} ({n} Tage später)': 'Deal {a} · public since {b} ({n} days later)',
+  'Für diese Börse gibt es keine offene Quelle.': 'There is no open source for this exchange.',
+  'Insider-Daten gibt es beim Heimat-Wert.': 'Insider data is available on the home listing.',
+  '{source} ist gerade nicht erreichbar.': '{source} cannot be reached right now.',
+  'Die Liste kann unvollständig sein (sehr viele Meldungen).': 'The list may be incomplete (very many filings).',
+  'Insider-Daten kommen über den gekoppelten PC.': 'Insider data comes through the paired PC.',
+  'Auf Tageskerzen wechseln': 'Switch to daily candles',
+  '12 Monate: {buys} · {sells}': '12 months: {buys} · {sells}',
+  '1 Kauf': '1 buy',
+  '{n} Käufe': '{n} buys',
+  '1 Verkauf': '1 sell',
+  '{n} Verkäufe': '{n} sells',
+  'Stand: vor {n} Min.': 'As of {n} min. ago',
+  'Geschäfte der letzten Tage können noch fehlen (BaFin meist 0–5 Tage, USA bis 2 Handelstage).': 'Deals of the last few days may still be missing (BaFin usually 0–5 days, US up to 2 trading days).',
+  'Insider': 'Insider',
+  'Meldungen': 'Filings',
+  'Marker nur für die geladenen Tage – Tageskerzen zeigen alle.': 'Markers only for the loaded days – daily candles show all.',
+  'Lade Events …': 'Loading events …',
+  'Ohne Gewähr für Vollständigkeit.': 'No guarantee of completeness.',
+  // Events: hover box in the chart
+  'Cluster-Kauf': 'Cluster buy',
+  // Events: one day of delay
+  'Geschäft {a} · öffentlich seit {b} (1 Tag später)': 'Deal {a} · public since {b} (1 day later)',
+  // Events: on/off and honest empty cases
+  'Events ausschalten': 'Switch events off',
+  'Events einschalten': 'Switch events on',
+  'Events sind aus.': 'Events are off.',
+  'Keine gemeldeten Käufe oder Verkäufe von Aktien in den letzten 12 Monaten. Melden müssen nur Führungskräfte und ihnen nahestehende Personen, seit 2026 erst ab 50.000 € im Jahr.': 'No reported buys or sells of shares in the last 12 months. Only managers and persons closely associated with them must report, and since 2026 only from €50,000 a year.',
+  'Keine Käufe oder Verkäufe an der Börse in den letzten 12 Monaten.': 'No buys or sells on the exchange in the last 12 months.',
+  'Ausgeblendete Meldungen ohne Kauf oder Verkauf von Aktien: {n} (z. B. Optionsausübungen, Zuteilungen, Schenkungen, Derivate).': 'Hidden filings without a buy or sell of shares: {n} (e.g. option exercises, awards, gifts, derivatives).',
+  // Events: hover box with many entries
+  '+ {n} weitere – in der Liste': '+ {n} more – in the list',
+  // Events: no Finnhub key
+  'Mit einem kostenlosen Finnhub-Key siehst du hier Insider-Käufe und -Verkäufe, 8-K-Meldungen und Firmen-News zu diesem Wert.': 'With a free Finnhub key you see insider buys and sells, 8-K filings and company news for this stock here.',
+  'Finnhub-Key eintragen': 'Enter Finnhub key',
+  // Events: phone card
+  'Alle Events': 'All events',
+  // Events: BaFin through the PC
+  'über den gekoppelten PC': 'through the paired PC',
+  // Phone menu groups
+  'Chart': 'Chart',
+  'App': 'App',
+  // Events: US listing (ADR) hint
+  '{symbol} öffnen': 'Open {symbol}',
+  // Events: US listing (ADR) hint
+  'Beim US-Wert {symbol} ({exchange}) melden Vorstände ihre Geschäfte seit März 2026 bei der SEC.': 'For the US listing {symbol} ({exchange}), directors and officers report their deals to the SEC since March 2026.',
+  // Events: phone without its PC, German listing without ISIN
+  'Insider-Daten kommen über den gekoppelten PC – bitte KandleOS am PC aktualisieren.': 'Insider data comes through the paired PC – please update KandleOS on the PC.',
+  'ISIN unbekannt – BaFin-Daten nicht abrufbar.': 'ISIN unknown – BaFin data cannot be fetched.'
 }

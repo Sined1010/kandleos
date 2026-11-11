@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { t } from '../../../shared/i18n'
 import { isNewer } from '../../../shared/version'
 import { checkForUpdate, RELEASES_URL } from './UpdateBadge'
+import { backdropClose } from '../lib/backdrop'
 
 /** About KandleOS: disclaimer, privacy notes, data sources and third-party licenses (first start: WelcomeModal). */
 export default function AboutModal({ onClose }: { onClose: () => void }) {
@@ -20,7 +21,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
   const link = 'text-accent hover:underline'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" {...backdropClose(onClose)}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -84,8 +85,9 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <li>{t('Binance – Kryptokurse')}</li>
           <li>{t('Alpaca – Aktienkurse, Symbolsuche und Namen, nur mit eigenem API-Key')}</li>
           <li>{t('Yahoo Finance – Aktienkurse, Symbolsuche, Namen und Unternehmensinfos, nur wenn als Datenquelle gewählt (Nutzung nur für private Zwecke)')}</li>
-          <li>{t('Finnhub – Echtzeit-Aktienkurse und Unternehmensinfos, nur wenn ein eigener API-Key eingetragen ist')}</li>
-          <li>{t('Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste für die Suche nach einer WKN lädt, sobald du in der Suche eine Ziffer tippst')}</li>
+          <li>{t('Finnhub – Echtzeit-Aktienkurse, Unternehmensinfos, Insider-Geschäfte, Meldungen (8-K) und Firmen-News, nur wenn ein eigener API-Key eingetragen ist')}</li>
+          <li>{t('BaFin – Insider-Geschäfte (Directors’ Dealings) deutscher Werte; bei eingeschalteten Events wird beim Öffnen eines deutschen Werts seine ISIN gesendet. Quelle: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de')}</li>
+          <li>{t('Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste lädt, sobald du in der Suche eine Ziffer tippst oder bei eingeschalteten Events einen deutschen Wert öffnest (fehlt er darin, wird Wikidata gefragt); bei eingeschalteten Events fragt die App Wikidata außerdem für Werte ohne Insider-Quelle nach einer US-Notierung')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
           <li>{t('GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“')}</li>
         </ul>

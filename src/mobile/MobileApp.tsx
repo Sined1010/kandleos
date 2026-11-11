@@ -6,7 +6,10 @@ import { SaveDialog, SavedChartsPanel } from '../renderer/src/components/SavedCh
 import { isCrypto } from '../shared/types'
 import ChartArea from '../renderer/src/components/ChartArea'
 import ChartBoundary from '../renderer/src/components/ChartBoundary'
+import EventsPanel from '../renderer/src/components/EventsPanel'
 import SettingsModal from '../renderer/src/components/SettingsModal'
+import { openEvents } from '../renderer/src/services/events'
+import { useEventsUi } from '../renderer/src/store/eventsUi'
 import WelcomeModal from '../renderer/src/components/WelcomeModal'
 import { useQuoteFeed } from '../renderer/src/services/quoteFeed'
 import { useStore } from '../renderer/src/store/useStore'
@@ -34,11 +37,13 @@ export default function MobileApp() {
   const stockSource = useStore((s) => s.stockSource)
   const [menu, setMenu] = useState(false)
   const [settings, setSettings] = useState(false)
+  // Field to focus when the settings open from elsewhere (the Events sheet asks for the Finnhub key).
+  const [settingsFocus, setSettingsFocus] = useState<string | undefined>()
   const [about, setAbout] = useState(false)
   const [sheet, setSheet] = useState<SheetPos>('low')
   const [drawing, setDrawing] = useState(false)
   const [full, setFull] = useState(false)
-  const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | 'pc' | null>(null)
+  const [page, setPage] = useState<'charts' | 'info' | 'licenses' | 'alarms' | 'pc' | 'events' | null>(null)
   const [alarmFor, setAlarmFor] = useState<string | null>(null)
   useEffect(() => startAlarmWatch(), [])
   useEffect(() => startLink(), [])
@@ -55,13 +60,35 @@ export default function MobileApp() {
     }
     // The forecast button without a paired PC asks for the pairing page (ChartArea.tsx).
     const pair = () => setPage('pc')
+    // "Alle Events" on the chart's event card.
+    const events = () => openEventsSheet()
+    // The Events sheet's Finnhub button (EventsPanel.tsx).
+    const settingsAt = (e: Event) => {
+      closeEventsSheet()
+      setSettingsFocus((e as CustomEvent<string>).detail)
+      setSettings(true)
+    }
     window.addEventListener('kandleos:licenses', show)
     window.addEventListener('kandleos:pair', pair)
+    window.addEventListener('kandleos:events', events)
+    window.addEventListener('kandleos:settings', settingsAt)
     return () => {
       window.removeEventListener('kandleos:licenses', show)
       window.removeEventListener('kandleos:pair', pair)
+      window.removeEventListener('kandleos:events', events)
+      window.removeEventListener('kandleos:settings', settingsAt)
     }
   }, [])
+  const openEventsSheet = () => {
+    setPage('events')
+    openEvents()
+  }
+  // Back to 'watchlist': while the side says 'events', every load counts as seen (services/events.ts) and the dot would never show.
+  const closeEventsSheet = () => {
+    setPage(null)
+    useEventsUi.setState({ side: 'watchlist' })
+  }
+
   useBack('save-as', saving, () => setSaving(false))
   const endDrawing = () => {
     useStore.getState().setTool('cursor')
@@ -122,7 +149,7 @@ export default function MobileApp() {
           title="KandleOS"
           onClose={() => setMenu(false)}
           items={[
-            { label: t('Chart-Stände'), onPick: () => setPage('charts') },
+            { label: t('Chart-Stände'), section: t('Chart'), onPick: () => setPage('charts') },
             {
               label: t('Kurs-Alarme'),
               onPick: () => {
@@ -132,7 +159,7 @@ export default function MobileApp() {
             },
             { label: t('Infos zum Wert'), disabled: isCrypto(symbol), onPick: () => setPage('info') },
             { label: t('Chart teilen'), onPick: () => void shareChart(document.querySelector('main')!, symbol).catch(() => {}) },
-            { label: t('Mit PC koppeln'), onPick: () => setPage('pc') },
+            { label: t('Mit PC koppeln'), section: t('App'), onPick: () => setPage('pc') },
             { label: t('Einstellungen'), onPick: () => setSettings(true) },
             { label: t('Über KandleOS'), onPick: () => setAbout(true) }
           ]}
@@ -159,6 +186,11 @@ export default function MobileApp() {
           <Licenses />
         </Layer>
       )}
+      {page === 'events' && (
+        <Layer id="events" title={t('Events')} onClose={closeEventsSheet}>
+          <EventsPanel page onJump={closeEventsSheet} />
+        </Layer>
+      )}
       {page === 'pc' && (
         <Layer id="pc" title={t('Mit PC koppeln')} onClose={() => setPage(null)}>
           <div className="mobile-page">
@@ -166,7 +198,7 @@ export default function MobileApp() {
           </div>
         </Layer>
       )}
-      {settings && <SettingsModal onClose={() => setSettings(false)} keysFromPc={pc.state !== 'none'} />}
+      {settings && <SettingsModal onClose={() => (setSettings(false), setSettingsFocus(undefined))} keysFromPc={pc.state !== 'none'} focus={settingsFocus} />}
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAbout(true)} />}
       {about && <AboutModal onClose={() => setAbout(false)} />}
       <MessageBox />

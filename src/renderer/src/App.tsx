@@ -16,9 +16,15 @@ import { useQuoteFeed } from './services/quoteFeed'
 import { answerPhone, startStamping } from './services/sync'
 import { startPcAlarmWatch } from './services/alarmWatch'
 import { useStore } from './store/useStore'
+import { setSeenStore } from './services/events'
+
+// Before the first chart loads its events: the list notes seen events in the persisted store.
+setSeenStore({ get: (s) => useStore.getState().eventsSeen[s], mark: (s, ids) => useStore.getState().markEventsSeen(s, ids) })
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Field to focus when the settings open from elsewhere (event 'kandleos:settings' with its element id).
+  const [settingsFocus, setSettingsFocus] = useState<string | undefined>()
   const [aboutOpen, setAboutOpen] = useState(false)
   const disclaimerAccepted = useStore((s) => s.disclaimerAccepted)
   const language = useStore((s) => s.language)
@@ -36,6 +42,14 @@ export default function App() {
   }, [])
   // Phone link: note local changes for sync, and answer a paired phone's sync requests (main/link.ts forwards them).
   useEffect(() => startStamping(), [])
+  useEffect(() => {
+    const open = (e: Event) => {
+      setSettingsFocus((e as CustomEvent<string>).detail)
+      setSettingsOpen(true)
+    }
+    window.addEventListener('kandleos:settings', open)
+    return () => window.removeEventListener('kandleos:settings', open)
+  }, [])
   useEffect(() => startPcAlarmWatch(), [])
   useEffect(
     () => window.api.link.onRequest((op, args, device) => (op === 'sync' ? answerPhone(device, args) : Promise.reject(new Error('unknown-op')))),
@@ -45,7 +59,7 @@ export default function App() {
   return (
     // Keyed by language: a switch redraws the whole window, so every text, number and chart label follows it.
     <div key={language} className="flex h-full select-none flex-col bg-bg text-sm text-slate-300">
-      <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenAbout={() => setAboutOpen(true)} />
+      <TopBar onOpenSettings={() => (setSettingsFocus(undefined), setSettingsOpen(true))} onOpenAbout={() => setAboutOpen(true)} />
       <div className="flex min-h-0 flex-1">
         {/* The chart with its tabs and drawing tools; this is what the fullscreen mode shows. */}
         <div id={FULLSCREEN_ID} className="flex min-w-0 flex-1 bg-bg">
@@ -65,7 +79,7 @@ export default function App() {
         </div>
         <Watchlist />
       </div>
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} focus={settingsFocus} />}
       {/* First start, and once for users from before the stock source choice. */}
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAboutOpen(true)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}

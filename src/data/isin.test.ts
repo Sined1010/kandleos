@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isinFromCusip, isinValid, looksLikeWkn, parseXetra, pickIsin, wknOf, xetraPath } from './isin.ts'
+import { isinFromCusip, isinValid, looksLikeWkn, parseXetra, pickAdr, pickIsin, tickerVariants, wknOf, xetraPath } from './isin.ts'
 
 test('a WKN is six letters or digits with at least one digit', () => {
   for (const q of ['716460', 'A0RPWH']) assert.equal(looksLikeWkn(q), true, q)
@@ -65,4 +65,21 @@ test('Wikidata: show an ISIN only when exactly one fits', () => {
   assert.equal(pickIsin(['US0378331005'], 'L'), 'US0378331005')
   assert.equal(pickIsin(['NET000AXPEN7'], ''), undefined)
   assert.equal(pickIsin([], 'PA'), undefined)
+})
+
+test('the one US listing (NYSE or Nasdaq) of a company, else none', () => {
+  const row = (ex: string, ticker: string) => ({ ex, ticker })
+  const NYSE = 'Q13677', NASDAQ = 'Q82059', LSE = 'Q171240', TOKYO = 'Q217475', OTC = 'Q2111134'
+  assert.deepEqual(pickAdr([row(TOKYO, '7203'), row(NYSE, 'TM'), row(LSE, 'TYT')]), { symbol: 'TM', exchange: 'NYSE' })
+  assert.deepEqual(pickAdr([row(NASDAQ, 'ASML'), row(NASDAQ, 'ASML')]), { symbol: 'ASML', exchange: 'Nasdaq' })
+  assert.equal(pickAdr([row(TOKYO, '7203')]), undefined) // none
+  assert.equal(pickAdr([row(NYSE, 'AAA'), row(NASDAQ, 'BBB')]), undefined) // several
+  assert.equal(pickAdr([row(OTC, 'TCEHY')]), undefined) // OTC is no US listing with Form 4
+  assert.equal(pickAdr([row(NYSE, 'not a ticker!')]), undefined)
+})
+
+test('a home ticker as Wikidata may write it', () => {
+  assert.deepEqual(tickerVariants('0700', 'HK'), ['0700', '700'])
+  assert.deepEqual(tickerVariants('NOVO-B', 'CO'), ['NOVO-B', 'NOVO B', 'NOVO'])
+  assert.deepEqual(tickerVariants('7203', 'T'), ['7203'])
 })

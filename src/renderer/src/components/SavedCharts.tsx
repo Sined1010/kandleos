@@ -7,6 +7,7 @@ import { drawingsKey, MAX_TABS, useStore, type Drawing, type SavedChart } from '
 import { TOOLS } from './DrawingToolbar'
 import { IS_MOBILE } from '../lib/platform'
 import { ask, tell } from '../../../mobile/MessageBox'
+import { backdropClose } from '../lib/backdrop'
 
 /** "1× Elliott impulse 0-1-2-3-4-5, 3× Trend line": the toolbar's labels without their click hints, in toolbar order. */
 export function toolSummary(drawings: Drawing[]): string {
@@ -310,7 +311,7 @@ export function SaveDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" {...backdropClose(onClose)}>
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
