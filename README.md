@@ -31,17 +31,22 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
 - **An AI forecast that tells you how good it is:** instead of a single target price you get uncertainty ranges,
   a backtest on past data and a comparison against simply assuming "the price stays the same". If that simple
   guess would have been closer, KandleOS says so
-- **Organize your watchlist your way:** as many folders as you like, as a list or as folder tiles, with drag & drop and your own names
+- **Organize your watchlist your way:** as many folders as you like, as a list or as folder tiles, with drag & drop, your own names and sorting by daily change
+- **See what insiders do:** board members' buys and sells (BaFin, Finnhub) right at their candle, off until you switch them on
 - **Free and open source** (GPL-3.0), no subscription, no ads, no paid tier
 
 ## Features
 
 - **Charts** with volume, live prices and candle sizes from 1 minute to 12 months, plus pre- and post-market prices and candles.
-  Older candles load automatically as you scroll back (up to 10,000), and for US stocks a price line shows the pre-/post-market price
+  Older candles load automatically as you scroll back (up to 10,000), and for US stocks a price line shows the pre-/post-market price.
+  2h and 4h stock candles follow the exchange's session (e.g. 9:30 and 13:30 in New York), also across daylight saving changes.
+  Switching back to a chart you opened before shows it at once while fresh prices load
 - **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR, with a legend in the chart showing their values
 - **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
 - **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
-- **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu
+- **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu.
+  The daily change shows as a colored pill, ⏰ marks symbols with an active alarm, each folder shows its average change,
+  and you can sort by your own order, strongest, weakest or name (per device, your saved order stays untouched)
 - **Up to 3 chart tabs**, full-screen mode (drawing works there too), symbol search by name, ticker, ISIN or WKN with filters for stocks, ETFs and crypto, company info with ISIN and WKN
 - **AI forecast ([Chronos-2](https://huggingface.co/amazon/chronos-2)):** runs locally via ONNX, no cloud. Shows a 50/80/90 % fan or forecast candles instead of a single target price, a plain-language summary (direction, range, probability of a higher price) and a backtest so you can see how accurate past forecasts were
 - **Forecast quality:** up to 30 backtests per forecast (older candles are loaded for them) show how often the price stayed inside
@@ -88,8 +93,9 @@ To uninstall: `bash ~/.local/share/kandleos-app/install.sh --uninstall` (your da
 
 ### Android (8.0 or newer)
 
-The Android app has charts, indicators, the watchlist with folders, drawings and saved charts, plus price alarms
-that also fire in the background.
+The Android app has charts, indicators, the watchlist with folders (as a list or folder tiles, with sorting and a
+reorder mode), drawings, saved charts and insider events (**⋮ → Events**), plus price alarms that also fire in the
+background.
 
 Install `KandleOS-<version>.apk` from the Releases page, or let [Obtainium](https://github.com/ImranR98/Obtainium)
 install and update it: add `https://github.com/Sined1010/kandleos` as a new app and set the APK filter to
@@ -105,6 +111,8 @@ TradingAgents analysis on the phone (your PC computes them, so it needs to be on
 
 Phone and PC must be in the same Wi-Fi, or connected through a VPN (set the PC's VPN address under **Advanced**).
 While pairing is on, closing the PC window keeps KandleOS running in the system tray, so sync and alarms go on.
+Keep the PC and the phone on the same KandleOS version: if one of them stores data the other cannot read yet, sync
+pauses and the phone asks you to update both, instead of losing drawings or alarms.
 
 ## Data sources
 
@@ -130,8 +138,8 @@ otherwise in a file readable only by you).
 
 ## AI forecast and analysis
 
-- **Chronos-2 forecast:** on the first click KandleOS downloads the model (about 480 MB) from Hugging Face and
-  verifies its SHA-256 checksum. After that, forecasts run offline on your CPU.
+- **Chronos-2 forecast:** on the first click KandleOS downloads a fixed version of the model (about 480 MB) from
+  Hugging Face and verifies its SHA-256 checksum. After that, forecasts run offline on your CPU.
 - **TradingAgents analysis (optional):** when you set it up, KandleOS downloads Python (via
   [uv](https://github.com/astral-sh/uv)) and TradingAgents into its own data folder, with all dependencies pinned
   by hash. Each analysis sends the symbol and the collected market and news data to the AI provider you choose,
@@ -173,6 +181,7 @@ npm 11 does not run install scripts by default. If Electron is missing after `np
 | Windows installer | `npm run dist:win` |
 | Linux tar.gz (also on Windows) | `npx electron-builder --linux tar.gz` (after `npm run licenses && npm run build`) |
 | Linux AppImage/.deb (on Linux) | `bash linux/build-installer.sh` |
+| Android APK (Windows, JDK 21 + Android SDK) | `npm run android:sync`, then `androiduild-apk.cmd` (debug) |
 
 Installers end up in `release/`.
 
