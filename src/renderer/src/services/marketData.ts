@@ -86,14 +86,17 @@ function socket(
   }
 }
 
-/** Keeps the last charts on the phone (src/mobile/candleCache.ts); the desktop never sets one. */
+/** Keeps the last charts (src/mobile/candleCache.ts): on the phone in files, on the PC in memory only. */
 interface CandleCacheLike {
   put(symbol: string, tf: Timeframe, c: CandleData): Promise<void>
   get(symbol: string, tf: Timeframe): CandleData | null
 }
 let cache: CandleCacheLike | null = null
 export const setCandleCache = (c: CandleCacheLike): void => void (cache = c)
-export const cachedCandles = (symbol: string, tf: Timeframe): CandleData | null => cache?.get(symbol, tf) ?? null
+// Candles with pre-market and after-hours bars get a slot of their own (the file name turns '+' into '_').
+const slot = (symbol: string, extended: boolean) => (extended ? symbol + '+ext' : symbol)
+export const cachedCandles = (symbol: string, tf: Timeframe, extended = false): CandleData | null =>
+  cache?.get(slot(symbol, extended), tf) ?? null
 
 export async function loadCandles(
   symbol: string,
@@ -105,11 +108,11 @@ export async function loadCandles(
   if (!cache || older) return fetchCandles(symbol, tf, finnhubKey, extended, older)
   try {
     const data = await fetchCandles(symbol, tf, finnhubKey, extended)
-    cache.put(symbol, tf, data).catch(() => {})
+    cache.put(slot(symbol, extended), tf, data).catch(() => {})
     return data
   } catch (e) {
     // Offline or source error: the last stored candles rather than an empty chart, marked with the reason.
-    const kept = cache.get(symbol, tf)
+    const kept = cachedCandles(symbol, tf, extended)
     if (kept) return { ...kept, stale: (e as Error).message || 'offline' }
     throw e
   }

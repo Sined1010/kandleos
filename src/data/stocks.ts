@@ -322,7 +322,7 @@ export async function stockCandles(
   if (viaAlpaca(symbol)) return alpacaCandles(symbol, tf, extended)
   if (!yahooOn()) throw sourceOff()
   let data: CandleData | undefined
-  if (key && !extended) {
+  if (key && !extended && key !== candlesDenied) {
     try {
       const candles = await finnhubCandles(symbol, tf, key)
       // Finnhub candles carry no currency; Yahoo's quote metadata does.
@@ -331,12 +331,18 @@ export async function stockCandles(
       const timezone = validTimeZone(meta?.exchangeTimezoneName) ?? timeZoneForSymbol(symbol)
       data = { candles, currency: meta?.currency ?? '', timezone, provider: 'finnhub' }
     } catch (e) {
-      console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, (e as Error).message)
+      const msg = (e as Error).message
+      // shortcut: one refusal (the free plan has no candles) stops the tries for this key until restart, also for
+      // US listings a paid plan might serve; Yahoo serves those too.
+      if (/HTTP 40[13]\b/.test(msg)) candlesDenied = key
+      console.warn(`Finnhub-Kerzen für ${symbol} nicht verfügbar, nutze Yahoo:`, msg)
     }
   }
   data ??= await yahooCandles(symbol, tf, extended)
   return finish(data, tf)
 }
+// The Finnhub key that was refused candles: each try would cost a round trip (up to 10 s) before Yahoo.
+let candlesDenied = ''
 
 /** Builds the longer candle sizes from the source's bars; a section keeps only bars up to `before`. */
 function finish(data: CandleData, tf: Timeframe, before = Infinity): CandleData {

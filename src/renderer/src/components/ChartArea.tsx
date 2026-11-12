@@ -297,7 +297,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       }, 250)
     }
 
-    // fresh: from the source; otherwise the phone's stored copy, shown at once until fresh candles arrive.
+    // fresh: from the source; otherwise the stored copy (phone: file, PC: memory), shown at once until fresh candles arrive.
     const show = ({ candles: bars, currency, timezone, provider }: CandleData, fresh = true) => {
         if (!active) return
         if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
@@ -333,9 +333,9 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           if (shownFrom < OLDER_MARGIN) loadOlderRef.current()
         })
       }
-    const kept = IS_MOBILE ? cachedCandles(symbol, timeframe) : null
+    const kept = cachedCandles(symbol, timeframe, extended)
     if (kept?.candles.length) show(kept, false)
-    // Only the phone gets stored candles (stale) back; it keeps asking until fresh ones arrive.
+    // Without fresh candles the stored ones come back (stale); it keeps asking until fresh ones arrive.
     let retry: ReturnType<typeof setTimeout> | undefined
     const load = (first: boolean) =>
       loadCandles(symbol, timeframe, finnhubKey, extended)

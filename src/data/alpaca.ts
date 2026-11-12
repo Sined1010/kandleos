@@ -161,18 +161,21 @@ export async function alpacaCandles(symbol: string, tf: Timeframe, extended: boo
   // A section reaches through the bar at `before` (see prependOlder), built hours half an hour further:
   // the hour starting at :30 needs the half hour after its bucket's edge too.
   const end = before === undefined ? undefined : new Date((before + TF_SECONDS[tf] + (hourly ? 1800 : 0)) * 1000 - 1000)
+  // The IEX tail is asked for at the same time: it starts early enough to cover the full-market bar that ends
+  // 15 minutes ago (plus slack), and the merge below ignores what it already has.
+  const step = hourly ? 1800 : TF_SECONDS[tf]
+  const tail =
+    before === undefined && intraday
+      ? bars(s, timeframe, new Date(Date.now() - (30 * 60 + step) * 1000), 'iex').catch(() => [] as Candle[])
+      : null
   let candles = await bars(s, timeframe, new Date(first * 1000), 'sip', end)
   if (before !== undefined) {
     if (!extended && intraday) candles = candles.filter((c) => phaseAt(symbol, ZONE, c.time) === 'open')
     if (hourly) candles = build(candles, tf)
     return { candles: candles.filter((c) => c.time >= first && c.time <= before), currency: 'USD', timezone: ZONE, provider: 'alpaca' }
   }
-  if (intraday) {
-    const last = candles[candles.length - 1]
-    const recent = await bars(s, timeframe, new Date(last ? last.time * 1000 : Date.now() - 3600_000), 'iex').catch(
-      () => []
-    )
-    for (const c of recent) {
+  if (tail) {
+    for (const c of await tail) {
       const prev = candles[candles.length - 1]
       if (!prev || c.time > prev.time) candles.push(c)
       // The full-market bar stops 15 minutes ago; IEX trades carry it on to now.

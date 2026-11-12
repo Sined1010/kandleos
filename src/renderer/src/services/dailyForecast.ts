@@ -27,6 +27,8 @@ export async function dailyForecast(
   } catch {
     return { skipped: 'load' }
   }
+  // A stored copy (source failed) is no base for an analysis or an archive record.
+  if (first.stale) return { skipped: 'load' }
   let bars: Candle[] = first.candles
   if (bars.length < FORECAST_MIN_BARS) return { skipped: 'history' }
   while (bars.length < historyNeeded(forecastSteps('1D', bars.length, 64), RUNS) && bars.length < HISTORY_LIMIT) {
