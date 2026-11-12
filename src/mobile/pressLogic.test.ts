@@ -15,12 +15,30 @@ function setup() {
   return { log, press, later: () => pending?.() }
 }
 
-test('a tap fires on the click, not on lifting the finger', () => {
+test('a tap fires on lifting the finger; the click that follows is swallowed', () => {
   const { log, press } = setup()
   press.down(0, 0)
   press.up()
-  assert.deepEqual(log, [])
+  assert.deepEqual(log, ['tap'])
   press.click()
+  assert.deepEqual(log, ['tap'])
+})
+
+test('a tap works when the browser sends no click (Android drops the first tap after a fast swipe)', () => {
+  const { log, press } = setup()
+  press.down(0, 0)
+  press.up()
+  press.down(0, 0)
+  press.up()
+  press.click()
+  assert.deepEqual(log, ['tap', 'tap'])
+})
+
+test('a finger tap followed by a pointerless click (accessibility) fires once', () => {
+  const { log, press } = setup()
+  press.down(0, 0)
+  press.up()
+  press.click(0)
   assert.deepEqual(log, ['tap'])
 })
 

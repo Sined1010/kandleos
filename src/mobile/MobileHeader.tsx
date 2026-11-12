@@ -8,7 +8,7 @@ import { formatChange, formatPrice } from '../renderer/src/lib/format'
 import { usePcStatus } from '../renderer/src/lib/pcStatus'
 import { metaFor, useChartMeta } from '../renderer/src/store/chartMeta'
 import { useQuotes, useStore } from '../renderer/src/store/useStore'
-import { toggleEvents, useUnseen } from '../renderer/src/components/EventsButton'
+import { useUnseen } from '../renderer/src/components/EventsButton'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
 import { ask as confirmBox } from './MessageBox'
@@ -32,7 +32,6 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
   const quote = useQuotes((s) => s.quotes[symbol])
   const { currency, timeZone } = metaFor(useChartMeta(), symbol)
   const pc = usePcStatus((s) => s.state)
-  const eventsOn = useStore((s) => s.eventsOn)
   const unseen = useUnseen(symbol).length
   const [grid, setGrid] = useState<number | null>(null)
   const [indicators, setIndicators] = useState<number | null>(null)
@@ -91,21 +90,6 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
                 · PC
               </button>
             )}
-            {/* Events chip, as beside the price on the PC: a tap switches Events on and opens the sheet (switching
-                off is in the sheet). The padding gives a 44 px tap area without making the row taller. */}
-            <button
-              onClick={() => {
-                if (!eventsOn) toggleEvents()
-                window.dispatchEvent(new Event('kandleos:events'))
-              }}
-              aria-pressed={eventsOn}
-              className="-my-[14px] shrink-0 py-[14px] pl-1"
-            >
-              <span className={`inline-flex items-center gap-1 rounded px-1.5 font-semibold ${eventsOn ? 'bg-brand text-white' : 'bg-line text-slate-300'}`}>
-                {t('Events')}
-                {unseen > 0 && <span className="animate-pulse rounded bg-amber-500 px-1 text-[10px] font-bold text-black">{unseen}</span>}
-              </span>
-            </button>
           </div>
         </div>
         {quote && (
@@ -125,8 +109,10 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
             )}
           </div>
         )}
-        <button onClick={p.onMenu} aria-label={t('Mehr')} className="mobile-icon w-8">
+        {/* Events are in this menu; the yellow dot says there are unseen important events. */}
+        <button onClick={p.onMenu} aria-label={unseen > 0 ? t('Mehr – neue Events') : t('Mehr')} className="mobile-icon relative w-8">
           <MoreVertical size={18} />
+          {unseen > 0 && <span aria-hidden className="absolute right-0.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />}
         </button>
       </div>
       <div className="grid grid-cols-6 gap-2 px-2 pb-2 pt-1.5">

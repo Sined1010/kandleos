@@ -410,6 +410,8 @@ export const EN: Record<string, string> = {
   'Name oder Symbol': 'Name or symbol',
   'Leer – „+“ oder Symbol hierher ziehen': 'Empty – click “+” or drag a symbol here',
   'Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen': 'Drag to reorder or into another folder · right-click for more actions',
+  'Ziehen in einen anderen Ordner · Rechtsklick für weitere Aktionen': 'Drag into another folder · right-click for more actions',
+  'Leer – Werte über die Suche oben hinzufügen': 'Empty – add symbols with the search above',
   'Aktionen für {symbol}': 'Actions for {symbol}',
   'Öffnen': 'Open',
   'In neuem Tab öffnen': 'Open in new tab',
@@ -1121,5 +1123,16 @@ export const EN: Record<string, string> = {
   'Beim US-Wert {symbol} ({exchange}) melden Vorstände ihre Geschäfte seit März 2026 bei der SEC.': 'For the US listing {symbol} ({exchange}), directors and officers report their deals to the SEC since March 2026.',
   // Events: phone without its PC, German listing without ISIN
   'Insider-Daten kommen über den gekoppelten PC – bitte KandleOS am PC aktualisieren.': 'Insider data comes through the paired PC – please update KandleOS on the PC.',
-  'ISIN unbekannt – BaFin-Daten nicht abrufbar.': 'ISIN unknown – BaFin data cannot be fetched.'
+  'ISIN unbekannt – BaFin-Daten nicht abrufbar.': 'ISIN unknown – BaFin data cannot be fetched.',
+  // Phone: Events in the ⋮ menu
+  'Events · {n} neu': 'Events · {n} new',
+  'Mehr – neue Events': 'More – new events',
+  // Watchlist: sorting and markers (PC and phone)
+  Sortieren: 'Sort',
+  'Eigene Reihenfolge': 'Custom order',
+  'Tagesänderung – stärkste zuerst': 'Daily change – strongest first',
+  'Tagesänderung – schwächste zuerst': 'Daily change – weakest first',
+  'Name A–Z': 'Name A–Z',
+  'Kurs-Alarm aktiv': 'Price alarm active',
+  'Reihenfolge ändern …': 'Reorder …'
 }

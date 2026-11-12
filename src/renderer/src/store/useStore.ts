@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type StockSource, type Timeframe } from '../../../shared/types'
 import { drawingsKey, type SavedChart } from '../lib/charts'
 import { rangeById, type RangeId } from '../lib/ranges'
-import { moveSymbolTo } from '../lib/watchlist'
+import { moveSymbolTo, type WatchSort } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
 import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
@@ -109,6 +109,9 @@ interface State {
   /** The watchlist as a list of folders, or as folder tiles that open one at a time. */
   watchlistView: 'list' | 'folders'
   setWatchlistView: (view: 'list' | 'folders') => void
+  /** Display order inside each folder; per device, not synced and never changes `folders`. */
+  watchlistSort: WatchSort
+  setWatchlistSort: (sort: WatchSort) => void
   /** Display names per symbol (automatic or set by the user); missing means "show the ticker". */
   names: Record<string, string>
   finnhubKey: string
@@ -263,6 +266,8 @@ export const useStore = create<State>()(
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
       watchlistView: 'list',
       setWatchlistView: (watchlistView) => set({ watchlistView }),
+      watchlistSort: 'own',
+      setWatchlistSort: (watchlistSort) => set({ watchlistSort }),
       names: {},
       stockSource: null,
       yahooExtra: false,
@@ -510,6 +515,7 @@ export const useStore = create<State>()(
         language,
         folders,
         watchlistView,
+        watchlistSort,
         names,
         indicators,
         drawings,
@@ -551,6 +557,7 @@ export const useStore = create<State>()(
         activeTab,
         folders,
         watchlistView,
+        watchlistSort,
         indicators,
         drawings,
         charts,

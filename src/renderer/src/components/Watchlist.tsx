@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
@@ -26,6 +27,8 @@ import { openEvents } from '../services/events'
 import { useEventsUi } from '../store/eventsUi'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
+import { AlarmMark, AvgText, ChangePill, FolderAvg, round2, sortOptions, useSortedSymbols } from './WatchParts'
+import { avgChange } from '../lib/watchlist'
 import SymbolSearch from './SymbolSearch'
 import { ask } from '../../../mobile/MessageBox'
 
@@ -110,6 +113,9 @@ export default function Watchlist() {
   const side = useEventsUi((s) => s.side)
   const unseenCount = useUnseen(useStore((s) => s.symbol)).length
   const setView = useStore((s) => s.setWatchlistView)
+  const sort = useStore((s) => s.watchlistSort)
+  // Sort menu below its button.
+  const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   // Folder whose symbol search is open.
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -230,6 +236,18 @@ export default function Watchlist() {
               </button>
             ))}
           </span>
+          <button
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setSortMenu({ x: r.left, y: r.bottom + 4 })
+            }}
+            aria-pressed={sort !== 'own'}
+            title={t('Sortieren')}
+            aria-label={t('Sortieren')}
+            className={`rounded p-0.5 hover:bg-line hover:text-white ${sort !== 'own' ? 'text-white' : 'text-muted'}`}
+          >
+            <ArrowUpDown size={15} />
+          </button>
           {view === 'list' && folders.length > 0 && (
             // Closes all while any is open, otherwise opens all.
             <button
@@ -247,9 +265,12 @@ export default function Watchlist() {
               setOpenId(null)
               setEditing(addFolder(t('Neuer Ordner')))
             }}
-            className="flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted hover:bg-line hover:text-white"
+            // Icon only: with the sort button the label pushed the buttons onto a second line in the 256 px panel.
+            title={t('Neuer Ordner')}
+            aria-label={t('Neuer Ordner')}
+            className="rounded p-0.5 text-muted hover:bg-line hover:text-white"
           >
-            <FolderPlus size={15} /> {t('Ordner')}
+            <FolderPlus size={15} />
           </button>
         </span>
       </div>
@@ -311,6 +332,18 @@ export default function Watchlist() {
             .filter((f) => f.id !== moveMenu.folderId)
             .map((f) => ({ label: f.name, run: () => moveSymbol(moveMenu.symbol, moveMenu.folderId, f.id, null) }))}
           onClose={() => setMoveMenu(null)}
+        />
+      )}
+      {sortMenu && (
+        <ContextMenu
+          x={sortMenu.x}
+          y={sortMenu.y}
+          label={t('Sortieren')}
+          items={sortOptions().map((o) => ({
+            label: `${o.value === sort ? '✓ ' : ''}${o.label}`,
+            run: () => useStore.getState().setWatchlistSort(o.value)
+          }))}
+          onClose={() => setSortMenu(null)}
         />
       )}
       {alarmFor && <AlarmsModal symbol={alarmFor} onClose={() => setAlarmFor(null)} />}
@@ -427,8 +460,12 @@ function FolderSection(props: SectionProps) {
   const toggle = useStore((s) => s.toggleFolder)
   const addToFolder = useStore((s) => s.addToFolder)
   const moveSymbol = useStore((s) => s.moveSymbol)
-  // Only this folder's quotes: a tick of any other symbol must not re-render it.
-  const folderQuotes = useQuotes(useShallow((s) => f.symbols.map((sym) => s.quotes[sym])))
+  // Display order (the sort is display only; dragging within the folder needs the own order).
+  const order = useSortedSymbols(f.symbols)
+  const sorting = useStore((s) => s.watchlistSort) !== 'own'
+  // Only this folder's quotes, in display order: a tick of any other symbol must not re-render it.
+  const folderQuotes = useQuotes(useShallow((s) => order.map((sym) => s.quotes[sym])))
+  const avg = round2(avgChange(folderQuotes.map((q) => q?.changePct)))
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -471,14 +508,16 @@ function FolderSection(props: SectionProps) {
   return (
     <section
       onDragOver={(e) => {
-        if (!drag.current) return
+        // While sorted there is no order to drop into: the own folder is no target (it would only move to the end).
+        if (!drag.current || (sorting && drag.current.from === f.id)) return
         e.preventDefault()
         setDropTarget(true)
       }}
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && endDrag()}
       onDrop={(e) => {
         e.preventDefault()
-        if (drag.current) moveSymbol(drag.current.symbol, drag.current.from, f.id, insertBefore ?? null)
+        if (drag.current && !(sorting && drag.current.from === f.id))
+          moveSymbol(drag.current.symbol, drag.current.from, f.id, sorting ? null : (insertBefore ?? null))
         drag.current = null
         endDrag()
       }}
@@ -556,26 +595,35 @@ function FolderSection(props: SectionProps) {
             {f.name} <span className="font-normal text-muted/50">{f.symbols.length}</span>
           </span>
         )}
-        <div className={`flex ${onBack ? '' : 'opacity-0 focus-within:opacity-100 group-hover/head:opacity-100'}`}>
-          <button
-            onClick={startAdding}
-            className={iconBtn}
-            title={t('Symbol hinzufügen')}
-            aria-label={t('Symbol zu {name} hinzufügen', { name: f.name })}
-          >
-            <Plus size={14} />
-          </button>
-          <button onClick={onEdit} className={iconBtn} title={t('Umbenennen')} aria-label={t('{name} umbenennen', { name: f.name })}>
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => deleteFolder(f)}
-            className={`${iconBtn} hover:text-down`}
-            title={t('Ordner löschen')}
-            aria-label={t('{name} löschen', { name: f.name })}
-          >
-            <Trash2 size={13} />
-          </button>
+        {/* Ø and the buttons share one cell: Ø shows, hovering or focusing the heading swaps in the buttons
+            (opacity, so the keyboard still reaches them), and the folder name keeps its width. */}
+        <div className="grid shrink-0 items-center">
+          <div className="peer/btns col-start-1 row-start-1 flex opacity-0 focus-within:opacity-100 group-hover/head:opacity-100">
+            <button
+              onClick={startAdding}
+              className={iconBtn}
+              title={t('Symbol hinzufügen')}
+              aria-label={t('Symbol zu {name} hinzufügen', { name: f.name })}
+            >
+              <Plus size={14} />
+            </button>
+            <button onClick={onEdit} className={iconBtn} title={t('Umbenennen')} aria-label={t('{name} umbenennen', { name: f.name })}>
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={() => deleteFolder(f)}
+              className={`${iconBtn} hover:text-down`}
+              title={t('Ordner löschen')}
+              aria-label={t('{name} löschen', { name: f.name })}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+          {/* After the buttons in the DOM so it can follow their focus (peer); the ← bar's autofocused back button must not hide it. */}
+          <AvgText
+            avg={avg}
+            className="pointer-events-none col-start-1 row-start-1 justify-self-end pr-1 text-[11px] group-hover/head:opacity-0 peer-focus-within/btns:opacity-0"
+          />
         </div>
       </div>
 
@@ -599,9 +647,9 @@ function FolderSection(props: SectionProps) {
       {shown && (
         // An open folder in the folder view shows its symbols as tiles, two per row.
         <div className={tiles ? 'grid grid-cols-2 gap-1.5 px-2 pb-2' : ''}>
-          {f.symbols.map((s, i) => {
+          {order.map((s, i) => {
             const q = folderQuotes[i]
-            const last = i === f.symbols.length - 1
+            const last = i === order.length - 1
             const name =
               renaming === s ? (
                 <input
@@ -636,12 +684,13 @@ function FolderSection(props: SectionProps) {
                   <span className="flex items-center gap-1.5">
                     <MarketDot symbol={s} timeZone={q?.timezone} />
                     <span className="truncate font-medium text-white">{names[s] ?? s}</span>
+                    <AlarmMark symbol={s} />
                   </span>
                   {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
                 </span>
               )
             const price = (
-              <span className={`tabular-nums ${tiles ? 'min-w-0 truncate text-xs' : 'text-right'}`}>
+              <span className={`tabular-nums ${tiles ? 'text-xs' : 'text-right'}`}>
                 {q ? formatPrice(q.price) : '—'}
                 {q?.ext && (
                   <span
@@ -655,12 +704,8 @@ function FolderSection(props: SectionProps) {
               </span>
             )
             const change = (
-              <span
-                className={`text-right tabular-nums ${tiles ? 'shrink-0 text-xs' : 'w-16 group-hover/row:hidden'} ${
-                  !q ? 'text-muted' : q.changePct >= 0 ? 'text-up' : 'text-down'
-                }`}
-              >
-                {q ? formatChange(q.changePct) : '—'}
+              <span className={`text-right tabular-nums ${tiles ? 'ml-auto shrink-0' : 'w-16 group-hover/row:hidden'}`}>
+                <ChangePill change={q?.changePct} className={tiles ? 'inline-block px-1.5 py-px text-[11px]' : 'block py-0.5 text-[11px]'} />
                 {q?.ext && (
                   <span className={`block text-[10px] ${q.ext.changePct >= 0 ? 'text-up/80' : 'text-down/80'}`}>
                     {formatChange(q.ext.changePct)}
@@ -700,7 +745,11 @@ function FolderSection(props: SectionProps) {
               <div
                 key={s}
                 draggable={renaming !== s}
-                title={t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')}
+                title={
+                  sorting
+                    ? t('Ziehen in einen anderen Ordner · Rechtsklick für weitere Aktionen')
+                    : t('Ziehen zum Sortieren oder in einen anderen Ordner · Rechtsklick für weitere Aktionen')
+                }
                 onContextMenu={(e) => {
                   e.preventDefault()
                   onMenu({
@@ -723,7 +772,8 @@ function FolderSection(props: SectionProps) {
                   endDrag()
                 }}
                 onDragOver={(e) => {
-                  if (!drag.current) return
+                  // Sorted: no insertion marker, a drop from elsewhere goes to the end (section onDrop).
+                  if (!drag.current || sorting) return
                   // Rows: upper half in front of this row, lower half in front of the next. Tiles: left and right half.
                   const r = e.currentTarget.getBoundingClientRect()
                   const after = tiles ? e.clientX >= r.left + r.width / 2 : e.clientY >= r.top + r.height / 2
@@ -754,7 +804,8 @@ function FolderSection(props: SectionProps) {
                 )}
                 {name}
                 {tiles ? (
-                  <span className="flex items-start justify-between gap-1">
+                  // Wraps the pill below the price instead of cutting the price in a narrow tile.
+                  <span className="flex flex-wrap items-start justify-between gap-x-1 gap-y-0.5">
                     {price}
                     {change}
                   </span>
@@ -860,6 +911,7 @@ function FolderGrid({ folders, editing, onOpen, onEdit, onEditDone, onAdd, focus
               {f.name}
             </span>
           )}
+          <FolderAvg symbols={f.symbols} className="-mt-0.5 text-[10px]" />
           {editing !== f.id && (
             <button
               onClick={(e) => {

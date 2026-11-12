@@ -1,19 +1,34 @@
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, GripVertical, Plus, Search } from 'lucide-react'
-import { useRef, useState } from 'react'
+import {
+  ArrowLeft,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ChevronUp,
+  GripVertical,
+  LayoutGrid,
+  List,
+  Plus,
+  Search
+} from 'lucide-react'
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { t } from '../shared/i18n'
 import { isCrypto } from '../shared/types'
 import { InfoPanel } from '../renderer/src/components/CompanyInfo'
-import { MarketDot } from '../renderer/src/components/MarketBadge'
+import { ExtIcon, extTitle, MarketDot } from '../renderer/src/components/MarketBadge'
 import SymbolSearch from '../renderer/src/components/SymbolSearch'
 import { useSymbolNames } from '../renderer/src/components/Watchlist'
+import { AlarmMark, ChangePill, FolderAvg, sortOptions, UpDownCount, useSortedSymbols } from '../renderer/src/components/WatchParts'
 import { formatChange, formatPrice } from '../renderer/src/lib/format'
-import { MAX_TABS, useQuotes, useStore } from '../renderer/src/store/useStore'
+import { MAX_TABS, useQuotes, useStore, type Folder } from '../renderer/src/store/useStore'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
 import Layer from './Layer'
 import { ask as confirmBox } from './MessageBox'
 import Sheet from './Sheet'
 import type { SheetPos } from './sheetSnap'
+import { useBack } from './useBack'
 import { useLongPress } from './useLongPress'
 
 type Menu = { title: string; items: ActionItem[] }
@@ -33,6 +48,38 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
   const [drag, setDrag] = useState<{ symbol: string; from: string; drop: Drop | null } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   useSymbolNames()
+  const sort = useStore((st) => st.watchlistSort)
+  const storedView = useStore((st) => st.watchlistView)
+  // "Reorder" mode: grips on, always in the list. It never writes the stored view, so closing leaves the device's view as it was.
+  const [ordering, setOrdering] = useState(false)
+  const view = ordering ? 'list' : storedView
+  // Folder open in the folder view (kept while reordering, so "Done" returns to it).
+  const [openId, setOpenId] = useState<string | null>(null)
+  const openFolder = view === 'folders' ? folders.find((f) => f.id === openId) : undefined
+  // Here, not inside <Sheet>: the sheet's own back entry must lie below these (parent effects run after the child's).
+  useBack('ordering', ordering && pos !== 'low', () => setOrdering(false))
+  useBack('watch-folder', !!openFolder && pos !== 'low', () => setOpenId(null))
+  useEffect(() => {
+    if (pos === 'low') setOrdering(false)
+  }, [pos])
+  // A deleted folder cannot stay open.
+  useEffect(() => {
+    if (openId && !folders.some((f) => f.id === openId)) setOpenId(null)
+  }, [folders, openId])
+
+  const startOrdering = () => {
+    s.setWatchlistSort('own')
+    setOrdering(true)
+    // From an open folder: unfold it in the list, so its grips show.
+    if (openFolder?.collapsed) s.toggleFolder(openFolder.id)
+  }
+  const sortMenu = (): Menu => ({
+    title: t('Sortieren'),
+    items: [
+      ...sortOptions().map((o) => ({ label: `${o.value === sort ? '✓ ' : ''}${o.label}`, onPick: () => s.setWatchlistSort(o.value) })),
+      { label: t('Reihenfolge ändern …'), onPick: startOrdering }
+    ]
+  })
 
   const open = (symbol: string) => {
     s.setSymbol(symbol)
@@ -174,66 +221,104 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
                 {pos === 'low' ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
                 <span className="text-xs font-medium text-muted">{count === 1 ? t('{n} Wert', { n: count }) : t('{n} Werte', { n: count })}</span>
               </div>
-              {pos !== 'low' && folders.length > 0 && (
-                // Like the PC: closes all while any is open, otherwise opens all. A <button>, so the sheet ignores the tap.
-                <button
-                  type="button"
-                  onClick={() => s.setAllCollapsed(anyOpen)}
-                  aria-label={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
-                  className="mobile-icon ml-auto text-muted"
-                >
-                  {anyOpen ? <ChevronsDownUp size={18} /> : <ChevronsUpDown size={18} />}
+              {/* Folded: today's rising and falling values. Not a button, so a tap on it opens the sheet too. */}
+              {pos === 'low' && <UpDownCount symbols={folders.flatMap((f) => f.symbols)} className="ml-auto pr-1 text-[13px]" />}
+              {/* <button>s, so the sheet ignores their taps; 36 px look, 44 px to tap. */}
+              {pos !== 'low' && ordering && (
+                <button type="button" onClick={() => setOrdering(false)} className="ml-auto flex h-11 items-center">
+                  <span className="rounded-[10px] bg-brand px-4 py-2 text-sm font-semibold text-white">{t('Fertig')}</span>
                 </button>
+              )}
+              {pos !== 'low' && !ordering && (
+                <span className="-mr-1 ml-auto flex">
+                  <HeadButton
+                    onClick={() => s.setWatchlistView(view === 'list' ? 'folders' : 'list')}
+                    label={view === 'list' ? t('Ordneransicht') : t('Listenansicht')}
+                  >
+                    {view === 'list' ? <LayoutGrid size={17} /> : <List size={17} />}
+                  </HeadButton>
+                  <HeadButton onClick={() => setMenu(sortMenu())} label={t('Sortieren')} on={sort !== 'own'}>
+                    <ArrowUpDown size={17} />
+                  </HeadButton>
+                  {view === 'list' && folders.length > 0 && (
+                    // Like the PC: closes all while any is open, otherwise opens all.
+                    <HeadButton
+                      onClick={() => s.setAllCollapsed(anyOpen)}
+                      label={anyOpen ? t('Alle Ordner zuklappen') : t('Alle Ordner aufklappen')}
+                    >
+                      {anyOpen ? <ChevronsDownUp size={17} /> : <ChevronsUpDown size={17} />}
+                    </HeadButton>
+                  )}
+                </span>
               )}
             </div>
           </div>
         }
       >
         <div ref={listRef} className="pb-4">
-          {folders.map((f) => (
-            <section key={f.id}>
-              <FolderHead
-                name={f.name}
-                collapsed={f.collapsed}
-                onToggle={() => s.toggleFolder(f.id)}
-                onMenu={() => setMenu(folderMenu(f.id, f.name))}
-              />
-              {!f.collapsed &&
-                f.symbols.map((sym) => (
-                  <Row
-                    key={sym}
-                    symbol={sym}
-                    folder={f.id}
-                    marked={drag?.drop?.folder === f.id && drag.drop.before === sym}
-                    onOpen={() => open(sym)}
-                    onMenu={() => setMenu(rowMenu(sym, f.id))}
-                    onGrip={(e) => {
-                      setDrag({ symbol: sym, from: f.id, drop: null })
-                      // Keeps the moves coming while the finger leaves the grip (fails only for synthetic events).
-                      try {
-                        e.currentTarget.setPointerCapture(e.pointerId)
-                      } catch {
-                        // not capturable: the row still gets the moves while the finger stays on it
-                      }
-                    }}
-                    onGripMove={(e) => drag && setDrag({ ...drag, drop: dropAt(e.clientX, e.clientY) })}
-                    onGripUp={() => {
-                      if (drag?.drop && drag.drop.before !== drag.symbol) s.moveSymbol(drag.symbol, drag.from, drag.drop.folder, drag.drop.before)
-                      setDrag(null)
-                    }}
-                  />
-                ))}
-              {!f.collapsed && (
-                <div data-folder-end={f.id} className={`h-3 ${drag?.drop?.folder === f.id && drag.drop.before === null ? 'border-t-2 border-accent' : ''}`} />
-              )}
-            </section>
-          ))}
-          <button
-            onClick={() => newFolder()}
-            className="mx-3 mt-2 flex min-h-12 items-center gap-2 text-muted active:text-white"
-          >
-            <Plus size={16} /> {t('Neuer Ordner')}
-          </button>
+          {view === 'list' && (
+            <>
+              {folders.map((f) => (
+                <FolderRows
+                  shown={pos !== 'low'}
+                  key={f.id}
+                  folder={f}
+                  ordering={ordering}
+                  drop={drag?.drop?.folder === f.id ? drag.drop.before : undefined}
+                  onToggle={() => s.toggleFolder(f.id)}
+                  onFolderMenu={() => setMenu(folderMenu(f.id, f.name))}
+                  onOpen={open}
+                  onMenu={(sym) => setMenu(rowMenu(sym, f.id))}
+                  onGrip={(sym, e) => {
+                    setDrag({ symbol: sym, from: f.id, drop: null })
+                    // Keeps the moves coming while the finger leaves the grip (fails only for synthetic events).
+                    try {
+                      e.currentTarget.setPointerCapture(e.pointerId)
+                    } catch {
+                      // not capturable: the row still gets the moves while the finger stays on it
+                    }
+                  }}
+                  onGripMove={(e) => drag && setDrag({ ...drag, drop: dropAt(e.clientX, e.clientY) })}
+                  onGripUp={() => {
+                    if (drag?.drop && drag.drop.before !== drag.symbol) s.moveSymbol(drag.symbol, drag.from, drag.drop.folder, drag.drop.before)
+                    setDrag(null)
+                  }}
+                />
+              ))}
+              <button onClick={() => newFolder()} className="mx-3 mt-2 flex min-h-12 items-center gap-2 text-muted active:text-white">
+                <Plus size={16} /> {t('Neuer Ordner')}
+              </button>
+            </>
+          )}
+          {view === 'folders' && !openFolder && (
+            <div className="grid grid-cols-3 gap-1.5 px-3 pt-1">
+              {folders.map((f) => (
+                <FolderTile key={f.id} folder={f} onOpen={() => setOpenId(f.id)} onMenu={() => setMenu(folderMenu(f.id, f.name))} />
+              ))}
+              <button
+                onClick={() => newFolder()}
+                className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs text-muted active:bg-line/40 active:text-white"
+              >
+                <Plus size={20} />
+                {t('Neuer Ordner')}
+              </button>
+            </div>
+          )}
+          {openFolder && (
+            <>
+              <button
+                onClick={() => setOpenId(null)}
+                className="flex min-h-11 w-full items-center gap-2 border-y border-line px-3 text-left font-semibold text-white active:bg-line/40"
+              >
+                <ArrowLeft size={18} className="shrink-0 text-muted" />
+                <span className="sr-only">{t('Zurück zu den Ordnern')}</span>
+                <span className="min-w-0 truncate">{openFolder.name}</span>
+                <span className="shrink-0 text-xs font-normal text-muted">· {openFolder.symbols.length}</span>
+                <FolderAvg symbols={openFolder.symbols} className="ml-auto pl-2 text-xs" />
+              </button>
+              <FolderTiles shown={pos !== 'low'} folder={openFolder} onOpen={open} onMenu={(sym) => setMenu(rowMenu(sym, openFolder.id))} />
+            </>
+          )}
         </div>
       </Sheet>
       {menu && <ActionMenu title={menu.title} items={menu.items} onClose={() => setMenu(null)} />}
@@ -247,12 +332,104 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
   )
 }
 
-function FolderHead(p: { name: string; collapsed: boolean; onToggle(): void; onMenu(): void }) {
+/** Header button: 36 px look, 44 px tap area. */
+function HeadButton(p: { onClick(): void; label: string; on?: boolean; children: ReactNode }) {
+  return (
+    <button type="button" onClick={p.onClick} aria-label={p.label} aria-pressed={p.on} className="flex h-11 w-11 items-center justify-center">
+      <span
+        className={`flex h-9 w-9 items-center justify-center rounded-[10px] ring-1 ${p.on ? 'bg-accent/15 text-white ring-accent' : 'text-muted ring-line'}`}
+      >
+        {p.children}
+      </span>
+    </button>
+  )
+}
+
+/** One folder in the list: its head and rows. A component of its own, so the sort hook is not called in a loop. */
+function FolderRows(p: {
+  folder: Folder
+  ordering: boolean
+  /** The sheet is pulled up: re-sorts at once when it opens. */
+  shown: boolean
+  /** Drop marker in this folder: before this symbol, null = at the end, undefined = none. */
+  drop: string | null | undefined
+  onToggle(): void
+  onFolderMenu(): void
+  onOpen(symbol: string): void
+  onMenu(symbol: string): void
+  onGrip(symbol: string, e: PointerEvent<HTMLButtonElement>): void
+  onGripMove(e: PointerEvent): void
+  onGripUp(): void
+}) {
+  const f = p.folder
+  const sorted = useSortedSymbols(f.symbols, p.shown)
+  const order = p.ordering ? f.symbols : sorted
+  return (
+    <section>
+      <FolderHead folder={f} onToggle={p.onToggle} onMenu={p.onFolderMenu} />
+      {!f.collapsed &&
+        order.map((sym) => (
+          <Row
+            key={sym}
+            symbol={sym}
+            folder={f.id}
+            marked={p.drop === sym}
+            ordering={p.ordering}
+            onOpen={() => p.onOpen(sym)}
+            onMenu={() => p.onMenu(sym)}
+            onGrip={(e) => p.onGrip(sym, e)}
+            onGripMove={p.onGripMove}
+            onGripUp={p.onGripUp}
+          />
+        ))}
+      {!f.collapsed && <div data-folder-end={f.id} className={`h-3 ${p.drop === null ? 'border-t-2 border-accent' : ''}`} />}
+    </section>
+  )
+}
+
+function FolderHead(p: { folder: Folder; onToggle(): void; onMenu(): void }) {
   const press = useLongPress(p.onMenu, p.onToggle)
+  const f = p.folder
   return (
     <div {...press} className="flex min-h-11 items-center gap-1 bg-bg/60 px-3 text-xs uppercase tracking-wider text-muted active:bg-line/40">
-      {p.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-      <span className="truncate">{p.name}</span>
+      {f.collapsed ? <ChevronRight size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
+      <span className="min-w-0 truncate font-semibold">{f.name}</span>
+      <span className="shrink-0">· {f.symbols.length}</span>
+      {/* Also for a folded folder: the feed covers the whole watchlist. */}
+      <FolderAvg symbols={f.symbols} className="ml-auto shrink-0 pl-2 normal-case tracking-normal" />
+    </div>
+  )
+}
+
+/** Name (+ alarm bell) and, below, market dot with ticker, or pre-/after-market price and change for US stocks. */
+function Names({ symbol, big }: { symbol: string; big?: boolean }) {
+  const q = useQuotes((s) => s.quotes[symbol])
+  const name = useStore((s) => s.names[symbol])
+  const ext = q?.ext
+  const dot = <MarketDot symbol={symbol} timeZone={q?.timezone} />
+  const second = ext ? (
+    <span className="flex min-w-0 items-center gap-1 tabular-nums" title={extTitle(ext)}>
+      {dot}
+      <ExtIcon phase={ext.phase} size={11} />
+      <span className="text-slate-200">{formatPrice(ext.price)}</span>
+      <span className={ext.changePct >= 0 ? 'text-up' : 'text-down'}>{formatChange(ext.changePct)}</span>
+    </span>
+  ) : (
+    name && (
+      <span className="flex min-w-0 items-center gap-1.5">
+        {dot}
+        <span className="truncate">{symbol}</span>
+      </span>
+    )
+  )
+  return (
+    <div className="min-w-0 flex-1">
+      <p className={`flex min-w-0 items-center gap-1.5 font-semibold text-white ${big ? 'text-[14.5px]' : 'text-sm'}`}>
+        {!name && !ext && dot}
+        <span className="truncate">{name ?? symbol}</span>
+        <AlarmMark symbol={symbol} />
+      </p>
+      {second && <div className="text-[11px] text-muted">{second}</div>}
     </div>
   )
 }
@@ -261,43 +438,92 @@ function Row(p: {
   symbol: string
   folder: string
   marked: boolean
+  ordering: boolean
   onOpen(): void
   onMenu(): void
-  onGrip(e: React.PointerEvent<HTMLButtonElement>): void
-  onGripMove(e: React.PointerEvent): void
+  onGrip(e: PointerEvent<HTMLButtonElement>): void
+  onGripMove(e: PointerEvent): void
   onGripUp(): void
 }) {
   const q = useQuotes((s) => s.quotes[p.symbol])
-  const name = useStore((s) => s.names[p.symbol])
   const press = useLongPress(p.onMenu, p.onOpen)
   return (
     <div
       data-row={p.symbol}
       data-folder={p.folder}
-      className={`flex min-h-14 items-center gap-2 border-b border-line/50 pl-3 active:bg-line/40 ${p.marked ? 'border-t-2 border-t-accent' : ''}`}
+      className={`flex min-h-[50px] items-stretch border-b border-line/50 pl-3 active:bg-line/40 ${p.ordering ? '' : 'pr-3'} ${p.marked ? 'border-t-2 border-t-accent' : ''}`}
     >
-      <div {...press} className="flex min-w-0 flex-1 items-center gap-2 py-2">
-        <MarketDot symbol={p.symbol} timeZone={q?.timezone} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-white">{name ?? p.symbol}</p>
-          {name && <p className="truncate text-[11px] text-muted">{p.symbol}</p>}
-        </div>
-        <div className="text-right tabular-nums">
-          <p className="text-white">{q ? formatPrice(q.price) : '—'}</p>
-          <p className={`text-xs ${!q ? 'text-muted' : q.changePct >= 0 ? 'text-up' : 'text-down'}`}>{q ? formatChange(q.changePct) : '—'}</p>
+      <div {...press} className="flex min-w-0 flex-1 items-center gap-2.5 py-1.5">
+        <Names symbol={p.symbol} big />
+        <span className="shrink-0 text-right text-[14.5px] font-semibold tabular-nums text-white">{q ? formatPrice(q.price) : '—'}</span>
+        <ChangePill change={q?.changePct} className="w-16 shrink-0 py-1 text-xs" />
+      </div>
+      {/* Grips only while reordering: the row has more room the rest of the time. */}
+      {p.ordering && (
+        <button
+          aria-label={t('Verschieben')}
+          data-grip
+          className="flex w-11 shrink-0 touch-none items-center justify-center text-muted"
+          onPointerDown={p.onGrip}
+          onPointerMove={p.onGripMove}
+          onPointerUp={p.onGripUp}
+          onPointerCancel={p.onGripUp}
+        >
+          <GripVertical size={18} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Folder view: a folder as a tile (icon with count, name, Ø); tap opens, long press is the folder menu. */
+function FolderTile(p: { folder: Folder; onOpen(): void; onMenu(): void }) {
+  const press = useLongPress(p.onMenu, p.onOpen)
+  const f = p.folder
+  return (
+    <div
+      {...press}
+      role="button"
+      aria-label={t('{name} öffnen', { name: f.name })}
+      className="flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 pb-2 pt-2.5 active:bg-line/40"
+    >
+      <span className="relative block h-10 w-[52px]">
+        <span className="absolute left-0 top-0 h-2 w-5 rounded-t-sm bg-brand-from/80" />
+        <span className="absolute inset-x-0 bottom-0 top-1 rounded-md rounded-tl-none bg-brand shadow-glow" />
+        <span className="absolute bottom-1 right-1 rounded bg-bg/60 px-1 text-[10px] tabular-nums text-white">{f.symbols.length}</span>
+      </span>
+      <span className="w-full truncate text-center text-xs text-white">{f.name}</span>
+      <FolderAvg symbols={f.symbols} className="text-[11.5px]" />
+    </div>
+  )
+}
+
+/** The open folder's symbols as tiles, two per row, in the chosen order. */
+function FolderTiles(p: { shown: boolean; folder: Folder; onOpen(symbol: string): void; onMenu(symbol: string): void }) {
+  const order = useSortedSymbols(p.folder.symbols, p.shown)
+  if (!order.length) return <p className="px-4 py-6 text-center text-sm text-muted">{t('Leer – Werte über die Suche oben hinzufügen')}</p>
+  return (
+    <div className="grid grid-cols-2 gap-2 px-3 pt-2">
+      {order.map((sym) => (
+        <ValueTile key={sym} symbol={sym} onOpen={() => p.onOpen(sym)} onMenu={() => p.onMenu(sym)} />
+      ))}
+    </div>
+  )
+}
+
+function ValueTile(p: { symbol: string; onOpen(): void; onMenu(): void }) {
+  const q = useQuotes((s) => s.quotes[p.symbol])
+  const press = useLongPress(p.onMenu, p.onOpen)
+  return (
+    <div {...press} className="flex min-w-0 rounded-xl bg-bg px-2.5 py-2 ring-1 ring-line active:bg-line/40">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Names symbol={p.symbol} />
+        {/* A long price pushes the pill to the next line rather than being cut. */}
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5 tabular-nums">
+          <span className="text-[13.5px] font-semibold text-white">{q ? formatPrice(q.price) : '—'}</span>
+          <ChangePill change={q?.changePct} className="ml-auto shrink-0 px-1.5 py-px text-[11px]" />
         </div>
       </div>
-      <button
-        aria-label={t('Verschieben')}
-        data-grip
-        className="flex h-14 w-11 shrink-0 touch-none items-center justify-center text-muted"
-        onPointerDown={p.onGrip}
-        onPointerMove={p.onGripMove}
-        onPointerUp={p.onGripUp}
-        onPointerCancel={p.onGripUp}
-      >
-        <GripVertical size={18} />
-      </button>
     </div>
   )
 }

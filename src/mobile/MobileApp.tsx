@@ -7,6 +7,7 @@ import { isCrypto } from '../shared/types'
 import ChartArea from '../renderer/src/components/ChartArea'
 import ChartBoundary from '../renderer/src/components/ChartBoundary'
 import EventsPanel from '../renderer/src/components/EventsPanel'
+import { toggleEvents, useUnseen } from '../renderer/src/components/EventsButton'
 import SettingsModal from '../renderer/src/components/SettingsModal'
 import { openEvents } from '../renderer/src/services/events'
 import { useEventsUi } from '../renderer/src/store/eventsUi'
@@ -51,6 +52,7 @@ export default function MobileApp() {
   const [saving, setSaving] = useState(false)
   const symbol = useStore((s) => s.symbol)
   const names = useStore((s) => s.names)
+  const unseen = useUnseen(symbol).length
   // window.api.openLicenses on the phone asks for the license page (src/mobile/api.ts).
   useEffect(() => {
     const show = () => {
@@ -149,7 +151,16 @@ export default function MobileApp() {
           title="KandleOS"
           onClose={() => setMenu(false)}
           items={[
-            { label: t('Chart-Stände'), section: t('Chart'), onPick: () => setPage('charts') },
+            {
+              label: unseen > 0 ? t('Events · {n} neu', { n: unseen }) : t('Events'),
+              section: t('Chart'),
+              // As the old header chip: switches Events on if needed and opens the sheet (switching off is in the sheet).
+              onPick: () => {
+                if (!useStore.getState().eventsOn) toggleEvents()
+                openEventsSheet()
+              }
+            },
+            { label: t('Chart-Stände'), onPick: () => setPage('charts') },
             {
               label: t('Kurs-Alarme'),
               onPick: () => {
