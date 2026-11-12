@@ -181,7 +181,7 @@ npm 11 does not run install scripts by default. If Electron is missing after `np
 | Windows installer | `npm run dist:win` |
 | Linux tar.gz (also on Windows) | `npx electron-builder --linux tar.gz` (after `npm run licenses && npm run build`) |
 | Linux AppImage/.deb (on Linux) | `bash linux/build-installer.sh` |
-| Android APK (Windows, JDK 21 + Android SDK) | `npm run android:sync`, then `androidbuild-apk.cmd` (debug) |
+| Android APK (Windows, JDK 21 + Android SDK) | `npm run android:sync`, then `android/build-apk.cmd` (debug) |
 
 Installers end up in `release/`.
 
