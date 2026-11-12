@@ -79,7 +79,9 @@ function PairPage({ onDone }: { onDone(): void }) {
               : readWithJsQR(v, canvas)
             if (text?.startsWith('kandleos:') && !found) {
               found = true
-              void tryRef.current(text)
+              // After a failed try (PC not reachable on mobile data) the camera looks again after a short pause, so the
+              // error stays readable; a success leaves the page.
+              void tryRef.current(text).finally(() => setTimeout(() => (found = false), 3000))
             }
           } catch {
             // a frame that could not be read; the next one comes in 200 ms
@@ -153,7 +155,7 @@ export default function PcLink() {
           <span className={`h-2 w-2 rounded-full ${state === 'online' ? 'bg-up' : 'bg-muted'}`} />
           <span className="text-slate-200">{pcName}</span>
           <span className="text-muted">
-            {state === 'online' ? (syncFailed ? t('erreichbar · Abgleich fehlgeschlagen') : t('erreichbar')) : lastSeen ? t('PC aus · zuletzt {when}', { when: new Date(lastSeen).toLocaleString() }) : t('PC aus')}
+            {state === 'online' ? (syncFailed === 'format' ? t('erreichbar · kein Abgleich: KandleOS auf PC und Handy aktualisieren') : syncFailed ? t('erreichbar · Abgleich fehlgeschlagen') : t('erreichbar')) : lastSeen ? t('PC aus · zuletzt {when}', { when: new Date(lastSeen).toLocaleString() }) : t('PC aus')}
           </span>
           <button
             type="button"

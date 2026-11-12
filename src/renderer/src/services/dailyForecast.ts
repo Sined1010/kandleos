@@ -47,7 +47,8 @@ export async function dailyForecast(
   const last = bars[bars.length - 1]
   opts.onStage?.('model')
   try {
-    const cutoffs = checkCutoffs(bars.length, n, RUNS)
+    // The newest bar is still moving: no backtest is scored against it.
+    const cutoffs = checkCutoffs(bars.length - 1, n, RUNS)
     const [live, ...past] = await window.api.forecast(
       [closes.slice(-CONTEXT), ...cutoffs.map((c) => closes.slice(Math.max(0, c - CONTEXT), c))],
       [0, ...cutoffs.map((_, k) => k + 1)]

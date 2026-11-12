@@ -424,7 +424,8 @@ export const useStore = create<State>()(
           alarms: s.alarms.map((a) => {
             if (a.id !== id) return a
             const { triggeredAt, triggeredPrice, ...armed } = a
-            return { ...armed, checkedUntil: now }
+            // createdAt goes along with the sync (checkedUntil does not), so the other device starts there too.
+            return { ...armed, createdAt: now, checkedUntil: now }
           })
         })),
       applyNative: (list) => set((s) => ({ alarms: mergeTriggered(s.alarms, list) }))

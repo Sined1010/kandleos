@@ -12,7 +12,8 @@ import { FORECAST_MIN_BARS } from '../shared/types'
 
 // Chronos-2 (amazon/chronos-2, Apache-2.0) as fp32 ONNX export by sktime: 2048 bars in, 64 steps x 21 quantiles out.
 const MODEL = {
-  url: 'https://huggingface.co/sktime/chronos2-onnx/resolve/main/chronos2-ctx2048-h64.onnx',
+  // A fixed revision, not `main`: a new export there would fail the checksum below for every new install.
+  url: 'https://huggingface.co/sktime/chronos2-onnx/resolve/84282421a54142dc689c0a71bc9876285b60bdae/chronos2-ctx2048-h64.onnx',
   bytes: 481_610_807,
   sha256: 'f06aba77b0445061b78639008074d71f45af8c0edf16c9dbe4c9ea513c422c0e'
 }

@@ -985,6 +985,7 @@ export const EN: Record<string, string> = {
   'Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.':
     'On the first sync the phone takes over the tabs from the PC. Your phone tabs with drawings are kept as saved charts “Tab from phone”.',
   'erreichbar · Abgleich fehlgeschlagen': 'reachable · sync failed',
+  'erreichbar · kein Abgleich: KandleOS auf PC und Handy aktualisieren': 'reachable · no sync: update KandleOS on the PC and the phone',
   'Handy-Kopplung funktioniert nicht': 'Phone pairing is not working',
   'Allgemein': 'General',
   'Kursdaten': 'Market data',

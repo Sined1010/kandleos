@@ -91,9 +91,14 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
   const provider = providerById(config.provider)
   const models = modelsFor(config.provider, config.models[config.provider])
 
+  // Once per opening: the caller passes a new onClose on every chart render (several a second on a busy chart),
+  // and each keys() call decrypts the key file in main.
   useEffect(() => {
     window.api.agents.status().then(setStatus)
     window.api.agents.keys().then(setKeys)
+  }, [])
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -42,7 +42,8 @@ export function checkCutoffs(bars: number, steps: number, max: number): number[]
 }
 
 /** Bars needed for `runs` backtests of `steps` each. */
-export const historyNeeded = (steps: number, runs: number): number => runs * steps + MIN_CONTEXT
+// One bar more: the newest bar is still moving and starts no backtest (checkCutoffs is called with length - 1).
+export const historyNeeded = (steps: number, runs: number): number => runs * steps + MIN_CONTEXT + 1
 
 /** Series indexes in model calls of at most `size`; series sharing a group id always go into the same call. */
 export function groupBatches(groups: number[], size = 16): number[][] {

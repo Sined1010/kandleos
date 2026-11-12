@@ -22,6 +22,7 @@ import { t } from '../shared/i18n'
 import { checkAnalyses } from '../shared/savedAnalysis'
 import { FINNHUB_KEY_RE, SYMBOL_RE } from '../shared/types'
 import { capHttp } from './capHttp'
+import { usePcStatus } from '../renderer/src/lib/pcStatus'
 import { tell } from './MessageBox'
 import { appFiles } from './files'
 import { KandleNative } from './native'
@@ -50,6 +51,9 @@ setBafinSource(async (isin) => {
   } catch {
     // asked through the PC below
   }
+  // A PC known to be off (away from home) is not tried: each of its addresses would wait 20 s, and the other link
+  // calls (sync, analyses) wait behind it.
+  if (usePcStatus.getState().state === 'offline') throw Object.assign(new Error('offline'), { name: 'PcNeeded' })
   try {
     const r = (await pc('events.bafin', isin, 20_000)) as { deals?: unknown; hidden?: unknown } | null
     const hidden = typeof r?.hidden === 'number' && Number.isFinite(r.hidden) && r.hidden >= 0 ? Math.floor(r.hidden) : 0

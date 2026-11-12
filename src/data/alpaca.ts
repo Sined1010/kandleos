@@ -2,7 +2,7 @@ import { http } from './http'
 import { aggregate } from '../shared/candles'
 import { firstWhole, sectionWindow } from '../shared/history'
 import { t } from '../shared/i18n'
-import { phaseAt } from '../shared/market'
+import { phaseAt, sessionOpen } from '../shared/market'
 import { cleanName } from '../shared/names'
 import {
   ALPACA_KEY_RE,
@@ -192,7 +192,8 @@ export async function alpacaCandles(symbol: string, tf: Timeframe, extended: boo
 /** Hours from 9:30 (a half-hour offset from the clock), then 2h/4h from those like the other sources. */
 function build(halfHours: Candle[], tf: Timeframe): Candle[] {
   const hours = aggregate(halfHours, 3600, 1800)
-  return tf === '1h' ? hours : aggregate(hours, TF_SECONDS[tf])
+  // 2h/4h on New York's clock from 9:30, like the other sources (stocks.ts finish).
+  return tf === '1h' ? hours : aggregate(hours, TF_SECONDS[tf], (sessionOpen(ZONE) ?? 0) % TF_SECONDS[tf], ZONE)
 }
 
 const dayOf = (t: number) => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date(t * 1000))

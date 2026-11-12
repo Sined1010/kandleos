@@ -292,7 +292,10 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
     keys.filter((k) => k.startsWith('alarm:')).flatMap((k) => {
       const a = parse<unknown>(u[k], null)
       if (!isObj(a) || !str(a.id) || !str(a.symbol) || typeof a.price !== 'number' || (a.op !== 'above' && a.op !== 'below') || typeof a.createdAt !== 'number') return []
-      const checkedUntil = keep.alarms.find((x) => x.id === a.id)?.checkedUntil
+      // The check point stays per device, but never before the (re)arm time: an alarm armed again on the other
+      // device must not count the bar that fired it last time.
+      const kept = keep.alarms.find((x) => x.id === a.id)?.checkedUntil
+      const checkedUntil = kept === undefined ? undefined : Math.max(kept, a.createdAt)
       return [{ ...(a as unknown as Alarm), ...(checkedUntil !== undefined && { checkedUntil }) }]
     }),
     keep.alarms
@@ -342,7 +345,18 @@ const UNIT_KEY =
 const MAX_UNITS = 100_000
 const MAX_VALUE = 300_000
 
+/**
+ * What the units may hold. A device drops units it cannot check (a drawing tool, candle size or alarm field only a
+ * newer version knows), and the merge would then delete them on the other device too. So both sides refuse to sync
+ * when their formats differ ('sync-format'); builds from before this field count as 1. Raise it whenever the checks
+ * behind sliceOf (checkDrawing, TIMEFRAMES, RANGES, alarms, tabs, charts) accept something new.
+ */
+export const SYNC_FORMAT = 1
+const formatOf = (v: Record<string, unknown>): number => (typeof v.format === 'number' && Number.isFinite(v.format) ? v.format : 1)
+
 export interface SyncRequest {
+  /** SYNC_FORMAT of the phone. */
+  format: number
   units: Units
   stamps: Stamps
   /** Phone clock when sending (ms); gives the clock offset. */
@@ -351,6 +365,8 @@ export interface SyncRequest {
   baseId: string | null
 }
 export interface SyncReply {
+  /** SYNC_FORMAT of the PC. */
+  format: number
   units: Units
   /** In the PC's clock. */
   stamps: Stamps
@@ -368,11 +384,11 @@ const stampsOk = (v: unknown): v is Stamps =>
 export function checkSyncRequest(v: unknown): SyncRequest | null {
   if (!isObj(v) || !unitsOk(v.units) || !stampsOk(v.stamps) || typeof v.phoneNow !== 'number' || !Number.isFinite(v.phoneNow)) return null
   const baseId = typeof v.baseId === 'string' && v.baseId.length <= 100 ? v.baseId : null
-  return { units: v.units, stamps: v.stamps, phoneNow: v.phoneNow, baseId }
+  return { format: formatOf(v), units: v.units, stamps: v.stamps, phoneNow: v.phoneNow, baseId }
 }
 export function checkSyncReply(v: unknown): SyncReply | null {
   if (!isObj(v) || !unitsOk(v.units) || !stampsOk(v.stamps) || typeof v.pcNow !== 'number' || !Number.isFinite(v.pcNow) || !str(v.baseId)) return null
-  return { units: v.units, stamps: v.stamps, pcNow: v.pcNow, baseId: v.baseId }
+  return { format: formatOf(v), units: v.units, stamps: v.stamps, pcNow: v.pcNow, baseId: v.baseId }
 }
 
 /**
@@ -389,6 +405,7 @@ export function answerSync(
   now: number,
   labels: { fromPhone: string; clash: string }
 ): { slice: SyncSlice; sync: SyncState; reply: SyncReply } {
+  if (req.format !== SYNC_FORMAT) throw new Error('sync-format')
   const pcUnits = unitsOf(pc)
   const pcStamps = stampChanges(st.seen, pcUnits, st.stamps, now)
   // phone clock + offset = PC clock (the request is a few ms old; that is far below any edit gap that matters).
@@ -408,7 +425,7 @@ export function answerSync(
   return {
     slice,
     sync: { stamps: stampsOf(stamps, seen), seen, bases: { ...st.bases, [device]: [{ id: baseId, units: merged }, ...known].slice(0, KEEP_BASES) } },
-    reply: { units: merged, stamps: stampsOf(stamps, merged), pcNow: now, baseId }
+    reply: { format: SYNC_FORMAT, units: merged, stamps: stampsOf(stamps, merged), pcNow: now, baseId }
   }
 }
 
@@ -417,6 +434,8 @@ export function answerSync(
  * kept and stamped, so it goes along with the next sync.
  */
 export function receiveSync(phone: SyncSlice, st: SyncState, pcId: string, sent: Units, reply: SyncReply, now: number): { slice: SyncSlice; sync: SyncState } {
+  // An older PC does not check the phone's format; its merge already dropped what it cannot read, so nothing is applied.
+  if (reply.format !== SYNC_FORMAT) throw new Error('sync-format')
   const current = unitsOf(phone)
   const offset = reply.pcNow - now
   const stamps: Stamps = {}

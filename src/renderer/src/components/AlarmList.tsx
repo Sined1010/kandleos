@@ -10,10 +10,10 @@ import { useQuotes, useStore } from '../store/useStore'
 const icon = IS_MOBILE ? 'mobile-icon' : 'rounded p-1.5 hover:bg-line'
 
 /**
- * Price alarms (PC and phone): set one for `symbol`, and see, re-arm or delete all of them. `onAdded`/`onForget` let
- * the phone ask for the notification permission and clear an old notification; `hint` says how often it checks.
+ * Price alarms (PC and phone): set one for `symbol`, and see, re-arm or delete all of them. `onAdded` lets the phone
+ * ask for the notification permission; `hint` says how often it checks.
  */
-export default function AlarmList({ symbol, hint, onAdded, onForget }: { symbol: string; hint: string; onAdded?: () => Promise<void>; onForget?: (id: string) => Promise<void> }) {
+export default function AlarmList({ symbol, hint, onAdded }: { symbol: string; hint: string; onAdded?: () => Promise<void> }) {
   const alarms = useStore((s) => s.alarms)
   const names = useStore((s) => s.names)
   const stockSource = useStore((s) => s.stockSource)
@@ -75,20 +75,13 @@ export default function AlarmList({ symbol, hint, onAdded, onForget }: { symbol:
             </div>
             {a.triggeredAt && (
               <button
-                onClick={async () => {
-                  // The old "reached" notification goes first, or the next hit would update it without a sound.
-                  await onForget?.(a.id)
-                  useStore.getState().rearmAlarm(a.id, alarmClock(useQuotes.getState().quotes[a.symbol]?.time))
-                }}
+                onClick={() => useStore.getState().rearmAlarm(a.id, alarmClock(useQuotes.getState().quotes[a.symbol]?.time))}
                 aria-label={t('Wieder scharf schalten')} className={icon}>
                 <RotateCcw size={18} />
               </button>
             )}
             <button
-              onClick={() => {
-                void onForget?.(a.id)
-                useStore.getState().removeAlarm(a.id)
-              }}
+              onClick={() => useStore.getState().removeAlarm(a.id)}
               aria-label={t('Alarm löschen')} className={`${icon} text-down`}>
               <Trash2 size={18} />
             </button>

@@ -3,7 +3,7 @@ import { alarmClock } from '../shared/alarms'
 import { t } from '../shared/i18n'
 import { createAlarmWatch } from '../renderer/src/lib/alarmCore'
 import { alarmTitle } from '../renderer/src/services/alarmWatch'
-import { loadCandles } from '../renderer/src/services/marketData'
+import { fetchCandles } from '../renderer/src/services/marketData'
 import { useQuotes, useStore } from '../renderer/src/store/useStore'
 import { planAlarm } from './alarmPlan'
 import { KandleNative, type NativeAlarm } from './native'
@@ -26,7 +26,7 @@ const watch = createAlarmWatch({
     const s = useStore.getState()
     return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
   },
-  loadBars: (symbol) => loadCandles(symbol, '5m', useStore.getState().finnhubKey),
+  loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
   notify: (a) => KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: t('Kurs-Alarm von KandleOS') }).catch(() => {}),
   collect: collectNative
 })
@@ -64,6 +64,12 @@ export function startAlarmWatch(): () => void {
   const resume = CapApp.addListener('resume', () => void refresh())
   const offSync = useStore.subscribe((s, prev) => {
     if (s.alarms !== prev.alarms || s.instantAlarms !== prev.instantAlarms) void syncNative()
+    // An alarm re-armed or deleted (here or on the PC) loses its old "reached" notification: Android would update
+    // that one without a sound at the next hit.
+    if (s.alarms !== prev.alarms)
+      for (const a of prev.alarms)
+        if (a.triggeredAt !== undefined && s.alarms.find((x) => x.id === a.id)?.triggeredAt === undefined)
+          void KandleNative.cancelNotification({ id: notificationId(a.id) }).catch(() => {})
   })
   return () => {
     off()

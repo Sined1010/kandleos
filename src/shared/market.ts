@@ -57,6 +57,9 @@ interface Schedule {
   edges: (date: string) => number[]
 }
 
+/** Start of the regular session (seconds after local midnight) of the main exchange in a zone, if known. */
+export const sessionOpen = (timeZone: string | undefined): number | undefined => (timeZone ? EXCHANGES[timeZone]?.open : undefined)
+
 function exchange(zone: string, hours: Hours): Schedule {
   const today = (date: string): Hours | null => {
     if (weekday(date) % 6 === 0 || isHoliday(zone, date)) return null

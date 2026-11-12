@@ -1,6 +1,8 @@
 // Exchange trading calendar: session times in the exchange's own time zone (so DST shifts are right) and
 // the public holidays of the main markets, keyed by the IANA time zone Yahoo reports for each exchange.
 
+import { alpacaKnows } from './types.ts'
+
 type Market = 'US' | 'DE' | 'UK' | 'EURONEXT' | 'CH'
 
 // shortcut: other markets (Tokyo, Hong Kong, ...) get correct DST but no holidays; add rules here when needed.
@@ -44,7 +46,8 @@ const SUFFIX_ZONES: Record<string, string> = {
 /** Exchange time zone from a ticker (SIE.DE, VOD.L); plain tickers and futures (GC=F) trade in New York. */
 export function timeZoneForSymbol(symbol: string): string | undefined {
   const suffix = /\.([A-Z]{1,2})$/.exec(symbol)?.[1]
-  if (suffix) return SUFFIX_ZONES[suffix]
+  // A US share class (BRK.B, BF.A) is no exchange suffix.
+  if (suffix && !alpacaKnows(symbol)) return SUFFIX_ZONES[suffix]
   // An index (^GDAXI, ^N225) belongs to whichever exchange computes it; no safe guess.
   return symbol.startsWith('^') ? undefined : 'America/New_York'
 }
@@ -177,16 +180,36 @@ export function earlyClose(timeZone: string, date: string): number | undefined {
 }
 
 const formats = new Map<string, Intl.DateTimeFormat>()
+const offsets = new Map<string, number>()
+// Zones change their offset only on quarter-hour edges, so one Intl call per zone and quarter hour is enough;
+// Intl itself costs about 3.5 µs, and charts read every bar's wall time on each new bar.
+const QUARTER = 900
+
+/** Seconds a time zone is ahead of UTC at a UTC timestamp (New York in winter: -18000). */
+export function utcOffset(t: number, timeZone: string): number {
+  const q = Math.floor(t / QUARTER)
+  const key = timeZone + '|' + q
+  let off = offsets.get(key)
+  if (off === undefined) {
+    let f = formats.get(timeZone)
+    if (!f) {
+      const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' } as const
+      formats.set(timeZone, (f = new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', ...opts })))
+    }
+    const at = q * QUARTER
+    const p = Object.fromEntries(f.formatToParts(new Date(at * 1000)).map((x) => [x.type, x.value]))
+    off = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) / 1000 - at
+    if (offsets.size > 50_000) offsets.clear()
+    offsets.set(key, off)
+  }
+  return off
+}
 
 /** Wall-clock date and second of day of a UTC timestamp in a time zone. */
 export function wall(t: number, timeZone: string): { date: string; sec: number } {
-  let f = formats.get(timeZone)
-  if (!f) {
-    const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' } as const
-    formats.set(timeZone, (f = new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', ...opts })))
-  }
-  const p = Object.fromEntries(f.formatToParts(new Date(t * 1000)).map((x) => [x.type, x.value]))
-  return { date: `${p.year}-${p.month}-${p.day}`, sec: +p.hour * 3600 + +p.minute * 60 + +p.second }
+  const local = t + utcOffset(t, timeZone)
+  const day = Math.floor(local / 86400)
+  return { date: new Date(day * 86_400_000).toISOString().slice(0, 10), sec: local - day * 86400 }
 }
 
 const dateSeconds = (date: string) => Date.parse(`${date}T00:00:00Z`) / 1000

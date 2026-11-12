@@ -181,6 +181,14 @@ test('sliceOf rebuilds the slice from its units, keeping per-device bits', () =>
   assert.deepEqual(sliceOf(unitsOf(s), s), s)
 })
 
+test('an alarm armed again on the other device starts its check at the new arm time here', () => {
+  const here = slice({ alarms: [{ id: 'a1', symbol: 'BTCUSDT', op: 'above', price: 120, createdAt: 1, checkedUntil: 50, triggeredAt: 50, triggeredPrice: 120 }] })
+  const there = slice({ alarms: [{ id: 'a1', symbol: 'BTCUSDT', op: 'above', price: 120, createdAt: 80, checkedUntil: 80 }] })
+  assert.equal(sliceOf(unitsOf(there), here).alarms[0].checkedUntil, 80)
+  // Without a new arm time the own, later check point stays.
+  assert.equal(sliceOf(unitsOf(slice()), slice({ alarms: [{ ...slice().alarms[0], checkedUntil: 70 }] })).alarms[0].checkedUntil, 70)
+})
+
 test('a drawing made while the sync was underway survives the sync result', () => {
   const sent = slice()
   const sentUnits = unitsOf(sent)
@@ -228,7 +236,7 @@ test('drawings, tabs and charts missing what they are drawn with are skipped', (
 })
 
 // ── one full round: phone sends, PC answers, phone receives ──
-import { answerSync, checkSyncRequest, emptySync, receiveSync } from './sync.ts'
+import { answerSync, checkSyncRequest, emptySync, receiveSync, SYNC_FORMAT } from './sync.ts'
 
 const labels = { fromPhone: 'Tab vom Handy', clash: ' (Handy)' }
 
@@ -249,7 +257,7 @@ test('a full round: both sides end with the same data, and the next round change
   let pcSync = emptySync(), phoneSync = emptySync()
   for (let round = 0; round < 2; round++) {
     const sent = unitsOf(phone)
-    const req = { units: sent, stamps: phoneSync.stamps, phoneNow: 1000 + round, baseId: phoneSync.bases.pc?.[0]?.id ?? null }
+    const req = { format: SYNC_FORMAT, units: sent, stamps: phoneSync.stamps, phoneNow: 1000 + round, baseId: phoneSync.bases.pc?.[0]?.id ?? null }
     const a = answerSync(pc, pcSync, 'dev', req, 1000 + round, labels)
     pc = a.slice
     pcSync = a.sync
@@ -268,7 +276,7 @@ test('stamps of deleted units are dropped after a sync on both sides', () => {
   let pcSync = emptySync(), phoneSync = emptySync()
   const round = (now: number) => {
     const sent = unitsOf(phone)
-    const a = answerSync(pc, pcSync, 'dev', { units: sent, stamps: phoneSync.stamps, phoneNow: now, baseId: phoneSync.bases.pc?.[0]?.id ?? null }, now, labels)
+    const a = answerSync(pc, pcSync, 'dev', { format: SYNC_FORMAT, units: sent, stamps: phoneSync.stamps, phoneNow: now, baseId: phoneSync.bases.pc?.[0]?.id ?? null }, now, labels)
     pc = a.slice
     pcSync = a.sync
     const r = receiveSync(phone, phoneSync, 'pc', sent, a.reply, now)
@@ -294,7 +302,7 @@ test('a change on the phone during the round stays and goes with the next round'
   let phone = slice()
   let pcSync = emptySync(), phoneSync = emptySync()
   const sent = unitsOf(phone)
-  const a = answerSync(pc, pcSync, 'dev', { units: sent, stamps: {}, phoneNow: 10, baseId: null }, 10, labels)
+  const a = answerSync(pc, pcSync, 'dev', { format: SYNC_FORMAT, units: sent, stamps: {}, phoneNow: 10, baseId: null }, 10, labels)
   pc = a.slice
   pcSync = a.sync
   // Meanwhile the phone renamed BTC.
@@ -303,7 +311,7 @@ test('a change on the phone during the round stays and goes with the next round'
   phone = r.slice
   phoneSync = r.sync
   assert.equal(phone.names.BTCUSDT, 'Neu')
-  const b = answerSync(pc, pcSync, 'dev', { units: unitsOf(phone), stamps: phoneSync.stamps, phoneNow: 20, baseId: phoneSync.bases.pc[0].id }, 20, labels)
+  const b = answerSync(pc, pcSync, 'dev', { format: SYNC_FORMAT, units: unitsOf(phone), stamps: phoneSync.stamps, phoneNow: 20, baseId: phoneSync.bases.pc[0].id }, 20, labels)
   assert.equal(b.slice.names.BTCUSDT, 'Neu')
 })
 
@@ -313,7 +321,7 @@ test('a lost reply does not delete what the PC added meanwhile (retry merges aga
   let pcSync = emptySync(), phoneSync = emptySync()
   const roundTrip = (lose: boolean, now: number) => {
     const sent = unitsOf(phone)
-    const a = answerSync(pc, pcSync, 'dev', { units: sent, stamps: phoneSync.stamps, phoneNow: now, baseId: phoneSync.bases.pc?.[0]?.id ?? null }, now, labels)
+    const a = answerSync(pc, pcSync, 'dev', { format: SYNC_FORMAT, units: sent, stamps: phoneSync.stamps, phoneNow: now, baseId: phoneSync.bases.pc?.[0]?.id ?? null }, now, labels)
     pc = a.slice
     pcSync = a.sync
     if (lose) return
@@ -335,7 +343,7 @@ test('a first sync retried after a lost reply does not save the phone tabs twice
   const phone = slice({ tabs: [{ id: 'p1', symbol: 'ETHUSDT', timeframe: '1h', range: null }], drawings: { 'p1:ETHUSDT': [{ id: 'q', type: 'hline', price: 1 }] } })
   let pcSync = emptySync()
   for (const now of [10, 20]) {
-    const a = answerSync(pc, pcSync, 'dev', { units: unitsOf(phone), stamps: {}, phoneNow: now, baseId: null }, now, labels)
+    const a = answerSync(pc, pcSync, 'dev', { format: SYNC_FORMAT, units: unitsOf(phone), stamps: {}, phoneNow: now, baseId: null }, now, labels)
     pc = a.slice
     pcSync = a.sync
   }
@@ -355,4 +363,15 @@ test('sliceOf keeps this device whole against odd units from another version', (
   assert.equal(out.tabs[0].range, null)
   assert.deepEqual(out.folders[0].symbols, [])
   assert.deepEqual(out.alarms.map((a) => a.id), ['a1'])
+})
+
+test('different sync formats are refused on both sides, before anything is merged or deleted', () => {
+  const pc = slice()
+  const sent = unitsOf(slice({ drawings: {} }))
+  const req = checkSyncRequest({ format: SYNC_FORMAT + 1, units: sent, stamps: {}, phoneNow: 1, baseId: null })!
+  assert.throws(() => answerSync(pc, emptySync(), 'dev', req, 1, labels), /sync-format/)
+  // A request or reply without the field is from a build before it: format 1.
+  assert.equal(checkSyncRequest({ units: sent, stamps: {}, phoneNow: 1, baseId: null })?.format, 1)
+  const reply = { format: SYNC_FORMAT + 1, units: {}, stamps: {}, pcNow: 1, baseId: 'b' }
+  assert.throws(() => receiveSync(slice(), emptySync(), 'pc', sent, reply, 1), /sync-format/)
 })

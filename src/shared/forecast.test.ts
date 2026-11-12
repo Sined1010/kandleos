@@ -30,7 +30,9 @@ test('checkCutoffs steps back one horizon at a time while 512 bars of history ar
   assert.equal(page.length, 7)
   assert.equal(page[6], 552)
   assert.deepEqual(checkCutoffs(400, 64, 30), [])
-  assert.equal(historyNeeded(64, 30), 2432)
+  // One bar more than 30 × 64 + 512: the newest bar starts no backtest.
+  assert.equal(historyNeeded(64, 30), 2433)
+  assert.equal(checkCutoffs(historyNeeded(64, 30) - 1, 64, 30).length, 30)
 })
 
 test('groupBatches packs whole groups into batches of at most 16 series', () => {

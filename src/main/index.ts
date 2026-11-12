@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron'
 import { readFileSync } from 'node:fs'
-import { rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -20,6 +19,7 @@ import { setLang, t } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
+import { writeFileAtomic } from './atomicFile'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, loadModel, modelReady } from './forecast'
 import { createRemoteOps } from './remoteOps'
@@ -150,10 +150,7 @@ ipcMain.handle('store:set', (_e, data: unknown) => {
   if (typeof data !== 'string' || storeLocked) return
   // Serialize writes and swap atomically so a crash mid-write never truncates the store.
   writeQueue = writeQueue
-    .then(async () => {
-      await writeFile(storeFile() + '.tmp', data, 'utf8')
-      await rename(storeFile() + '.tmp', storeFile())
-    })
+    .then(() => writeFileAtomic(storeFile(), data))
     .catch((err) => console.error('Speichern fehlgeschlagen:', err))
   return writeQueue
 })
@@ -181,8 +178,7 @@ ipcMain.handle('backup:apply', async (e, password) => {
   await writeQueue
   if (store) {
     try {
-      await writeFile(storeFile() + '.tmp', store, 'utf8')
-      await rename(storeFile() + '.tmp', storeFile())
+      await writeFileAtomic(storeFile(), store)
     } catch (err) {
       // No reload comes, so the page must be able to save again.
       storeLocked = false

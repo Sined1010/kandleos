@@ -8,6 +8,7 @@ import {
   checkSyncRequest,
   emptySync,
   receiveSync,
+  SYNC_FORMAT,
   stampChanges,
   unitsOf,
   type SyncReply,
@@ -106,7 +107,7 @@ export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeo
         firstNotice = true
         tell(t('Beim ersten Abgleich übernimmt das Handy die Tabs vom PC. Deine Handy-Tabs mit Zeichnungen werden als Chart-Stände „Tab vom Handy“ gespeichert.'))
       }
-      const reply = checkSyncReply(await call('sync', { units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }, SYNC_TIMEOUT_MS))
+      const reply = checkSyncReply(await call('sync', { format: SYNC_FORMAT, units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }, SYNC_TIMEOUT_MS))
       if (!reply) throw new Error('bad-reply')
       const out = receiveSync(sliceOfStore(), useStore.getState().sync, pcId, sent, reply, Date.now())
       apply(out.slice, out.sync)

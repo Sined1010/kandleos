@@ -1,7 +1,8 @@
 // The forecast archive on disk (userData/forecasts): archive.jsonl gets one line per forecast and per settlement,
 // only ever appended to; summary.json holds the small running totals the window shows. No electron import, so the
 // tests can point it at a temporary folder.
-import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rm } from 'node:fs/promises'
+import { writeFileAtomic } from './atomicFile.ts'
 import { join } from 'node:path'
 import { addToSummary, closesAt, parseEntry, shouldArchive, summaryKey, type ArchiveEntry, type Bands, type Settlement, type SummaryRow } from '../shared/archive.ts'
 
@@ -144,8 +145,7 @@ export function createArchive(dir: string, rawLimit = ARCHIVE_RAW_LIMIT) {
 
   async function writeAtomic(path: string, text: string): Promise<void> {
     await mkdir(dir, { recursive: true })
-    await writeFile(path + '.tmp', text, 'utf8')
-    await rename(path + '.tmp', path)
+    await writeFileAtomic(path, text)
   }
 
   /** Rewrites the lines without the oldest settled forecasts until well under the limit. */

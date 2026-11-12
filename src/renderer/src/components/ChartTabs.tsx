@@ -17,9 +17,10 @@ export async function closeTabAsked(tabId: string): Promise<void> {
   const changed = saved && isDirty(saved, tab.timeframe, drawings[key] ?? [])
   // All drawings of this tab (any symbol) go with it, except those kept in its saved chart.
   const lost = Object.entries(drawings).reduce((n, [k, d]) => n + (k.startsWith(`${tab.id}:`) && !(saved && k === key) ? d.length : 0), 0)
-  const ok = changed
-    ? await ask(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }), t('Verwerfen'), { danger: true })
-    : !lost || (await ask(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }), t('Tab schließen'), { danger: true }))
+  // Lost drawings weigh more than unsaved changes, so they are named even when both apply.
+  const ok = lost
+    ? await ask(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }), t('Tab schließen'), { danger: true })
+    : !changed || (await ask(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }), t('Verwerfen'), { danger: true }))
   if (ok) closeTab(tab.id)
 }
 

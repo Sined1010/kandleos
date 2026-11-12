@@ -118,7 +118,8 @@ export async function loadCandles(
   }
 }
 
-async function fetchCandles(
+/** Straight from the source, without the stored copies (the alarm checks: they have no use for a stale copy). */
+export async function fetchCandles(
   symbol: string,
   tf: Timeframe,
   finnhubKey: string,

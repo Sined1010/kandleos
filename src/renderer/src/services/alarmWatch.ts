@@ -5,7 +5,7 @@ import { t } from '../../../shared/i18n'
 import { planAlarm } from '../../../mobile/alarmPlan'
 import { createAlarmWatch } from '../lib/alarmCore'
 import { formatPrice } from '../lib/format'
-import { loadCandles } from './marketData'
+import { fetchCandles } from './marketData'
 import { useQuotes, useStore } from '../store/useStore'
 
 export const alarmTitle = (a: Alarm): string =>
@@ -23,7 +23,7 @@ export function startPcAlarmWatch(): () => void {
       const s = useStore.getState()
       return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
     },
-    loadBars: (symbol) => loadCandles(symbol, '5m', useStore.getState().finnhubKey),
+    loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
     notify: async (a) => window.api.notify(alarmTitle(a), t('Kurs-Alarm von KandleOS')),
     collect: async () => {}
   })

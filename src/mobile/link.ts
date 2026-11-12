@@ -64,7 +64,7 @@ export async function hello(): Promise<void> {
     const msg = (e as Error).message
     if (/removed|not-paired/.test(msg)) usePcStatus.setState({ state: 'none' })
     // Answered hello, then the sync failed (window busy, bad reply): the PC is there, the sync is what went wrong.
-    else if (reached && msg !== 'offline') usePcStatus.setState({ syncFailed: true })
+    else if (reached && msg !== 'offline') usePcStatus.setState({ syncFailed: /sync-format/.test(msg) ? 'format' : true })
     else usePcStatus.setState({ state: 'offline', pcName: p.pcName })
   }
 }

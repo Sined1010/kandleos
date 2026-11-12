@@ -4,7 +4,7 @@ import { isinFromCusip, looksLikeWkn, warmXetra, xetraOfWkn, wikidataIsin, wknOf
 import { matchCoins, mergeHits, withPrices } from '../shared/search'
 import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
 import { t } from '../shared/i18n'
-import { marketStatus, phaseAt } from '../shared/market'
+import { marketStatus, phaseAt, sessionOpen } from '../shared/market'
 import { aggregate, aggregateMonths, snapLast } from '../shared/candles'
 import { firstWhole, sectionWindow } from '../shared/history'
 import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
@@ -351,7 +351,8 @@ function finish(data: CandleData, tf: Timeframe, before = Infinity): CandleData 
     months && months > 1
       ? aggregateMonths(data.candles, months, data.timezone)
       : tf === '2h' || tf === '4h'
-        ? aggregate(data.candles, TF_SECONDS[tf])
+        ? // On the exchange's clock, from the session open (US 9:30, 13:30; Xetra 9:00, 13:00, 17:00).
+          aggregate(data.candles, TF_SECONDS[tf], (sessionOpen(data.timezone) ?? 0) % TF_SECONDS[tf], data.timezone)
         : data.candles
   return { ...data, candles: candles.filter((c) => c.time <= before) }
 }
@@ -461,8 +462,10 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<{ 
         const [symbol, key] = checkArgs(s, keyArg)
         // Outside the regular session Yahoo also has the pre-market and after-hours price; Finnhub's quote does not.
         const regular = marketStatus(symbol, timeZoneForSymbol(symbol))?.phase === 'open'
+        // Finnhub's free plan quotes US listings only; asking it for SAP.DE every few seconds only used up its
+        // 60 calls a minute, which the events and the live stream need.
         out[symbol] =
-          key && regular ? await finnhubQuote(symbol, key).catch(() => yahooQuote(symbol)) : await yahooQuote(symbol)
+          key && regular && alpacaKnows(symbol) ? await finnhubQuote(symbol, key).catch(() => yahooQuote(symbol)) : await yahooQuote(symbol)
       } catch (e) {
         console.warn((e as Error).message)
       }

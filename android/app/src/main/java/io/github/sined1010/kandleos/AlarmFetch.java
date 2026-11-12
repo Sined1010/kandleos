@@ -10,7 +10,10 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,9 +39,10 @@ public final class AlarmFetch {
                 return out;
             }
             case "yahoo": {
-                // Yahoo rejects requests without a browser-like user agent (as in src/data/stocks.ts).
+                // Yahoo rejects requests without a browser-like user agent (as in src/data/stocks.ts). Regular session
+                // only, like the app's catch-up and its live check against the regular price.
                 JSONObject r = new JSONObject(get("https://query1.finance.yahoo.com/v8/finance/chart/" + sym
-                        + "?interval=5m&includePrePost=true&period1=" + Math.max(fromSec, now - 5 * 86400) + "&period2=" + now, headers("User-Agent", "Mozilla/5.0")))
+                        + "?interval=5m&period1=" + Math.max(fromSec, now - 5 * 86400) + "&period2=" + now, headers("User-Agent", "Mozilla/5.0")))
                         .getJSONObject("chart").getJSONArray("result").getJSONObject(0);
                 JSONArray ts = r.optJSONArray("timestamp");
                 JSONObject q = r.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0);
@@ -61,13 +65,26 @@ public final class AlarmFetch {
                 List<AlarmCheck.Bar> out = new ArrayList<>();
                 for (int i = 0; b != null && i < b.length(); i++) {
                     JSONObject x = b.getJSONObject(i);
-                    out.add(new AlarmCheck.Bar(Instant.parse(x.getString("t")).getEpochSecond(), x.getDouble("h"), x.getDouble("l")));
+                    long t = Instant.parse(x.getString("t")).getEpochSecond();
+                    if (regularUs(t)) out.add(new AlarmCheck.Bar(t, x.getDouble("h"), x.getDouble("l")));
                 }
                 return out;
             }
             default:
                 return new ArrayList<>();
         }
+    }
+
+    /**
+     * A 5-minute bar of the regular US session (9:30-16:00 New York, Monday to Friday), as the app keeps them.
+     * shortcut: half days count until 16:00 (the app stops at the early close); fine unless alarms on those few
+     * afternoons matter.
+     */
+    static boolean regularUs(long sec) {
+        ZonedDateTime d = Instant.ofEpochSecond(sec).atZone(ZoneId.of("America/New_York"));
+        int min = d.getHour() * 60 + d.getMinute();
+        DayOfWeek w = d.getDayOfWeek();
+        return w != DayOfWeek.SATURDAY && w != DayOfWeek.SUNDAY && min >= 570 && min < 960;
     }
 
     /** Map.of needs Android 11; this works from the app's minimum (Android 8). */

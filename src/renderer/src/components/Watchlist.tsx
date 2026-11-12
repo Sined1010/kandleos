@@ -85,16 +85,21 @@ function FolderNameInput({ folder: f, onDone, className }: { folder: Folder; onD
 
 /** Fills in readable names for symbols that have none yet (new symbols, or after a reset); shared with the phone.
  *  Also for the charts in the tabs: a value opened from the search is often in no folder. */
-export function useSymbolNames(): RefObject<Set<string>> {
+export function useSymbolNames(): void {
   const folders = useStore((s) => s.folders)
   const tabs = useStore((s) => s.tabs)
   const names = useStore((s) => s.names)
   const setName = useStore((s) => s.setName)
-  // Symbols already looked up this session, so a symbol Yahoo does not know is not asked for again.
+  // Symbols looked up this session without a name since, so a symbol Yahoo does not know is not asked for again.
+  // One with a name leaves the set: cleared later (reset in the list, on the phone or the PC), it is looked up again.
   const looked = useRef(new Set<string>())
   useEffect(() => {
     for (const s of new Set([...folders.flatMap((f) => f.symbols), ...tabs.map((t) => t.symbol)])) {
-      if (names[s] || looked.current.has(s)) continue
+      if (names[s]) {
+        looked.current.delete(s)
+        continue
+      }
+      if (looked.current.has(s)) continue
       looked.current.add(s)
       window.api
         .symbolName(s)
@@ -103,7 +108,6 @@ export function useSymbolNames(): RefObject<Set<string>> {
         .catch(() => {})
     }
   }, [folders, tabs, names, setName])
-  return looked
 }
 
 export default function Watchlist() {
@@ -161,12 +165,8 @@ export default function Watchlist() {
   }, [open, side])
   const drag = useRef<{ symbol: string; from: string } | null>(null)
   const setName = useStore((s) => s.setName)
-  const looked = useSymbolNames()
-
-  const resetName = (s: string) => {
-    looked.current.delete(s)
-    setName(s, '')
-  }
+  useSymbolNames()
+  const resetName = (s: string) => setName(s, '')
 
   const anyOpen = folders.some((f) => !f.collapsed)
   const [menu, setMenu] = useState<RowAt | null>(null)

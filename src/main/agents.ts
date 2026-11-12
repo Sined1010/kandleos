@@ -10,6 +10,7 @@ import { agentsTicker, ANALYSTS, doneFromBridge, keyEnvFor, PROVIDERS, stageOf, 
 import { chronosBlock, chronosOrSkip, type ChronosSkip, type ChronosSnapshot } from '../shared/chronosLink'
 import { getLang, t } from '../shared/i18n'
 import { SYMBOL_RE } from '../shared/types'
+import { writeFileAtomic } from './atomicFile'
 import { read as readSecret, save as saveSecret } from './keys'
 
 // TradingAgents runs in its own Python, set up on first use inside the app's data folder: uv (a single
@@ -443,7 +444,8 @@ async function runChecked(req: AgentsRequest, onEvent: (e: AgentsEvent) => void,
 /** Writes one analysis to results/<symbol>/<id>.json; the caller has checked symbol and id. */
 export async function saveAnalysis(a: SavedAnalysis): Promise<void> {
   await mkdir(resultsDir(a.symbol), { recursive: true })
-  await writeFile(join(resultsDir(a.symbol), `${a.id}.json`), JSON.stringify(a))
+  // A paid analysis must not end up as half a file when the app quits while writing.
+  await writeFileAtomic(join(resultsDir(a.symbol), `${a.id}.json`), JSON.stringify(a))
 }
 
 /** Every saved analysis of every symbol, for the backup file. Unreadable files are skipped. */

@@ -1,4 +1,4 @@
-import { barZone, periodIndex, periodStart } from './calendar.ts'
+import { barZone, periodIndex, periodStart, utcOffset } from './calendar.ts'
 import type { Candle } from './types'
 
 /** Groups bars into buckets; `bucketOf` gives each bar's bucket start time. */
@@ -17,10 +17,17 @@ function group(candles: Candle[], bucketOf: (t: number) => number): Candle[] {
   return out
 }
 
-// shortcut: buckets are aligned to UTC (shifted by `offset` seconds), not exchange sessions; switch to
-// session-aligned bars if that matters.
-export function aggregate(candles: Candle[], seconds: number, offset = 0): Candle[] {
-  return group(candles, (t) => Math.floor((t - offset) / seconds) * seconds + offset)
+/**
+ * Buckets of `seconds`, shifted by `offset`. With `timeZone` the grid runs on that zone's clock, so 2h/4h stock bars
+ * keep their time of day across a DST switch (on a UTC grid they would move by an hour, and the forecast's future bars
+ * would take both seasons' times). Without one the grid is UTC (crypto, and hours built from half hours).
+ */
+export function aggregate(candles: Candle[], seconds: number, offset = 0, timeZone?: string): Candle[] {
+  if (!timeZone) return group(candles, (t) => Math.floor((t - offset) / seconds) * seconds + offset)
+  return group(candles, (t) => {
+    const shift = utcOffset(t, timeZone)
+    return Math.floor((t + shift - offset) / seconds) * seconds + offset - shift
+  })
 }
 
 /**
@@ -65,15 +72,21 @@ export function logicalToTime(times: number[], l: number, step: number): number 
 }
 
 /**
- * Folds a price tick into the last bar, or opens the next bar: on the timeframe grid anchored at the last bar,
- * or for month-based bars (`months` > 0) at the start of the tick's calendar period in `zone`.
+ * Folds a price tick into the last bar, or opens the next bar: on the timeframe grid anchored at the last bar, counted
+ * on `zone`'s clock (2h/4h stock bars are built on it, see aggregate: across a DST weekend a UTC step would open
+ * Monday's bar an hour off), or for month-based bars (`months` > 0) at the start of the tick's calendar period.
  */
 export function mergeTick(last: Candle, price: number, time: number, seconds: number, months = 0, zone = 'UTC'): Candle {
-  const period = months ? periodIndex(time, months, zone) : 0
-  if (months ? period <= periodIndex(last.time, months, zone) : time < last.time + seconds) {
-    return { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price }
+  const fold = (): Candle => ({ ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price })
+  if (months) {
+    const period = periodIndex(time, months, zone)
+    if (period <= periodIndex(last.time, months, zone)) return fold()
+    return { time: periodStart(period, months, zone), open: price, high: price, low: price, close: price, volume: 0 }
   }
-  const t = months ? periodStart(period, months, zone) : last.time + Math.floor((time - last.time) / seconds) * seconds
+  const from = last.time + utcOffset(last.time, zone)
+  const local = time + utcOffset(time, zone)
+  if (local < from + seconds) return fold()
+  const t = from + Math.floor((local - from) / seconds) * seconds - utcOffset(time, zone)
   return { time: t, open: price, high: price, low: price, close: price, volume: 0 }
 }
 

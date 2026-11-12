@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { easter, futureTimes, isHoliday, timeZoneForSymbol } from './calendar.ts'
+import { easter, fromWall, futureTimes, isHoliday, nextDate, timeZoneForSymbol, wall, weekday } from './calendar.ts'
+import { aggregate } from './candles.ts'
 
 const utc = (m: number, d: number, h = 0, min = 0) => Date.UTC(2026, m - 1, d, h, min) / 1000
 const NY = 'America/New_York'
@@ -74,6 +75,7 @@ test('timeZoneForSymbol maps market suffixes, US tickers and futures', () => {
   assert.equal(timeZoneForSymbol('VOD.L'), 'Europe/London')
   assert.equal(timeZoneForSymbol('AAPL'), NY)
   assert.equal(timeZoneForSymbol('GC=F'), NY)
+  assert.equal(timeZoneForSymbol('BRK.B'), NY)
   assert.equal(timeZoneForSymbol('^GDAXI'), undefined)
   assert.equal(timeZoneForSymbol('XYZ.QQ'), undefined)
 })
@@ -114,4 +116,31 @@ test('futureTimes ends a half day at the early close', () => {
   const bars = [23, 24, 25].flatMap((d) => est.map((h) => utc(11, d, Math.floor(h), (h % 1) * 60)))
   const next = futureTimes(bars, 3600, 5, NY)
   assert.deepEqual(next, [utc(11, 27, 14, 30), utc(11, 27, 15, 30), utc(11, 27, 16, 30), utc(11, 27, 17, 30), utc(11, 30, 14, 30)])
+})
+
+test('wall() gives the same date and time as Intl, across DST switches and odd offsets', () => {
+  for (const zone of ['America/New_York', 'Europe/Berlin', 'Australia/Sydney', 'Asia/Kolkata', 'Asia/Kathmandu']) {
+    const f = new Intl.DateTimeFormat('en-CA', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    for (let t = Date.UTC(2026, 0, 1) / 1000; t < Date.UTC(2027, 0, 1) / 1000; t += 37 * 60 + 13) {
+      const p = Object.fromEntries(f.formatToParts(new Date(t * 1000)).map((x) => [x.type, x.value]))
+      const want = { date: `${p.year}-${p.month}-${p.day}`, sec: +p.hour * 3600 + +p.minute * 60 + +p.second }
+      assert.deepEqual(wall(t, zone), want, `${zone} ${new Date(t * 1000).toISOString()}`)
+    }
+  }
+})
+
+test('4h stock bars across a DST switch give two future bars a day, at 9:30 and 13:30 New York time', () => {
+  const zone = 'America/New_York'
+  const hours = []
+  for (let date = '2026-09-01'; date <= '2026-11-11'; date = nextDate(date)) {
+    if (weekday(date) % 6 === 0) continue
+    for (let s = 9.5 * 3600; s < 16 * 3600; s += 3600) hours.push({ time: fromWall(date, s, zone), open: 1, high: 1, low: 1, close: 1, volume: 1 })
+  }
+  const bars = aggregate(hours, 14400, 5400, zone)
+  // Before and after the switch (1 November) the bars start at the same wall times.
+  assert.deepEqual([...new Set(bars.map((b) => wall(b.time, zone).sec / 3600))], [9.5, 13.5])
+  const next = futureTimes(bars.map((b) => b.time), 14400, 6, zone).map((t) => wall(t, zone))
+  assert.deepEqual(next.map((w) => `${w.date} ${w.sec / 3600}`), [
+    '2026-11-12 9.5', '2026-11-12 13.5', '2026-11-13 9.5', '2026-11-13 13.5', '2026-11-16 9.5', '2026-11-16 13.5'
+  ])
 })

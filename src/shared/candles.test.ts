@@ -100,3 +100,13 @@ test('snapLast puts Yahoo\'s "now" point on the bar grid or into the bar it fall
   const on = [bar(300, 1), bar(600, 2)]
   assert.equal(snapLast(on, 300), on)
 })
+
+test('mergeTick steps 4h stock bars on the exchange clock across a DST weekend', () => {
+  const NY = 'America/New_York'
+  // Friday 2026-10-30 13:30 EDT (17:30 UTC); Monday 2026-11-02 9:31 EST (14:31 UTC).
+  const last = { time: Date.UTC(2026, 9, 30, 17, 30) / 1000, open: 1, high: 1, low: 1, close: 1, volume: 1 }
+  const next = mergeTick(last, 2, Date.UTC(2026, 10, 2, 14, 31) / 1000, 14400, 0, NY)
+  assert.equal(next.time, Date.UTC(2026, 10, 2, 14, 30) / 1000)
+  // Without a zone (crypto) the grid stays UTC, as before.
+  assert.equal(mergeTick(last, 2, last.time + 14400 + 60, 14400).time, last.time + 14400)
+})

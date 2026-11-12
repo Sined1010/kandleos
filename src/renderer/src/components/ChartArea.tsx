@@ -269,6 +269,13 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           fmtTime(t, intraday ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }, dateZone())
       }
     })
+    // A forecast belongs to the candles it was made from: it goes with them (also when a stored copy is replaced).
+    const dropForecast = () => {
+      fcRun.current++
+      lastCheck.current = null
+      setFc({ state: 'idle' })
+    }
+    dropForecast()
     dataRef.current = []
     // Month-based candles already come with all the history there is.
     Object.assign(older.current, { gen: older.current.gen + 1, ready: false, busy: false, done: !!months, retryAt: 0, provider: undefined })
@@ -289,6 +296,21 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       if (!active || !arr.length || bar.time < arr[arr.length - 1].time) return
       if (bar.time === arr[arr.length - 1].time) arr[arr.length - 1] = bar
       else arr.push(bar)
+      if (arr.length > HISTORY_LIMIT + 500) {
+        // A chart left open for days would grow without end (and every tick works over all bars): the oldest go,
+        // as a new array (a running backtest holds the old one), and the view stays where it was.
+        const cut = arr.length - HISTORY_LIMIT
+        const kept = arr.slice(cut)
+        const view = api.chart.timeScale().getVisibleLogicalRange()
+        api.candles.setData(kept.map(toBar))
+        api.volume.setData(kept.map(toVol))
+        if (view) api.chart.timeScale().setVisibleLogicalRange({ from: view.from - cut, to: view.to - cut })
+        dataRef.current = kept
+        // Full again: scrolling left would only find what was just cut.
+        older.current.done = true
+        setData([...kept])
+        return
+      }
       api.candles.update(toBar(bar))
       api.volume.update(toVol(bar))
       soon ??= setTimeout(() => {
@@ -301,6 +323,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     const show = ({ candles: bars, currency, timezone, provider }: CandleData, fresh = true) => {
         if (!active) return
         if (!bars.length) return setStatus(t('Keine Daten für {symbol}', { symbol }))
+        // Fresh candles over a stored copy: a forecast started meanwhile was made from the old bars.
+        if (fresh && dataRef.current.length) dropForecast()
         const last = bars[bars.length - 1].close
         const precision = last < 1 ? 6 : last < 10 ? 4 : 2
         const format = (p: number) => p.toFixed(precision)
@@ -356,14 +380,17 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           const q = s.quotes[symbol]
           const arr = dataRef.current
           if (!q || q === prev.quotes[symbol] || !arr.length) return
-          // Month-based bars end at calendar month edges, read in the zone the source dates its bars in.
-          const zone = months ? barZone(arr.map((c) => c.time), timezoneRef.current) : undefined
+          // Month-based bars end at calendar month edges, read in the zone the source dates its bars in; intraday bars
+          // step on the exchange's clock (2h/4h bars are built on it).
+          const zone = months ? barZone(arr.map((c) => c.time), timezoneRef.current) : timezoneRef.current
           // With extended hours shown, pre-market and after-hours prices move the chart too.
           const tick = extended && q.ext && q.ext.time >= q.time ? q.ext : q
           push(mergeTick(arr[arr.length - 1], tick.price, tick.time, seconds, months, zone))
         })
     return () => {
       active = false
+      // Also on unmount (a tab switch remounts the chart): a forecast still running for these candles is dropped.
+      fcRun.current++
       clearTimeout(retry)
       clearTimeout(soon)
       stop()
@@ -541,15 +568,6 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     }
   }, [data, indicatorSeries])
 
-  // A forecast belongs to one symbol and timeframe; drop it when either changes.
-  useEffect(() => {
-    return () => {
-      fcRun.current++
-      lastCheck.current = null
-      setFc({ state: 'idle' })
-    }
-  }, [api, symbol, timeframe])
-
   const toggleForecast = async () => {
     if (fc.state !== 'shown') {
       // On the phone the PC computes; the model (480 MB) only loads there after a yes.
@@ -618,7 +636,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       if (stale()) return drop()
       const bars = dataRef.current
       const closes = bars.map((c) => c.close)
-      const cutoffs = checkCutoffs(bars.length, n, runs)
+      // The newest bar is still moving: no backtest is scored against it.
+      const cutoffs = checkCutoffs(bars.length - 1, n, runs)
       if (!cutoffs.length) {
         lastCheck.current = { check: null, scale: null, path: null }
         archiveNow(null)
