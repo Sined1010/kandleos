@@ -689,6 +689,11 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       const lower = bars.map((c) => Math.min(c.open, c.close) - c.low)
       const { horizon, backtestRuns, calibrate } = useStore.getState().forecastRun
       const n = forecastSteps(timeframe, bars.length, horizon === 'auto' ? 64 : horizon)
+      // Widen the view so the whole forecast is visible, already for the loader's ghost candles; the left edge stays
+      // where the user put it.
+      const view = api.chart.timeScale().getVisibleLogicalRange()
+      if (!quiet && view && view.to < bars.length + n)
+        api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
       // The close on its own (grouping it with the wicks made it measurably worse in backtests) and the two
       // wick series as a group of their own; the backtests follow once the forecast is shown.
       const [live, liveUpper, liveLower] = await window.api.forecast([closes, upper, lower], [0, 1, 1])
@@ -715,10 +720,6 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       // Archived as shown: with calibration that waits for the check's factor.
       const awaitFactor = calibrate && backtestRuns > 0 && !reuse
       if (!awaitFactor) archiveForecast(result, archiveContext(quiet))
-      // Widen the view so the whole forecast is visible; the left edge stays where the user put it.
-      const view = api.chart.timeScale().getVisibleLogicalRange()
-      if (!quiet && view && view.to < bars.length + n)
-        api.chart.timeScale().setVisibleLogicalRange({ from: view.from, to: bars.length + n + 2 })
       if (backtestRuns && !reuse) void runCheck(run, result, n, backtestRuns, calibrate)
     } catch (e) {
       const error = ipcError(e)
@@ -1031,6 +1032,9 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
             series={api.candles}
             time={data[data.length - 1].time}
             price={data[data.length - 1].close}
+            // Average high-low of the last 20 candles; a flat chart falls back to 0.2 % of the price.
+            range={data.slice(-20).reduce((s, c) => s + c.high - c.low, 0) / Math.min(20, data.length) || data[data.length - 1].close * 0.002}
+            count={forecastSteps(timeframe, data.length, maxSteps)}
             right={(sideOpen ? AGENTS_WIDTH : 0) + api.chart.priceScale('right').width()}
             bottom={api.chart.timeScale().height()}
           />

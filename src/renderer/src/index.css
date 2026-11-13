@@ -134,7 +134,7 @@ input[type='number']::-webkit-inner-spin-button {
   border-color: var(--color-line);
 }
 
-/* Candle loader while the forecast is computed (ForecastLoader.tsx), after "Candle Loader" by Bilal Bostan
+/* Candle loader while a symbol loads (BrandLoader in ForecastLoader.tsx), after "Candle Loader" by Bilal Bostan
    (uiverse.io, MIT). Only transform and opacity move, so the browser animates it without repainting. */
 .fc-loader {
   display: flex;
@@ -155,9 +155,9 @@ input[type='number']::-webkit-inner-spin-button {
 .fc-loader i::before {
   content: '';
   position: absolute;
-  /* Amber for the forecast; the brand loader gives each candle its own colour (--c). */
-  background: var(--c, #ffd54f);
-  box-shadow: 0 0 3px var(--c, #ffd54f);
+  /* Each candle its own colour of the logo's gradient (--c). */
+  background: var(--c);
+  box-shadow: 0 0 3px var(--c);
 }
 .fc-loader i::after {
   left: 0;
@@ -198,9 +198,65 @@ input[type='number']::-webkit-inner-spin-button {
     transform: scaleY(0);
   }
 }
+
+/* Ghost candles while the forecast is computed (ForecastLoader.tsx). The script sets --s (bar spacing), --bw (body
+   width) and --u (pixels per average candle range); each candle's values are in that unit, up from the last close.
+   They fade in one after another from left to right, hold and fade out again: only opacity and transform move. */
+.fc-ghost {
+  animation: fc-loader-in 1ms 250ms both;
+}
+.fc-ghost i {
+  position: absolute;
+  top: 0;
+  left: calc((var(--k) + 1) * var(--s) - var(--bw) / 2);
+  width: var(--bw);
+  /* One colour, the forecast's amber (ChartArea FORECAST): green and red would read as a predicted direction. */
+  color: #ffd54f;
+  opacity: 0;
+  animation: fc-ghost 3s calc(var(--k) * var(--step)) infinite ease-out;
+}
+.fc-ghost i::before,
+.fc-ghost i::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+}
+.fc-ghost i::before {
+  left: calc(50% - 0.5px);
+  width: 1px;
+  top: calc(var(--hi) * var(--u) * -1);
+  height: calc((var(--hi) - var(--lo)) * var(--u));
+}
+.fc-ghost i::after {
+  left: 0;
+  right: 0;
+  top: calc(var(--top) * var(--u) * -1);
+  height: max(1px, calc(var(--body) * var(--u)));
+  border-radius: 1px;
+}
+@keyframes fc-ghost {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  18% {
+    opacity: 0.45;
+    transform: none;
+  }
+  65% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .fc-loader i {
     animation: none;
     opacity: 0.8;
+  }
+  .fc-ghost i {
+    animation: none;
+    opacity: 0.35;
   }
 }
