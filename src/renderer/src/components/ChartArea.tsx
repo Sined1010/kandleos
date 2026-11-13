@@ -345,9 +345,10 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
         setData([...bars])
         timezoneRef.current = timezone
         useChartMeta.setState({ symbol, currency, timeZone: timezone })
-        setStatus(null)
         older.current.provider = provider
+        // Over the stored copy "Loading …" stays until fresh candles come: old bars must not pass for current ones.
         if (!fresh) return
+        setStatus(null)
         // The chart applies the new view on its next frame and reports the previous chart's view before it;
         // its frame was requested first, so by this one only the new view counts.
         requestAnimationFrame(() => {

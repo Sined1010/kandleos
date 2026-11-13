@@ -12,6 +12,7 @@ import { useUnseen } from '../renderer/src/components/EventsButton'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
 import { ask as confirmBox } from './MessageBox'
+import { notice } from './Notice'
 import TabButton from './TabButton'
 import TimeframeGrid from './TimeframeGrid'
 import { useBack } from './useBack'
@@ -50,13 +51,17 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
       return
     }
     const s = useStore.getState()
+    const add = (id: string, folder: string) => {
+      s.addToFolder(id, symbol)
+      notice(t('Zu „{name}“ hinzugefügt', { name: folder }))
+    }
     setMenu({
       title: t('Zur Watchlist hinzufügen …'),
       items: [
-        ...s.folders.map((f) => ({ label: f.name, onPick: () => s.addToFolder(f.id, symbol) })),
+        ...s.folders.map((f) => ({ label: f.name, onPick: () => add(f.id, f.name) })),
         {
           label: t('Neuer Ordner …'),
-          onPick: () => setAsk({ title: t('Neuer Ordner'), ok: t('Anlegen'), onOk: (n) => s.addToFolder(s.addFolder(n), symbol) })
+          onPick: () => setAsk({ title: t('Neuer Ordner'), ok: t('Anlegen'), onOk: (n) => add(s.addFolder(n), n) })
         }
       ]
     })

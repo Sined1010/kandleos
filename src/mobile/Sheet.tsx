@@ -83,7 +83,8 @@ export default function Sheet({ pos, onPos, head, children }: { pos: SheetPos; o
       <div
         className="shrink-0 touch-none"
         onPointerDown={(e) => {
-          if ((e.target as HTMLElement).closest('button')) return
+          // A search hit is no tap on the sheet either: it folds the sheet itself and would open it again.
+          if ((e.target as HTMLElement).closest('button, [role="option"]')) return
           // The search field fills most of the low sheet: a tap must still focus it, so a drag
           // only starts there once the finger has moved.
           down(e, (e.target as HTMLElement).closest('input') ? 6 : 0)

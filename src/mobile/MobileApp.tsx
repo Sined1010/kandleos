@@ -1,3 +1,4 @@
+import { App as CapApp } from '@capacitor/app'
 import { useEffect, useState } from 'react'
 import { t } from '../shared/i18n'
 import AboutModal from '../renderer/src/components/AboutModal'
@@ -24,6 +25,7 @@ import Layer from './Layer'
 import Licenses from './Licenses'
 import MessageBox from './MessageBox'
 import MobileHeader, { FullscreenBar } from './MobileHeader'
+import Notice from './Notice'
 import { setFullscreen } from './statusBar'
 import { shareChart } from './share'
 import type { SheetPos } from './sheetSnap'
@@ -48,6 +50,18 @@ export default function MobileApp() {
   const [alarmFor, setAlarmFor] = useState<string | null>(null)
   useEffect(() => startAlarmWatch(), [])
   useEffect(() => startLink(), [])
+  // Back after more than 5 minutes away: the chart loads afresh. Live prices only move the last candle, so the
+  // candles of the time away would be missing (and a chart left open for weeks would show weeks-old candles).
+  const [wake, setWake] = useState(0)
+  useEffect(() => {
+    let away = 0
+    const pause = CapApp.addListener('pause', () => void (away = Date.now()))
+    const resume = CapApp.addListener('resume', () => away && Date.now() - away > 5 * 60_000 && setWake((n) => n + 1))
+    return () => {
+      void pause.then((l) => l.remove())
+      void resume.then((l) => l.remove())
+    }
+  }, [])
   const pc = usePcStatus()
   const [saving, setSaving] = useState(false)
   const symbol = useStore((s) => s.symbol)
@@ -123,7 +137,7 @@ export default function MobileApp() {
       {/* The low sheet (grip + search) and the drawing tools both cover the bottom 96 px; the chart ends above
           them and keeps its size when drawing starts. */}
       <main className="relative mb-24 min-h-0 flex-1">
-        <ChartBoundary key={activeTab}>
+        <ChartBoundary key={`${activeTab}:${wake}`}>
           <ChartArea full={full} />
         </ChartBoundary>
       </main>
@@ -213,6 +227,7 @@ export default function MobileApp() {
       {(!disclaimerAccepted || !stockSource) && <WelcomeModal onOpenAbout={() => setAbout(true)} />}
       {about && <AboutModal onClose={() => setAbout(false)} />}
       <MessageBox />
+      <Notice />
     </div>
   )
 }

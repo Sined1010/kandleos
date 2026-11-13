@@ -145,39 +145,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
     ]
   })
 
-  const newFolder = (then?: (id: string) => void) =>
-    setAsk({
-      title: t('Neuer Ordner'),
-      ok: t('Anlegen'),
-      onOk: (n) => {
-        const id = s.addFolder(n)
-        then?.(id)
-      }
-    })
-  const addTo = (symbol: string, id: string) => {
-    s.addToFolder(id, symbol)
-    open(symbol)
-  }
-  // A found value: look at it, or add it; the folders only come after "add to watchlist".
-  const picked = (symbol: string) =>
-    setMenu({
-      title: s.names[symbol] ?? symbol,
-      items: [
-        { label: t('Ansehen'), onPick: () => open(symbol) },
-        {
-          label: t('Zur Watchlist hinzufügen …'),
-          disabled: folders.length > 0 && folders.every((f) => f.symbols.includes(symbol)),
-          onPick: () =>
-            setMenu({
-              title: t('Zur Watchlist hinzufügen …'),
-              items: [
-                ...folders.map((f) => ({ label: f.name, disabled: f.symbols.includes(symbol), onPick: () => addTo(symbol, f.id) })),
-                { label: t('Neuer Ordner …'), onPick: () => newFolder((id) => addTo(symbol, id)) }
-              ]
-            })
-        }
-      ]
-    })
+  const newFolder = () => setAsk({ title: t('Neuer Ordner'), ok: t('Anlegen'), onOk: (n) => void s.addFolder(n) })
 
   // Reordering by the grip: the row under the finger is the drop target.
   const dropAt = (x: number, y: number): Drop | null => {
@@ -198,7 +166,8 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
             <SymbolSearch
               compact
               placeholder={t('Aktien, ETF oder Krypto suchen')}
-              onPick={picked}
+              // A found value opens at once; the star in the header adds it to the watchlist.
+              onPick={open}
               inputClassName="w-full rounded-xl bg-bg py-2.5 pl-10 pr-3 text-base text-white outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent"
             />
             <div className="flex items-center">
