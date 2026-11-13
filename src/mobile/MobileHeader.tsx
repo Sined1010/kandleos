@@ -1,4 +1,4 @@
-import { Bell, Check, ChevronDown, Maximize, Minimize, MoreVertical, Pencil, SlidersHorizontal, Star } from 'lucide-react'
+import { Bell, Check, ChevronDown, Maximize, Minimize, MoreVertical, Pencil, SlidersHorizontal } from 'lucide-react'
 import { useState, type MouseEvent } from 'react'
 import { t } from '../shared/i18n'
 import { tfLabel } from '../shared/types'
@@ -11,7 +11,7 @@ import { useQuotes, useStore } from '../renderer/src/store/useStore'
 import { useUnseen } from '../renderer/src/components/EventsButton'
 import ActionMenu, { type ActionItem } from './ActionMenu'
 import AskDialog, { type Ask } from './AskDialog'
-import { ask as confirmBox } from './MessageBox'
+import WatchStar, { removeFromWatchlist } from '../renderer/src/components/WatchStar'
 import { notice } from './Notice'
 import TabButton from './TabButton'
 import TimeframeGrid from './TimeframeGrid'
@@ -42,14 +42,8 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
   const name = names[symbol] ?? symbol
   const inWatchlist = folders.some((f) => f.symbols.includes(symbol))
 
-  const star = async () => {
-    if (inWatchlist) {
-      if (await confirmBox(t('„{name}“ aus der Watchlist löschen?', { name }), t('Löschen'), { danger: true })) {
-        const s = useStore.getState()
-        for (const f of s.folders) if (f.symbols.includes(symbol)) s.removeFromFolder(f.id, symbol)
-      }
-      return
-    }
+  const star = () => {
+    if (inWatchlist) return void removeFromWatchlist(symbol)
     const s = useStore.getState()
     const add = (id: string, folder: string) => {
       s.addToFolder(id, symbol)
@@ -72,16 +66,14 @@ export default function MobileHeader(p: { drawing: boolean; onDraw(): void; onMe
       <div className="flex items-center gap-2 px-2 pt-1">
         <TabButton />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-[15px] font-bold text-white">{name}</span>
-            <button
+            <WatchStar
+              on={inWatchlist}
               onClick={star}
-              aria-label={inWatchlist ? t('Aus Watchlist löschen') : t('Zur Watchlist hinzufügen …')}
-              aria-pressed={inWatchlist}
-              className="flex h-8 w-8 shrink-0 items-center justify-center text-muted active:text-white"
-            >
-              <Star size={16} fill={inWatchlist ? 'currentColor' : 'none'} />
-            </button>
+              title={inWatchlist ? t('Aus Watchlist löschen') : t('Zur Watchlist hinzufügen …')}
+              small
+            />
           </div>
           <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
             <MarketBadge symbol={symbol} timeZone={timeZone} plain />

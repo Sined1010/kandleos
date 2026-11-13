@@ -1,4 +1,5 @@
-import { Activity, Bell, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Plus, Search, Settings } from 'lucide-react'
+import { Activity, Bell, ChevronDown, Folder as FolderIcon, FolderPlus, Info, Search, Settings } from 'lucide-react'
+import WatchStar, { removeFromWatchlist } from './WatchStar'
 import { useState } from 'react'
 import { locale, msg, t } from '../../../shared/i18n'
 import { isCrypto, tfLabel, type StockSource, type Timeframe } from '../../../shared/types'
@@ -206,13 +207,13 @@ function FeedBadge({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** Shown only while the open chart is in no folder; puts it into the chosen one. */
+/** The star as on the phone: adds the open chart to the chosen folder, or (blue, already in one) takes it out. */
 function AddToWatchlist({ symbol }: { symbol: string }) {
   const folders = useStore((s) => s.folders)
   const addToFolder = useStore((s) => s.addToFolder)
   const addFolder = useStore((s) => s.addFolder)
   const [open, setOpen] = useState(false)
-  if (folders.some((f) => f.symbols.includes(symbol))) return null
+  const inWatchlist = folders.some((f) => f.symbols.includes(symbol))
 
   const put = (folderId: string) => {
     addToFolder(folderId, symbol)
@@ -221,15 +222,12 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
   const item = 'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-bg'
   return (
     <div className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        title={t('{symbol} zur Watchlist hinzufügen', { symbol })}
-        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-accent ring-1 ring-accent/50 transition hover:bg-accent/15 hover:shadow-glow"
-      >
-        <Plus size={14} /> Watchlist
-      </button>
-      {open && (
+      <WatchStar
+        on={inWatchlist}
+        onClick={() => (inWatchlist ? void removeFromWatchlist(symbol) : setOpen((o) => !o))}
+        title={inWatchlist ? t('Aus Watchlist löschen') : t('{symbol} zur Watchlist hinzufügen', { symbol })}
+      />
+      {open && !inWatchlist && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-line bg-panel/95 backdrop-blur py-1 shadow-2xl shadow-black/50">
