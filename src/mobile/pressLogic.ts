@@ -15,6 +15,7 @@ export function createPress(o: {
   let swallow = false
   let fired = false // the long press of this touch has fired
   let tapped = false // this touch's tap fired on lifting the finger: its click, whatever its detail, is no second tap
+  let touched = false // a finger or mouse went down on this element since its last click
   const cancel = () => {
     if (start) o.clearTimer(start.timer)
     start = null
@@ -25,6 +26,7 @@ export function createPress(o: {
       swallow = false
       fired = false
       tapped = false
+      touched = true
       const timer = o.setTimer(() => {
         start = null
         swallow = true
@@ -60,6 +62,11 @@ export function createPress(o: {
     },
     /** detail 0: a click without a pointer (keyboard, TalkBack), never swallowed. */
     click(detail?: number) {
+      const ghost = !!detail && !touched
+      touched = false
+      // A pointer click whose finger went down elsewhere: the tap there replaced what was under the finger
+      // (a folder tile opens its folder) and the browser's click lands on this element in its place.
+      if (ghost) return
       if (tapped) tapped = false
       else if (swallow && detail !== 0) swallow = false
       else {

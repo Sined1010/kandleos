@@ -95,6 +95,16 @@ test('a click without a pointer (keyboard, TalkBack) is never swallowed', () => 
   assert.deepEqual(log, ['tap'])
 })
 
+test('a pointer click without a finger down on this element (it appeared under the finger) is ignored', () => {
+  const { log, press } = setup()
+  press.click(1)
+  assert.deepEqual(log, [])
+  press.down(0, 0)
+  press.up()
+  press.click(1)
+  assert.deepEqual(log, ['tap'])
+})
+
 test('right click or the menu key opens the long-press action', () => {
   const { log, press } = setup()
   press.contextMenu()
