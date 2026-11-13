@@ -128,19 +128,20 @@ const toCandle = (b: any): Candle => ({ time: Date.parse(b.t) / 1000, open: b.o,
 async function bars(symbol: string, timeframe: string, start: Date, feed: 'sip' | 'iex', end?: Date): Promise<Candle[]> {
   const out: Candle[] = []
   let page: string | undefined
-  // Pages of up to 10,000 bars, oldest first; a few are plenty for the spans above.
+  // Pages of up to 10,000 bars, newest first: Alpaca may send smaller pages, and if the pages run out, only the
+  // oldest history is missing (oldest first, the chart ended months ago and jumped to today's IEX bars).
   for (let i = 0; i < 5; i++) {
     const d = await request(
       `${DATA}/stocks/bars?symbols=${encodeURIComponent(symbol)}&timeframe=${timeframe}&start=${start.toISOString()}` +
         (end ? `&end=${end.toISOString()}` : '') +
-        `&limit=10000&adjustment=split&feed=${feed}` +
+        `&limit=10000&sort=desc&adjustment=split&feed=${feed}` +
         (page ? `&page_token=${encodeURIComponent(page)}` : '')
     )
     out.push(...(d.bars?.[symbol] ?? []).map(toCandle))
     page = d.next_page_token ?? undefined
     if (!page) break
   }
-  return out
+  return out.reverse()
 }
 
 /**
