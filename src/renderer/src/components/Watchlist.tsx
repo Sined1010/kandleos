@@ -862,7 +862,7 @@ function PinnedSection({ tiles, onMenu }: { tiles: boolean; onMenu: (row: RowAt)
   const order = useSortedSymbols(usePinned())
   if (!order.length) return null
   return (
-    <section className="border-b border-line pb-1">
+    <section className="border-b border-line bg-accent/[0.06] pb-1">
       <div className="flex items-center gap-1.5 px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
         <Pin size={12} className="text-accent" />
         <span>

@@ -386,7 +386,7 @@ function FolderHead(p: { folder: Folder; onToggle(): void; onMenu(): void }) {
 /** Heading of the pinned symbols, above the folders. */
 function PinnedHead({ count }: { count: number }) {
   return (
-    <div className="flex min-h-11 items-center gap-1.5 bg-bg/60 px-3 text-xs uppercase tracking-wider text-muted">
+    <div className="flex min-h-11 items-center gap-1.5 px-3 text-xs uppercase tracking-wider text-muted">
       <Pin size={14} className="shrink-0 text-accent" />
       <span className="font-semibold">{t('Angeheftet')}</span>
       <span className="shrink-0">· {count}</span>
@@ -400,7 +400,7 @@ function PinnedRows(p: { shown: boolean; onOpen(symbol: string): void; onMenu(sy
   if (!order.length) return null
   const none = () => {}
   return (
-    <section>
+    <section className="mb-2 bg-accent/[0.06]">
       <PinnedHead count={order.length} />
       {order.map((sym) => (
         <Row
@@ -426,7 +426,7 @@ function PinnedTiles(p: { shown: boolean; onOpen(symbol: string): void; onMenu(s
   const order = useSortedSymbols(usePinned(), p.shown)
   if (!order.length) return null
   return (
-    <section className="mb-2 border-b border-line pb-3">
+    <section className="mb-2 border-b border-line bg-accent/[0.06] pb-3">
       <PinnedHead count={order.length} />
       <div className="grid grid-cols-2 gap-2 px-3 pt-2">
         {order.map((sym) => (
