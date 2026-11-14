@@ -89,3 +89,10 @@ export const sortOptions = (): { value: WatchSort; label: string }[] => [
   { value: 'down', label: t('Tagesänderung – schwächste zuerst') },
   { value: 'name', label: t('Name A–Z') }
 ]
+
+/** Pinned symbols still in the watchlist (a sync can bring a pin whose symbol the other device just removed). */
+export const usePinned = (): string[] =>
+  useStore(useShallow((s) => s.pinned.filter((x) => s.folders.some((f) => f.symbols.includes(x)))))
+
+/** The first folder holding the symbol: a pinned row's menu moves or removes it there. */
+export const folderOf = (symbol: string): string => useStore.getState().folders.find((f) => f.symbols.includes(symbol))?.id ?? ''

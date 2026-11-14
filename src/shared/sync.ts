@@ -16,6 +16,7 @@ export type Stamps = Record<UnitKey, number>
 
 export interface SyncSlice {
   folders: Folder[]
+  pinned: string[]
   names: Record<string, string>
   tabs: ChartTab[]
   drawings: Record<string, Drawing[]>
@@ -41,7 +42,7 @@ export function stable(v: unknown): string {
 }
 
 /**
- * Keys: folder:<id> (name) · entry:<folderId>:<symbol> · order:folders · order:<folderId> · name:<symbol> ·
+ * Keys: folder:<id> (name) · entry:<folderId>:<symbol> · order:folders · order:<folderId> · pin:<symbol> · order:pins · name:<symbol> ·
  * tab:<id> · order:tabs · drawing:<tabId>:<symbol>:<id> · chart:<id> · indicators · alarm:<id>.
  * Left out on purpose: whether a folder is collapsed and how far an alarm is checked (both per device).
  */
@@ -53,6 +54,9 @@ export function unitsOf(s: SyncSlice): Units {
     u[`order:${f.id}`] = stable(f.symbols)
     for (const sym of f.symbols) u[`entry:${f.id}:${sym}`] = '1'
   }
+  // One unit per pin, like the folder entries: a pin made on each device survives the merge, the list only orders.
+  u['order:pins'] = stable(s.pinned)
+  for (const sym of s.pinned) u[`pin:${sym}`] = '1'
   for (const [sym, name] of Object.entries(s.names)) u[`name:${sym}`] = stable(name)
   u['order:tabs'] = stable(s.tabs.map((t) => t.id))
   for (const { id, ...tab } of s.tabs) u[`tab:${id}`] = stable(tab)
@@ -145,12 +149,18 @@ function normalize(out: Units, sources: Units[]): Units {
   }
   const folders = Object.keys(out).filter((k) => k.startsWith('folder:')).map((k) => k.slice(7))
   fixOrder(out, 'order:folders', folders)
-  for (const k of Object.keys(out)) if (k.startsWith('order:') && k !== 'order:folders' && k !== 'order:tabs' && !folders.includes(k.slice(6))) delete out[k]
+  const lists = ['order:folders', 'order:tabs', 'order:pins']
+  for (const k of Object.keys(out)) if (k.startsWith('order:') && !lists.includes(k) && !folders.includes(k.slice(6))) delete out[k]
   for (const f of folders) {
     const prefix = `entry:${f}:`
     fixOrder(out, `order:${f}`, Object.keys(out).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length)))
   }
   fixOrder(out, 'order:tabs', Object.keys(out).filter((k) => k.startsWith('tab:')).map((k) => k.slice(4)))
+  // A pin whose symbol is in no folder any more (removed on one side, pinned on the other) goes too: re-adding the
+  // symbol later must not bring the pin back.
+  const kept = new Set(Object.keys(out).filter((k) => k.startsWith('entry:')).map((k) => k.slice(k.indexOf(':', 6) + 1)))
+  for (const k of Object.keys(out)) if (k.startsWith('pin:') && !kept.has(k.slice(4))) delete out[k]
+  fixOrder(out, 'order:pins', Object.keys(out).filter((k) => k.startsWith('pin:')).map((k) => k.slice(4)))
   return out
 }
 
@@ -207,6 +217,7 @@ export function firstMerge(pc: SyncSlice, phone: SyncSlice, tabLabel: string, cl
   return {
     slice: {
       folders,
+      pinned: [...pc.pinned, ...phone.pinned.filter((x) => !pc.pinned.includes(x))],
       names: { ...phone.names, ...pc.names },
       tabs: pc.tabs,
       drawings: pc.drawings,
@@ -256,6 +267,7 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
       const symbols = list(u[`order:${id}`]).filter((sym): sym is string => str(sym) && u[`entry:${id}:${sym}`] !== undefined)
       return [{ id, name: f.name, symbols, collapsed: keep.folders.find((k) => k.id === id)?.collapsed ?? false }]
     })
+  const pinned = list(u['order:pins']).filter((sym): sym is string => str(sym) && u[`pin:${sym}`] !== undefined)
   const names: Record<string, string> = {}
   for (const k of keys) if (k.startsWith('name:')) {
     const n = parse<unknown>(u[k], null)
@@ -300,7 +312,7 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
     }),
     keep.alarms
   )
-  return { folders, names, tabs, drawings, charts, indicators: cleanIndicators(keep.indicators, indicators), alarms }
+  return { folders, pinned, names, tabs, drawings, charts, indicators: cleanIndicators(keep.indicators, indicators), alarms }
 }
 
 /**
@@ -341,7 +353,7 @@ const KEEP_BASES = 3
 // Same as MAX_TABS in the store (not imported: this file must run without the window).
 const MAX_TABS = 3
 const UNIT_KEY =
-  /^(indicators|order:folders|order:tabs|(folder|order|name|tab|chart|alarm):[^:\s]{1,200}|entry:[^:\s]{1,200}:[^:\s]{1,40}|drawing:[^:\s]{1,200}:[^:\s]{1,40}:[^:\s]{1,200})$/
+  /^(indicators|order:folders|order:tabs|(folder|order|name|tab|chart|alarm|pin):[^:\s]{1,200}|entry:[^:\s]{1,200}:[^:\s]{1,40}|drawing:[^:\s]{1,200}:[^:\s]{1,40}:[^:\s]{1,200})$/
 const MAX_UNITS = 100_000
 const MAX_VALUE = 300_000
 
@@ -351,7 +363,8 @@ const MAX_VALUE = 300_000
  * when their formats differ ('sync-format'); builds from before this field count as 1. Raise it whenever the checks
  * behind sliceOf (checkDrawing, TIMEFRAMES, RANGES, alarms, tabs, charts) accept something new.
  */
-export const SYNC_FORMAT = 1
+// 2: pinned watchlist symbols (pin:<symbol>, order:pins); a format-1 device would drop them and unpin everywhere.
+export const SYNC_FORMAT = 2
 const formatOf = (v: Record<string, unknown>): number => (typeof v.format === 'number' && Number.isFinite(v.format) ? v.format : 1)
 
 export interface SyncRequest {

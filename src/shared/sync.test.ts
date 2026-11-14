@@ -5,6 +5,7 @@ import { stampChanges, unitsOf, type SyncSlice } from './sync.ts'
 const indicators = { sma: { on: true, period: 20 } } as unknown as SyncSlice['indicators']
 const slice = (over: Partial<SyncSlice> = {}): SyncSlice => ({
   folders: [{ id: 'f1', name: 'Crypto', symbols: ['BTCUSDT', 'ETHUSDT'], collapsed: false }],
+  pinned: [],
   names: { BTCUSDT: 'Bitcoin' },
   tabs: [{ id: 't1', symbol: 'BTCUSDT', timeframe: '1h', range: null }],
   drawings: { 't1:BTCUSDT': [{ id: 'd1', type: 'hline', price: 100 }, { id: 'd2', type: 'vline', time: 5 }] },
@@ -107,6 +108,45 @@ test('a symbol removed on one side and untouched on the other is gone, and stays
   const out = mergeUnits(base, base, phone, {}, { 'order:f1': 5, 'entry:f1:ETHUSDT': 5 }, 0)
   assert.equal(out['entry:f1:ETHUSDT'], undefined)
   assert.deepEqual(JSON.parse(out['order:f1']), ['BTCUSDT'])
+})
+
+test('pins: one made on each side are both kept; one unpinned on one side is gone', () => {
+  const folders = [{ id: 'f1', name: 'Crypto', symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'], collapsed: false }]
+  const base = pcU({ folders, pinned: ['BTCUSDT'] })
+  const pc = pcU({ folders, pinned: ['BTCUSDT', 'ETHUSDT'] })
+  const phone = pcU({ folders, pinned: ['SOLUSDT'] })
+  const out = mergeUnits(base, pc, phone, { 'order:pins': 5, 'pin:ETHUSDT': 5 }, { 'order:pins': 6, 'pin:BTCUSDT': 6, 'pin:SOLUSDT': 6 }, 0)
+  assert.deepEqual(sliceOf(out, slice()).pinned, ['SOLUSDT', 'ETHUSDT'])
+})
+
+test('pins after the update: a base without any pin units keeps the pin made on one side', () => {
+  const { 'order:pins': _, ...base } = pcU()
+  const pc = pcU()
+  const phone = pcU({ pinned: ['ETHUSDT'] })
+  const out = mergeUnits(base, pc, phone, { 'order:pins': 5 }, { 'order:pins': 9, 'pin:ETHUSDT': 9 }, 0)
+  assert.deepEqual(sliceOf(out, slice()).pinned, ['ETHUSDT'])
+  // Both stamped the list at their first start; the later, empty one must not drop the pin.
+  const late = mergeUnits(base, pc, phone, { 'order:pins': 50 }, { 'order:pins': 9, 'pin:ETHUSDT': 9 }, 0)
+  assert.deepEqual(sliceOf(late, slice()).pinned, ['ETHUSDT'])
+})
+
+test('a symbol removed on the PC while the phone pinned it: the pin goes with it', () => {
+  const base = pcU()
+  const pc = pcU({ folders: [{ id: 'f1', name: 'Crypto', symbols: ['BTCUSDT'], collapsed: false }] })
+  const phone = pcU({ pinned: ['ETHUSDT'] })
+  const out = mergeUnits(base, pc, phone, { 'order:f1': 5, 'entry:f1:ETHUSDT': 5 }, { 'order:pins': 6, 'pin:ETHUSDT': 6 }, 0)
+  assert.equal(out['pin:ETHUSDT'], undefined)
+  assert.deepEqual(sliceOf(out, slice()).pinned, [])
+})
+
+test('a request with pins passes the input check', () => {
+  const units = unitsOf(slice({ pinned: ['BTCUSDT'] }))
+  assert.ok(checkSyncRequest({ format: SYNC_FORMAT, units, stamps: {}, phoneNow: 1, baseId: null }))
+})
+
+test('first merge joins the pins of both sides', () => {
+  const out = firstMerge(slice({ pinned: ['BTCUSDT'] }), slice({ pinned: ['ETHUSDT', 'BTCUSDT'] }), 'Tab vom Handy', ' (Handy)')
+  assert.deepEqual(out.slice.pinned, ['BTCUSDT', 'ETHUSDT'])
 })
 
 test('phone deletes a folder the PC just added a symbol to → the folder comes back with it', () => {

@@ -9,6 +9,8 @@ import {
   LayoutGrid,
   List,
   Pencil,
+  Pin,
+  PinOff,
   Plus,
   Trash2,
   X
@@ -16,7 +18,7 @@ import {
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { t } from '../../../shared/i18n'
-import { isCrypto } from '../../../shared/types'
+import { isCrypto, type Quote } from '../../../shared/types'
 import { formatChange, formatPrice } from '../lib/format'
 import { insertTarget } from '../lib/watchlist'
 import { MAX_TABS, useQuotes, useStore, type Folder } from '../store/useStore'
@@ -27,9 +29,10 @@ import { openEvents } from '../services/events'
 import { useEventsUi } from '../store/eventsUi'
 import { InfoPanel } from './CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from './MarketBadge'
-import { AlarmMark, AvgText, ChangePill, FolderAvg, round2, sortOptions, useSortedSymbols } from './WatchParts'
+import { AlarmMark, AvgText, ChangePill, folderOf, FolderAvg, round2, sortOptions, usePinned, useSortedSymbols } from './WatchParts'
 import { avgChange } from '../lib/watchlist'
 import SymbolSearch from './SymbolSearch'
+import { removeFromWatchlist } from './WatchStar'
 import { ask } from '../../../mobile/MessageBox'
 
 type Drag = RefObject<{ symbol: string; from: string } | null>
@@ -39,7 +42,7 @@ const DRAG_TYPE = 'application/x-kandleos-symbol'
  * A right-clicked watchlist row: which symbol in which folder, where the mouse was, the row's left edge and how
  * to start renaming it (the row edits its own name).
  */
-type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number; rename: () => void }
+type RowAt = { symbol: string; folderId: string; x: number; y: number; left: number; rename?: () => void; pinned?: true }
 type MenuItem = { label: string; run?: () => void; reason?: string; danger?: boolean }
 
 const deleteFolder = async (f: Folder) => {
@@ -281,6 +284,7 @@ export default function Watchlist() {
         </div>
       )}
       <div className={`flex-1 overflow-y-auto pb-6 ${side === 'events' ? 'hidden' : ''}`}>
+        {(view === 'list' || !open) && <PinnedSection tiles={view !== 'list'} onMenu={setMenu} />}
         {(view === 'list' ? folders : open ? [open] : []).map((f) => (
           <FolderSection
             key={f.id}
@@ -369,6 +373,7 @@ function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onAla
   const setSymbol = useStore((s) => s.setSymbol)
   const addTab = useStore((s) => s.addTab)
   const tabsFull = useStore((s) => s.tabs.length >= MAX_TABS)
+  const pinned = useStore((st) => st.pinned.includes(at.symbol))
   const s = at.symbol
   const items: MenuItem[] = [
     { label: t('Öffnen'), run: () => setSymbol(s) },
@@ -382,11 +387,12 @@ function RowMenu(props: { at: RowAt; canMove: boolean; onInfo: () => void; onAla
             setSymbol(s)
           }
         },
+    { label: pinned ? t('Nicht mehr anheften') : t('Oben anheften'), run: () => useStore.getState().togglePin(s) },
     isCrypto(s) ? { label: t('Infos zum Wert'), reason: t('Infos gibt es nur für Aktien.') } : { label: t('Infos zum Wert'), run: onInfo },
     { label: t('Kurs-Alarm …'), run: onAlarm },
-    { label: t('Umbenennen'), run: at.rename },
+    ...(at.rename ? [{ label: t('Umbenennen'), run: at.rename }] : []),
     canMove ? { label: t('Verschieben nach …'), run: onMove } : { label: t('Verschieben nach …'), reason: t('Kein anderer Ordner') },
-    { label: t('Aus Watchlist löschen'), run: () => removeSymbol(at.folderId, s), danger: true }
+    { label: t('Aus Watchlist löschen'), run: () => (at.pinned ? removeFromWatchlist(s) : removeSymbol(at.folderId, s)), danger: true }
   ]
   return <ContextMenu x={at.x} y={at.y} label={t('Aktionen für {symbol}', { symbol: s })} items={items} onClose={onClose} />
 }
@@ -689,36 +695,15 @@ function FolderSection(props: SectionProps) {
                   {names[s] && <span className="block truncate text-[10px] text-muted">{s}</span>}
                 </span>
               )
-            const price = (
-              <span className={`tabular-nums ${tiles ? 'text-xs' : 'text-right'}`}>
-                {q ? formatPrice(q.price) : '—'}
-                {q?.ext && (
-                  <span
-                    className={`flex items-center gap-1 text-[10px] text-muted ${tiles ? '' : 'justify-end'}`}
-                    title={extTitle(q.ext)}
-                  >
-                    <ExtIcon phase={q.ext.phase} />
-                    {formatPrice(q.ext.price)}
-                  </span>
-                )}
-              </span>
-            )
-            const change = (
-              <span className={`text-right tabular-nums ${tiles ? 'ml-auto shrink-0' : 'w-16 group-hover/row:hidden'}`}>
-                <ChangePill change={q?.changePct} className={tiles ? 'inline-block px-1.5 py-px text-[11px]' : 'block py-0.5 text-[11px]'} />
-                {q?.ext && (
-                  <span className={`block text-[10px] ${q.ext.changePct >= 0 ? 'text-up/80' : 'text-down/80'}`}>
-                    {formatChange(q.ext.changePct)}
-                  </span>
-                )}
-              </span>
-            )
+            const price = <RowPrice q={q} tiles={tiles} />
+            const change = <RowChange q={q} tiles={tiles} />
             const buttons = (
               <div
                 className={`hidden gap-1.5 group-hover/row:flex ${
                   tiles ? 'absolute right-1 top-1 rounded bg-panel/90 px-1 py-0.5' : 'w-16 justify-end'
                 }`}
               >
+                <PinButton symbol={s} />
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -822,6 +807,120 @@ function FolderSection(props: SectionProps) {
         </div>
       )}
     </section>
+  )
+}
+
+function RowPrice({ q, tiles }: { q?: Quote; tiles: boolean }) {
+  return (
+    <span className={`tabular-nums ${tiles ? 'text-xs' : 'text-right'}`}>
+      {q ? formatPrice(q.price) : '—'}
+      {q?.ext && (
+        <span className={`flex items-center gap-1 text-[10px] text-muted ${tiles ? '' : 'justify-end'}`} title={extTitle(q.ext)}>
+          <ExtIcon phase={q.ext.phase} />
+          {formatPrice(q.ext.price)}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function RowChange({ q, tiles }: { q?: Quote; tiles: boolean }) {
+  return (
+    <span className={`text-right tabular-nums ${tiles ? 'ml-auto shrink-0' : 'w-16 group-hover/row:hidden'}`}>
+      <ChangePill change={q?.changePct} className={tiles ? 'inline-block px-1.5 py-px text-[11px]' : 'block py-0.5 text-[11px]'} />
+      {q?.ext && (
+        <span className={`block text-[10px] ${q.ext.changePct >= 0 ? 'text-up/80' : 'text-down/80'}`}>{formatChange(q.ext.changePct)}</span>
+      )}
+    </span>
+  )
+}
+
+/** Hover button of a row: pins the symbol above the folders, or unpins it. */
+function PinButton({ symbol }: { symbol: string }) {
+  const pinned = useStore((s) => s.pinned.includes(symbol))
+  const label = pinned ? t('{symbol} nicht mehr anheften', { symbol }) : t('{symbol} oben anheften', { symbol })
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        useStore.getState().togglePin(symbol)
+      }}
+      className={pinned ? 'text-accent hover:text-white' : 'text-muted hover:text-white'}
+      title={label}
+      aria-label={label}
+    >
+      {pinned ? <PinOff size={13} /> : <Pin size={13} />}
+    </button>
+  )
+}
+
+/**
+ * Pinned symbols above all folders, looking like folder rows (tiles in the folder view). A click opens, the pin
+ * button or the right-click menu unpins. Neither draggable nor a drop target: moving belongs to the folders.
+ */
+function PinnedSection({ tiles, onMenu }: { tiles: boolean; onMenu: (row: RowAt) => void }) {
+  const order = useSortedSymbols(usePinned())
+  if (!order.length) return null
+  return (
+    <section className="border-b border-line pb-1">
+      <div className="flex items-center gap-1.5 px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
+        <Pin size={12} className="text-accent" />
+        <span>
+          {t('Angeheftet')} <span className="font-normal text-muted/50">{order.length}</span>
+        </span>
+      </div>
+      <div className={tiles ? 'grid grid-cols-2 gap-1.5 px-2 pb-2' : ''}>
+        {order.map((s) => (
+          <PinnedRow key={s} symbol={s} tiles={tiles} onMenu={onMenu} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PinnedRow({ symbol: s, tiles, onMenu }: { symbol: string; tiles: boolean; onMenu: (row: RowAt) => void }) {
+  const q = useQuotes((st) => st.quotes[s])
+  const name = useStore((st) => st.names[s])
+  const active = useStore((st) => st.symbol === s)
+  return (
+    <div
+      title={t('Rechtsklick für weitere Aktionen')}
+      onClick={() => useStore.getState().setSymbol(s)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onMenu({ symbol: s, folderId: folderOf(s), x: e.clientX, y: e.clientY, left: e.currentTarget.getBoundingClientRect().left, pinned: true })
+      }}
+      className={`group/row relative cursor-pointer ${
+        tiles
+          ? `flex min-w-0 flex-col gap-1 rounded-md p-2 ${active ? 'bg-accent/10 ring-1 ring-brand-to' : 'bg-bg/60 hover:bg-bg'}`
+          : `grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 pl-7 pr-3 ${
+              active ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-brand-to)]' : 'hover:bg-bg'
+            }`
+      }`}
+    >
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5">
+          <MarketDot symbol={s} timeZone={q?.timezone} />
+          <span className="truncate font-medium text-white">{name ?? s}</span>
+          <AlarmMark symbol={s} />
+        </span>
+        {name && <span className="block truncate text-[10px] text-muted">{s}</span>}
+      </span>
+      {tiles ? (
+        <span className="flex flex-wrap items-start justify-between gap-x-1 gap-y-0.5">
+          <RowPrice q={q} tiles />
+          <RowChange q={q} tiles />
+        </span>
+      ) : (
+        <>
+          <RowPrice q={q} tiles={false} />
+          <RowChange q={q} tiles={false} />
+        </>
+      )}
+      <div className={`hidden gap-1.5 group-hover/row:flex ${tiles ? 'absolute right-1 top-1 rounded bg-panel/90 px-1 py-0.5' : 'w-16 justify-end'}`}>
+        <PinButton symbol={s} />
+      </div>
+    </div>
   )
 }
 

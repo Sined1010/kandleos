@@ -106,6 +106,10 @@ interface State {
   closeTab: (id: string) => void
   selectTab: (id: string) => void
   folders: Folder[]
+  /** Watchlist symbols kept above all folders, in the order they were pinned; synced like the folders. */
+  pinned: string[]
+  /** Pins a symbol, or unpins it when it is pinned. */
+  togglePin: (symbol: string) => void
   /** The watchlist as a list of folders, or as folder tiles that open one at a time. */
   watchlistView: 'list' | 'folders'
   setWatchlistView: (view: 'list' | 'folders') => void
@@ -231,6 +235,8 @@ const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
 const withSymbol = (f: Folder, symbol: string): Folder =>
   f.symbols.includes(symbol) ? f : { ...f, symbols: [...f.symbols, symbol] }
 const withoutSymbol = (f: Folder, symbol: string): Folder => ({ ...f, symbols: f.symbols.filter((x) => x !== symbol) })
+/** A symbol that left the watchlist is no longer pinned (re-adding it later must not bring the pin back). */
+const keepPins = (pinned: string[], folders: Folder[]) => ({ folders, pinned: pinned.filter((x) => folders.some((f) => f.symbols.includes(x))) })
 
 export const useStore = create<State>()(
   persist(
@@ -264,6 +270,9 @@ export const useStore = create<State>()(
         }),
       // Created on first start, when the language is still the default English.
       folders: [folder('Crypto', ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']), folder('Stocks', ['AAPL', 'NVDA', 'MSFT', 'TSLA'])],
+      pinned: [],
+      togglePin: (symbol) =>
+        set((s) => ({ pinned: s.pinned.includes(symbol) ? s.pinned.filter((x) => x !== symbol) : [...s.pinned, symbol] })),
       watchlistView: 'list',
       setWatchlistView: (watchlistView) => set({ watchlistView }),
       watchlistSort: 'own',
@@ -334,11 +343,11 @@ export const useStore = create<State>()(
         return f.id
       },
       renameFolder: (id, name) => set((s) => mapFolder(s, id, (f) => ({ ...f, name }))),
-      removeFolder: (id) => set((s) => ({ folders: s.folders.filter((f) => f.id !== id) })),
+      removeFolder: (id) => set((s) => keepPins(s.pinned, s.folders.filter((f) => f.id !== id))),
       toggleFolder: (id) => set((s) => mapFolder(s, id, (f) => ({ ...f, collapsed: !f.collapsed }))),
       setAllCollapsed: (collapsed) => set((s) => ({ folders: s.folders.map((f) => ({ ...f, collapsed })) })),
       addToFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withSymbol({ ...f, collapsed: false }, symbol))),
-      removeFromFolder: (id, symbol) => set((s) => mapFolder(s, id, (f) => withoutSymbol(f, symbol))),
+      removeFromFolder: (id, symbol) => set((s) => keepPins(s.pinned, mapFolder(s, id, (f) => withoutSymbol(f, symbol)).folders)),
       moveSymbol: (symbol, fromId, toId, before) =>
         set((s) => ({ folders: moveSymbolTo(s.folders, symbol, fromId, toId, before) })),
       setFinnhubKey: (finnhubKey) => {
@@ -490,6 +499,7 @@ export const useStore = create<State>()(
           // Files from before saved charts have none.
           charts: p.charts ?? [],
           alarms: p.alarms ?? [],
+          pinned: Array.isArray(p.pinned) ? p.pinned.filter((x) => typeof x === 'string') : [],
           sync: { ...emptySync(), ...p.sync }
         }
         // Files from before tabs hold a single chart; it becomes the first tab.
@@ -515,6 +525,7 @@ export const useStore = create<State>()(
         agentsConfig,
         language,
         folders,
+        pinned,
         watchlistView,
         watchlistSort,
         names,
@@ -557,6 +568,7 @@ export const useStore = create<State>()(
         tabs,
         activeTab,
         folders,
+        pinned,
         watchlistView,
         watchlistSort,
         indicators,

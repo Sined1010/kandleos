@@ -9,6 +9,7 @@ import {
   GripVertical,
   LayoutGrid,
   List,
+  Pin,
   Plus,
   Search
 } from 'lucide-react'
@@ -18,8 +19,9 @@ import { isCrypto } from '../shared/types'
 import { InfoPanel } from '../renderer/src/components/CompanyInfo'
 import { ExtIcon, extTitle, MarketDot } from '../renderer/src/components/MarketBadge'
 import SymbolSearch from '../renderer/src/components/SymbolSearch'
+import { removeFromWatchlist } from '../renderer/src/components/WatchStar'
 import { useSymbolNames } from '../renderer/src/components/Watchlist'
-import { AlarmMark, ChangePill, FolderAvg, sortOptions, UpDownCount, useSortedSymbols } from '../renderer/src/components/WatchParts'
+import { AlarmMark, ChangePill, folderOf, FolderAvg, sortOptions, UpDownCount, usePinned, useSortedSymbols } from '../renderer/src/components/WatchParts'
 import { formatChange, formatPrice } from '../renderer/src/lib/format'
 import { MAX_TABS, useQuotes, useStore, type Folder } from '../renderer/src/store/useStore'
 import ActionMenu, { type ActionItem } from './ActionMenu'
@@ -86,7 +88,8 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
     onPos('low')
   }
 
-  const rowMenu = (symbol: string, folderId: string): Menu => {
+  /** pinned: opened from the pinned rows, where deleting means the whole watchlist (the symbol may sit in two folders). */
+  const rowMenu = (symbol: string, folderId: string, pinned?: boolean): Menu => {
     const others = folders.filter((f) => f.id !== folderId)
     return {
       title: s.names[symbol] ?? symbol,
@@ -99,6 +102,10 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
             s.addTab()
             open(symbol)
           }
+        },
+        {
+          label: s.pinned.includes(symbol) ? t('Nicht mehr anheften') : t('Oben anheften'),
+          onPick: () => s.togglePin(symbol)
         },
         { label: t('Infos zum Wert'), disabled: isCrypto(symbol), onPick: () => setInfo(symbol) },
         ...(extraItems?.(symbol) ?? []),
@@ -122,7 +129,9 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
               items: others.map((f) => ({ label: f.name, onPick: () => s.moveSymbol(symbol, folderId, f.id) }))
             })
         },
-        { label: t('Aus Watchlist löschen'), danger: true, onPick: async () =>
+        pinned
+          ? { label: t('Aus Watchlist löschen'), danger: true, onPick: () => void removeFromWatchlist(symbol) }
+          : { label: t('Aus Watchlist löschen'), danger: true, onPick: async () =>
             (await confirmBox(t('„{name}“ aus der Watchlist löschen?', { name: s.names[symbol] ?? symbol }), t('Löschen'), { danger: true })) &&
             s.removeFromFolder(folderId, symbol)
         }
@@ -227,6 +236,7 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
         <div ref={listRef} className="pb-4">
           {view === 'list' && (
             <>
+              {!ordering && <PinnedRows shown={pos !== 'low'} onOpen={open} onMenu={(sym) => setMenu(rowMenu(sym, folderOf(sym), true))} />}
               {folders.map((f) => (
                 <FolderRows
                   shown={pos !== 'low'}
@@ -258,6 +268,9 @@ export default function WatchSheet({ pos, onPos, extraItems }: { pos: SheetPos; 
                 <Plus size={16} /> {t('Neuer Ordner')}
               </button>
             </>
+          )}
+          {view === 'folders' && !openFolder && (
+            <PinnedTiles shown={pos !== 'low'} onOpen={open} onMenu={(sym) => setMenu(rowMenu(sym, folderOf(sym), true))} />
           )}
           {view === 'folders' && !openFolder && (
             <div className="grid grid-cols-3 gap-1.5 px-3 pt-1">
@@ -367,6 +380,60 @@ function FolderHead(p: { folder: Folder; onToggle(): void; onMenu(): void }) {
       {/* Also for a folded folder: the feed covers the whole watchlist. */}
       <FolderAvg symbols={f.symbols} className="ml-auto shrink-0 pl-2 normal-case tracking-normal" />
     </div>
+  )
+}
+
+/** Heading of the pinned symbols, above the folders. */
+function PinnedHead({ count }: { count: number }) {
+  return (
+    <div className="flex min-h-11 items-center gap-1.5 bg-bg/60 px-3 text-xs uppercase tracking-wider text-muted">
+      <Pin size={14} className="shrink-0 text-accent" />
+      <span className="font-semibold">{t('Angeheftet')}</span>
+      <span className="shrink-0">· {count}</span>
+    </div>
+  )
+}
+
+/** Pinned symbols as rows above the folders; a tap opens, a long press is the row menu (which unpins). */
+function PinnedRows(p: { shown: boolean; onOpen(symbol: string): void; onMenu(symbol: string): void }) {
+  const order = useSortedSymbols(usePinned(), p.shown)
+  if (!order.length) return null
+  const none = () => {}
+  return (
+    <section>
+      <PinnedHead count={order.length} />
+      {order.map((sym) => (
+        <Row
+          key={sym}
+          symbol={sym}
+          folder=""
+          marked={false}
+          ordering={false}
+          onOpen={() => p.onOpen(sym)}
+          onMenu={() => p.onMenu(sym)}
+          onGrip={none}
+          onGripMove={none}
+          onGripUp={none}
+        />
+      ))}
+      <div className="h-3" />
+    </section>
+  )
+}
+
+/** Folder view: the pinned symbols as value tiles above the folder tiles. */
+function PinnedTiles(p: { shown: boolean; onOpen(symbol: string): void; onMenu(symbol: string): void }) {
+  const order = useSortedSymbols(usePinned(), p.shown)
+  if (!order.length) return null
+  return (
+    <section className="mb-2 border-b border-line pb-3">
+      <PinnedHead count={order.length} />
+      <div className="grid grid-cols-2 gap-2 px-3 pt-2">
+        {order.map((sym) => (
+          <ValueTile key={sym} symbol={sym} onOpen={() => p.onOpen(sym)} onMenu={() => p.onMenu(sym)} />
+        ))}
+      </div>
+    </section>
   )
 }
 

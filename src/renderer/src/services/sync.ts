@@ -20,7 +20,7 @@ import { useStore } from '../store/useStore'
 
 const sliceOfStore = (): SyncSlice => {
   const s = useStore.getState()
-  return { folders: s.folders, names: s.names, tabs: s.tabs, drawings: s.drawings, charts: s.charts, indicators: s.indicators, alarms: s.alarms }
+  return { folders: s.folders, pinned: s.pinned, names: s.names, tabs: s.tabs, drawings: s.drawings, charts: s.charts, indicators: s.indicators, alarms: s.alarms }
 }
 
 const same = (a: Units, b: Units) => {
@@ -51,7 +51,7 @@ export function startStamping(onLocalChange?: () => void): () => void {
   let timer = 0
   stampNow()
   const unsub = useStore.subscribe((st, prev) => {
-    const synced: (keyof SyncSlice)[] = ['folders', 'names', 'tabs', 'drawings', 'charts', 'indicators', 'alarms']
+    const synced: (keyof SyncSlice)[] = ['folders', 'pinned', 'names', 'tabs', 'drawings', 'charts', 'indicators', 'alarms']
     if (synced.every((k) => st[k] === prev[k])) return
     clearTimeout(timer)
     timer = window.setTimeout(() => stampNow() && onLocalChange?.(), 500)
