@@ -8,9 +8,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Sined1010/kandleos" alt="License: GPL-3.0"></a>
 </p>
 
-A fast, local desktop app for technical chart analysis on **Windows and Linux**, with a built-in
-AI price forecast (Chronos-2) that runs entirely on your computer. An Android app brings charts, watchlist,
-drawings and price alarms to your phone, and paired with your PC also the AI forecast and analysis.
+Local chart analysis for Windows, Linux and Android with a private AI price forecast (Chronos-2), insider deals and a synced watchlist. No cloud, no account.
 
 <p align="center">
   <a href="https://github.com/Sined1010/kandleos/releases/latest"><img src="docs/badges/windows.svg" height="48" alt="Download for Windows"></a>
