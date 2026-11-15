@@ -614,6 +614,10 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     setValueTags(tags)
     return () => {
       list.forEach((i) => chart.removeSeries(i.series))
+      // The data effect below may still run with this list in the same commit (new symbol: new data and flows at
+      // once). setData on a removed series puts its points back on the time scale for good, and every bar after
+      // them then sits at a wrong index (event badges on the wrong candle). Emptied, the old list writes nothing.
+      list.length = 0
       while (chart.panes().length > 1) chart.removePane(chart.panes().length - 1)
     }
   }, [api, indicators, flowBars, flowSupply, flowCoin])

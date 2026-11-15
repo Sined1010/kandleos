@@ -20,8 +20,6 @@ export interface Badge {
   /** Hover/click id (EventLayer: the bar's time, or 'tmp'). */
   id: string
   time: number
-  /** Bar index in the candles, for its high and low. */
-  index: number
   kind: 'buy' | 'sell' | 'mixed' | 'note'
   text: string
   /** Heavy deal (big or in a cluster): longer stem, stronger fill, glow. */
@@ -50,8 +48,11 @@ class Renderer implements IPrimitivePaneRenderer {
       ctx.save()
       ctx.font = FONT
       const placed = badges.flatMap((b) => {
+        // The bar by its time, not by its place in the candles: other series may put their own times on the shared
+        // time scale, and then the two counts differ (the badge hung at another bar's wick).
         const x = chart.timeScale().timeToCoordinate(b.time as Time)
-        const bar = series.dataByIndex(b.index) as CandlestickData | null
+        const at = chart.timeScale().timeToIndex(b.time as Time, false)
+        const bar = at === null ? null : (series.dataByIndex(at) as CandlestickData | null)
         if (x === null || !bar) return []
         const above = b.kind !== 'buy'
         const y = series.priceToCoordinate(above ? bar.high : bar.low)

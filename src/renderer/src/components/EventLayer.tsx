@@ -119,7 +119,6 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
     const list: Badge[] = marks.map((m) => ({
       id: String(m.time),
       time: m.time,
-      index: m.index,
       kind: m.side,
       text: IS_MOBILE ? '' : m.text,
       strong: m.big
@@ -132,10 +131,10 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
         : focused.kind === 'cluster' ? t('Cluster-Kauf')
         : focused.kind === 'transfer' ? t('Übertragung')
         : focused.deal?.volume !== undefined ? shortMoney(focused.deal.volume, focused.deal.currency) : ''
-      list.push({ id: 'tmp', time: tmp, index: focusIndex, kind: 'note', text: IS_MOBILE ? '' : text, strong: false, temp: true })
+      list.push({ id: 'tmp', time: tmp, kind: 'note', text: IS_MOBILE ? '' : text, strong: false, temp: true })
     }
     badges.current?.set(list)
-  }, [marks, tmp, focused, focusIndex])
+  }, [marks, tmp, focused])
 
   /** Events shown for a bar: those of its permanent marker, or the temporary one. */
   const eventsAt = (time: number): ChartEvent[] => {
@@ -212,9 +211,12 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
     const i = base.index.get(jump.id) ?? -1
     if (i < 0) return
     const ts = chart.timeScale()
+    // The bar's place on the time scale, which other series' times can shift against its place in the candles.
+    const at = ts.timeToIndex(base.times[i] as Time, false)
+    if (at === null) return
     const r = ts.getVisibleLogicalRange()
     const w = r ? r.to - r.from : 120
-    ts.setVisibleLogicalRange({ from: i - w / 2, to: i + w / 2 })
+    ts.setVisibleLogicalRange({ from: at - w / 2, to: at + w / 2 })
     useEventsUi.setState({ jump: null })
   }, [jump, base, chart])
 
