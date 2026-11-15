@@ -88,6 +88,7 @@ export default function AboutModal({ onClose }: { onClose: () => void }) {
           <li>{t('Finnhub – Echtzeit-Aktienkurse, Unternehmensinfos, Insider-Geschäfte, Meldungen (8-K) und Firmen-News, nur wenn ein eigener API-Key eingetragen ist')}</li>
           <li>{t('BaFin – Insider-Geschäfte (Directors’ Dealings) deutscher Werte; bei eingeschalteten Events wird beim Öffnen eines deutschen Werts seine ISIN gesendet. Quelle: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de')}</li>
           <li>{t('Deutsche Börse und Wikidata – ISIN und WKN in den Infos zu einem Wert; die Xetra-Liste lädt, sobald du in der Suche eine Ziffer tippst oder bei eingeschalteten Events einen deutschen Wert öffnest (fehlt er darin, wird Wikidata gefragt); bei eingeschalteten Events fragt die App Wikidata außerdem für Werte ohne Insider-Quelle nach einer US-Notierung')}</li>
+          <li>{t('Coin Metrics – tägliche Zu- und Abflüsse von BTC und ETH auf Börsen (Schätzung), nur bei eingeschalteten Events und geöffnetem BTC- oder ETH-Chart, höchstens einmal am Tag; gesendet werden nur Coin, Kennzahlen und Zeitraum. Daten unter CC BY-NC 4.0 (nur nicht kommerzielle Nutzung)')}</li>
           <li>{t('Hugging Face – einmaliger Download des Prognosemodells beim ersten Klick auf „Prognose“')}</li>
           <li>{t('GitHub – Suche nach neuen Versionen, nur wenn in den Einstellungen eingeschaltet (1× täglich) oder per Klick auf „Nach Updates suchen“')}</li>
         </ul>

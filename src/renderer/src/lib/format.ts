@@ -1,5 +1,8 @@
 import { locale } from '../../../shared/i18n.ts'
 
+/** Whole coins without sign, e.g. exchange flows: "23.581". */
+export const wholeCoins = (v: number): string => Math.round(Math.abs(v)).toLocaleString(locale())
+
 export const formatPrice = (p: number): string =>
   p.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: p < 1 ? 6 : p < 10 ? 4 : 2 })
 

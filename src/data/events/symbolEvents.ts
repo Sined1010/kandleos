@@ -4,6 +4,7 @@ import type { InsiderDeal } from '../../shared/events'
 import { bafinDeals } from './bafin'
 import { finnhubFilings, finnhubInsider, finnhubNews } from './finnhub'
 import { wikidataAdr } from '../isin'
+import { coinMetricsFlows, dailyFlows } from './coinmetrics'
 import { createSymbolEvents, germanIsin } from './index'
 
 // The phone puts its own BaFin source here (direct, then through the paired PC; src/mobile/api.ts).
@@ -19,5 +20,6 @@ export const symbolEvents = createSymbolEvents({
   filings: finnhubFilings,
   news: finnhubNews,
   adr: wikidataAdr,
+  flows: dailyFlows((asset) => coinMetricsFlows(asset)),
   now: () => Date.now() / 1000
 })

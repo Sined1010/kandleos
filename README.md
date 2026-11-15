@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
   a backtest on past data and a comparison against simply assuming "the price stays the same". If that simple
   guess would have been closer, KandleOS says so
 - **Organize your watchlist your way:** as many folders as you like, as a list or as folder tiles, with drag & drop, your own names and sorting by daily change
-- **See what insiders do:** board members' buys and sells (BaFin, Finnhub) right at their candle, off until you switch them on
+- **See what insiders do:** board members' buys and sells (BaFin, Finnhub) right at their candle, and for BTC and ETH how many coins move onto and off exchanges each day, off until you switch them on
 - **Free and open source** (GPL-3.0), no subscription, no ads, no paid tier
 
 ## Features
@@ -55,6 +55,9 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
 - **Insider deals in the chart:** buys and sells by board members (BaFin for German stocks, Finnhub for US stocks) as markers
   at their candle and as a list in the Events tab, with clusters, the delay until publication and a short context per deal.
   US stocks also list 8-K filings and company news. Off by default; the Events button switches them on
+- **Exchange flows for BTC and ETH:** how many coins moved onto and off exchanges each day (estimates by Coin Metrics),
+  as bars below the chart with the exchanges' holdings as an optional line, and the unusual days (largest in 90 days) in the
+  Events tab. Coins moving onto an exchange are not sales; the numbers arrive a day later
 - **Back up your data:** export watchlist, drawings, saved charts and settings to one file, API keys only password-encrypted
 - **Android app** with price alarms (in the app, in the background every 15 minutes, or as instant alarms every 15 seconds)
 - **Pair your phone with your PC:** watchlist, drawings, saved charts and alarms stay in sync, alarms also show up on the PC,
@@ -123,6 +126,7 @@ You choose the stock data source on first start; you can change it any time in t
 | Yahoo Finance | Stocks worldwide, indices, commodities, pre-/post-market | not needed, opt-in |
 | [Finnhub](https://finnhub.io/) | Optional real-time trades for US stocks, company info, and for US stocks insider deals, 8-K filings and company news in the Events tab | your own free key |
 | [BaFin](https://portal.mvp.bafin.de/database/DealingsInfo/) | Insider dealings of German companies, last 12 months (Events tab, asked only with events switched on). Source: © Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de | not needed |
+| [Coin Metrics](https://docs.coinmetrics.io/packages/coin-metrics-community-data) | Daily exchange in- and outflows of BTC and ETH (Events tab, only with events switched on and a BTC or ETH chart open, at most once a day). Community data under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): non-commercial use only, which also applies to modified versions of KandleOS | not needed |
 | [Deutsche Börse](https://www.cashmarket.deutsche-boerse.com/cash-en/trading/Tradable-Instruments-Xetra), [Wikidata](https://www.wikidata.org/) | ISIN and WKN in the company info (US stocks: computed from Alpaca's CUSIP); the Xetra list loads once a digit is typed into the search (Yahoo only) or, with events on, a German stock is opened; a German stock missing from it is looked up on Wikidata. With events on, Wikidata is also asked for the US listing (ADR) of a stock without an insider source | not needed |
 
 **About Yahoo Finance:** Yahoo does not offer an official API for this. Like the open-source library yfinance,
@@ -151,7 +155,8 @@ directly to the providers above, which see your IP address. The update check is 
 KandleOS asks GitHub once a day for the latest version number (or when you click **Check for updates** in About);
 nothing is downloaded or installed automatically. A paired phone talks to your PC directly over your local network or
 VPN; every message is encrypted with a key that only the two devices know, and nothing goes through a server.
-With events switched on (they are off by default), opening a German stock sends its ISIN to BaFin to load the insider deals of that company.
+With events switched on (they are off by default), opening a German stock sends its ISIN to BaFin to load the insider deals of that company,
+and opening a BTC or ETH chart asks Coin Metrics for the daily exchange flows (only the coin, the figures and the date range are sent).
 Details are in the app under **About KandleOS**.
 
 ## Not investment advice

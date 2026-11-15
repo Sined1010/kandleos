@@ -19,6 +19,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { mergeTick } from '../../../shared/candles'
+import { flowAsset, flowsPerBar } from '../../../shared/chain'
+import { candleDates } from '../../../shared/eventChart'
 import { HISTORY_LIMIT, mayLoadOlder, OLDER_RETRY_MS, prependOlder } from '../../../shared/history'
 import { backtest, bandScale, checkCutoffs, forecastCandles, historyNeeded, Q, scaleBands, type BacktestResult } from '../../../shared/forecast'
 import type { Decision } from '../../../shared/agents'
@@ -36,7 +38,7 @@ import {
   type CandleProvider
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
-import { ipcError } from '../lib/format'
+import { ipcError, wholeCoins } from '../lib/format'
 import { THEME } from '../lib/theme'
 import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
@@ -65,6 +67,9 @@ import IndicatorLegend, { type LegendGroup } from './IndicatorLegend'
 import MarketBadge, { QuoteChip } from './MarketBadge'
 
 const { up: UP, down: DOWN, line: LINE } = THEME
+/** Exchange flows: coins onto exchanges (grey) and withdrawn (indigo); neutral, as neither is a buy or a sale. */
+const FLOW_IN = '#a3a9c2'
+const FLOW_OUT = '#818cf8'
 const SESSION_TITLE = { pre: msg('Vorbörse'), post: msg('Nachbörse'), close: msg('Schluss') }
 // Line and tag colours: orange (sunrise) before, indigo (moon) after the session, grey for the regular close.
 const SESSION_TAG = { pre: { color: '#fb923c', ink: '#0a0c16' }, post: { color: '#a5b4fc', ink: '#0a0c16' }, close: { color: '#5d6375', ink: '#fff' } }
@@ -129,6 +134,15 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   const stockSource = useStore((s) => s.stockSource)
   const yahooExtra = useStore((s) => s.yahooExtra)
   const indicators = useStore((s) => s.indicators)
+  // BTC/ETH exchange flows (Events): bars in their own pane from daily candles up, holdings as a line on request.
+  const flowDays = useEventsData((s) => (eventsOn && s.symbol === symbol ? s.result?.flows : undefined))
+  // The pane follows the coin and the settings, not the data: it must not come and go (and rebuild every indicator
+  // pane twice) while the flows load. Until they are there it stays empty.
+  const flowCoin = eventsOn && TF_SECONDS[timeframe] >= 86400 ? flowAsset(symbol) : undefined
+  const flowBars = useStore((s) => s.flowBars) && !!flowCoin
+  const flowSupply = useStore((s) => s.flowSupply)
+  const flowsRef = useRef(flowDays)
+  flowsRef.current = flowDays
   const select = useStore((s) => s.select)
   const range = useStore((s) => s.range)
   const setRange = useStore((s) => s.setRange)
@@ -551,6 +565,49 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       valueTag(series, '#b0bec5')
       legend(pane++, `ATR ${at.period}`, '#b0bec5', [series])
     }
+    if (flowBars) {
+      // Net flow per bar: grey = more coins onto exchanges, indigo = more withdrawn; unusual days full, the rest faint.
+      // Neutral colours on purpose: coins moving onto an exchange are no sale (Events list says so too).
+      const asset = flowCoin!
+      let bars: ReturnType<typeof flowsPerBar> = []
+      // Bar dates change only when a bar is added, not on every price tick.
+      let dates = { key: '', list: [] as string[] }
+      const perBar = (d: Candle[]) => {
+        const key = `${d.length}|${d[0]?.time}|${d.at(-1)?.time}`
+        if (key !== dates.key) dates = { key, list: candleDates(d.map((c) => c.time), 'UTC') }
+        return (bars = flowsPerBar(flowsRef.current?.days ?? [], dates.list))
+      }
+      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceFormat: { type: 'volume' } }, pane)
+      trackTicks(hist)
+      list.push({
+        series: hist,
+        calc: (_, d) => perBar(d).map((b) => (b ? b.in - b.out : NaN)),
+        color: (v, i) => (v > 0 ? FLOW_IN : FLOW_OUT) + (bars[i]?.unusual ? '' : '66')
+      })
+      const shown: ISeriesApi<SeriesType>[] = [hist]
+      if (flowSupply) {
+        // Own invisible scale: the holdings (millions) and the daily flows (thousands) do not share an axis.
+        const supply = chart.addSeries(
+          LineSeries,
+          { color: '#e6e8f2aa', lineWidth: 1, priceScaleId: 'flowSupply', priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
+          pane
+        )
+        list.push({ series: supply, calc: () => bars.map((b) => b?.supply ?? NaN) })
+        shown.push(supply)
+      }
+      const n = wholeCoins
+      groups.push({
+        pane: pane++,
+        label: t('Börsen-Nettofluss {coin}', { coin: asset }),
+        color: FLOW_OUT,
+        series: shown,
+        format: (v, i) =>
+          i === 1 ? t('auf Börsen {n}', { n: n(v) })
+          : Math.round(v) === 0 ? t('ausgeglichen')
+          : v > 0 ? t('+{n} eingezahlt', { n: n(v) })
+          : t('−{n} abgezogen', { n: n(v) })
+      })
+    }
     chart.panes().forEach((p, i) => i > 0 && p.setStretchFactor(0.3))
     setIndicatorSeries(list)
     setLegend(groups)
@@ -559,7 +616,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       list.forEach((i) => chart.removeSeries(i.series))
       while (chart.panes().length > 1) chart.removePane(chart.panes().length - 1)
     }
-  }, [api, indicators])
+  }, [api, indicators, flowBars, flowSupply, flowCoin])
 
   useEffect(() => {
     const closes = data.map((c) => c.close)
@@ -571,7 +628,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
         )
       )
     }
-  }, [data, indicatorSeries])
+    // flowDays: the exchange flows arrive after the candles and change once a day.
+  }, [data, indicatorSeries, flowDays])
 
   const toggleForecast = async () => {
     if (fc.state !== 'shown') {

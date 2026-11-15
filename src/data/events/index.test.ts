@@ -34,7 +34,7 @@ test('a US share with a key asks Finnhub for all three', async () => {
 test('foreign shares on German exchanges, crypto, unknown ISIN', async () => {
   const { get } = setup()
   assert.deepEqual((await get('APC.DE', 'k')).notes, [{ part: 'insider', state: 'home' }])
-  assert.deepEqual((await get('BTCUSDT', 'k')).notes, [{ part: 'insider', state: 'no-source' }])
+  assert.deepEqual((await get('SOLUSDT', 'k')).notes, [{ part: 'flows', state: 'only-btc-eth' }])
   assert.deepEqual((await get('XYZ.DE', 'k')).notes, [{ part: 'insider', state: 'no-isin', source: 'BaFin' }])
   await assert.rejects(get('../x', 'k'))
 })
@@ -105,4 +105,21 @@ test('without its PC the phone says why: not paired, PC too old, or just not rea
   for (const reason of ['not-paired', 'unknown-op', 'offline'] as const)
     assert.deepEqual((await setup({ bafin: fail(reason) }).get('SAP.DE', 'k')).notes, [{ part: 'insider', state: 'via-pc', source: 'BaFin', reason }])
   assert.deepEqual((await setup({ bafin: fail('removed') }).get('SAP.DE', 'k')).notes[0].reason, 'not-paired')
+})
+
+test('BTC and ETH get their exchange flows and nothing else; a failing source says so and is retried soon', async () => {
+  const series = { asset: 'BTC' as const, source: 'Coin Metrics' as const, days: [{ date: '2026-11-13', in: 1, out: 2 }] }
+  const asked: string[] = []
+  const ok = setup({ flows: async (a) => (asked.push(a), { ...series, asset: a }) })
+  const btc = await ok.get('BTCUSDT', 'k')
+  assert.deepEqual([btc.flows?.asset, btc.notes, ok.calls], ['BTC', [], []])
+  assert.equal((await ok.get('ETHBTC', 'k')).flows?.asset, 'ETH')
+  assert.deepEqual(asked, ['BTC', 'ETH'])
+
+  let fail = true
+  const bad = setup({ flows: async () => (fail ? Promise.reject(new Error('HTTP 500')) : series) })
+  assert.deepEqual((await bad.get('BTCUSDT', '')).notes, [{ part: 'flows', state: 'error', source: 'Coin Metrics' }])
+  fail = false
+  bad.tick(61)
+  assert.equal((await bad.get('BTCUSDT', '')).flows?.days.length, 1)
 })

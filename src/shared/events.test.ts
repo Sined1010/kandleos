@@ -103,3 +103,18 @@ test('US listings report insiders only for issuers outside the SEC exempt countr
   for (const s of ['NOVO-B.CO', 'ASML.AS', 'NESN.SW', 'VOD.L', 'SHOP.TO', '005930.KS', 'BHP.AX', 'INFY.NS', 'D05.SI', 'SAP.DE', 'MC.PA', 'AAPL', 'BTCUSDT'])
     assert.equal(adrMayReport(s), false, s)
 })
+
+test('unusual exchange-flow days become list entries that never blink', () => {
+  const days: { date: string; in: number; out: number; supply?: number }[] = Array.from({ length: 100 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 9, 1) + i * 864e5).toISOString().slice(0, 10),
+    in: 100,
+    out: 100
+  }))
+  days[95] = { ...days[95], out: 900, supply: 5000 }
+  const events = buildEvents({ deals: [], filings: [], news: [], flows: { asset: 'BTC', source: 'Coin Metrics', days } })
+  assert.equal(events.length, 1)
+  const e = events[0]
+  assert.deepEqual([e.id, e.kind, e.group, e.level, e.date], [`FL|BTC|${days[95].date}`, 'flow', 'chain', 2, days[95].date])
+  assert.deepEqual(e.flow, { asset: 'BTC', in: 100, out: 900, net: -800, supply: 5000, since: null, dataFrom: days[0].date })
+  assert.deepEqual(importantIds(events), [])
+})

@@ -9,6 +9,8 @@ export interface LegendGroup {
   series: ISeriesApi<SeriesType>[]
   /** Bounded oscillator (RSI, stochastic): a plain number rather than a price. */
   osc?: boolean
+  /** Own wording per series (exchange flows: "−3,376 BTC withdrawn"); wins over `osc` and the price format. */
+  format?: (value: number, series: number) => string
 }
 type Point = { value?: number; color?: string }
 
@@ -53,10 +55,12 @@ export default function IndicatorLegend({ chart, groups, fmt, main }: Props) {
         const p = ((hover ? hover.get(s) : s.dataByIndex(Number.MAX_SAFE_INTEGER, MismatchDirection.NearestLeft)) ?? {}) as Point
         if (p.value === undefined) return null
         // Supertrend hides the jump at a trend flip with a transparent point; the value still needs a colour.
-        const color = p.color && p.color !== 'transparent' ? p.color : (s.options() as { color?: string }).color
+        const raw = p.color && p.color !== 'transparent' ? p.color : (s.options() as { color?: string }).color
+        // Faint bars (MACD histogram, ordinary exchange-flow days) carry an alpha; the number stays fully readable.
+        const color = raw && /^#[0-9a-f]{8}$/i.test(raw) ? raw.slice(0, 7) : raw
         return (
           <span key={i} className="whitespace-nowrap tabular-nums" style={{ color }}>
-            {g.osc ? p.value.toFixed(1) : fmt(p.value)}
+            {g.format ? g.format(p.value, i) : g.osc ? p.value.toFixed(1) : fmt(p.value)}
           </span>
         )
       })}

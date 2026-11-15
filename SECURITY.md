@@ -24,4 +24,4 @@ in the release notes unless you prefer otherwise.
 In scope: the KandleOS app, its installers and the bundled TradingAgents bridge (`resources/agents/`).
 
 Out of scope: vulnerabilities in third-party services (Binance, Alpaca, Yahoo Finance, Finnhub, BaFin, Deutsche Börse,
-Wikidata, Hugging Face, AI providers) and in TradingAgents itself; please report those to the respective projects.
+Wikidata, Coin Metrics, Hugging Face, AI providers) and in TradingAgents itself; please report those to the respective projects.

@@ -1,9 +1,10 @@
 // The events of one symbol from the source that serves it, kept for a while so switching back and forth is free.
 // The sources come in as dependencies, so this file loads under node --test (see symbolEvents.ts for the app's).
 import type { EventsResult, Filing, InsiderDeal, NewsItem, SourceNote } from '../../shared/events.ts'
+import { flowAsset, type FlowAsset, type FlowSeries } from '../../shared/chain.ts'
 import { adrMayReport, eventRoute } from '../../shared/events.ts'
 import { t } from '../../shared/i18n.ts'
-import { SYMBOL_RE } from '../../shared/types.ts'
+import { SYMBOL_RE, isCrypto } from '../../shared/types.ts'
 import { wikidataIsin, xetraIds } from '../isin.ts'
 
 export interface EventDeps {
@@ -14,6 +15,8 @@ export interface EventDeps {
   news(symbol: string, key: string): Promise<NewsItem[]>
   /** The US listing (NYSE/Nasdaq) of a company listed elsewhere, from Wikidata. */
   adr?(symbol: string): Promise<{ symbol: string; exchange: string } | undefined>
+  /** BTC and ETH: daily exchange flows (Coin Metrics, kept until the next day's values). */
+  flows?(asset: FlowAsset): Promise<FlowSeries>
   /** Unix seconds. */
   now(): number
 }
@@ -49,9 +52,19 @@ export function createSymbolEvents(deps: EventDeps): (symbol: unknown, key: unkn
 
   async function load(symbol: string, key: string): Promise<EventsResult> {
     const r: EventsResult = { deals: [], filings: [], news: [], notes: [], fetchedAt: deps.now() }
-    const fail = (part: SourceNote['part'], source: 'BaFin' | 'Finnhub') => (e: unknown) => {
+    const fail = (part: SourceNote['part'], source: NonNullable<SourceNote['source']>) => (e: unknown) => {
       console.warn(`events ${symbol}: ${(e as Error)?.message}`)
       r.notes.push({ part, state: 'error', source })
+    }
+    // Crypto: exchange flows for BTC and ETH, nothing for other coins (no insiders, no open news source).
+    if (isCrypto(symbol)) {
+      const asset = flowAsset(symbol)
+      if (!asset || !deps.flows) {
+        r.notes.push({ part: 'flows', state: 'only-btc-eth' })
+        return r
+      }
+      await deps.flows(asset).then((flows) => void (r.flows = flows), fail('flows', 'Coin Metrics'))
+      return r
     }
     // A German listing needs its ISIN; a lookup that fails or hangs (the Xetra list is 5 MB) is an error worth
     // retrying in a minute, not "no open source".

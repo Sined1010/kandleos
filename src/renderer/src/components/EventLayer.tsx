@@ -126,7 +126,8 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
     }))
     if (tmp !== undefined && focused) {
       const text =
-        focused.kind === 'filing' ? t('8-K')
+        focused.kind === 'flow' ? t('Börsen')
+        : focused.kind === 'filing' ? t('8-K')
         : focused.kind === 'news' ? t('News')
         : focused.kind === 'cluster' ? t('Cluster-Kauf')
         : focused.kind === 'transfer' ? t('Übertragung')

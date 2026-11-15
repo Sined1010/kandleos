@@ -164,8 +164,13 @@ interface State {
   tabHintSeen: boolean
   setTabHintSeen: () => void
   /** Events tab: which groups the list and the markers show. */
-  eventFilters: { insider: boolean; filings: boolean; news: boolean }
-  setEventFilter: (group: 'insider' | 'filings' | 'news', on: boolean) => void
+  eventFilters: { insider: boolean; filings: boolean; news: boolean; chain: boolean }
+  setEventFilter: (group: 'insider' | 'filings' | 'news' | 'chain', on: boolean) => void
+  /** BTC/ETH: daily exchange flows as bars in a pane under the chart, and the exchanges' holdings as a line there. */
+  flowBars: boolean
+  setFlowBars: (on: boolean) => void
+  flowSupply: boolean
+  setFlowSupply: (on: boolean) => void
   /** Events (insider markers, list, sources asked) are off until the user switches them on. */
   eventsOn: boolean
   setEventsOn: (on: boolean) => void
@@ -286,7 +291,11 @@ export const useStore = create<State>()(
       acceptDisclaimer: () => set({ disclaimerAccepted: true }),
       tabHintSeen: false,
       setTabHintSeen: () => set({ tabHintSeen: true }),
-      eventFilters: { insider: true, filings: true, news: true },
+      eventFilters: { insider: true, filings: true, news: true, chain: true },
+      flowBars: true,
+      setFlowBars: (flowBars) => set({ flowBars }),
+      flowSupply: false,
+      setFlowSupply: (flowSupply) => set({ flowSupply }),
       setEventFilter: (group, on) => set((s) => ({ eventFilters: { ...s.eventFilters, [group]: on } })),
       // Off by default, also for files from before this field (merge keeps the default when it is missing).
       eventsOn: false,
@@ -540,6 +549,8 @@ export const useStore = create<State>()(
         disclaimerAccepted,
         tabHintSeen,
         eventFilters,
+        flowBars,
+        flowSupply,
         eventsOn,
         eventsSeen,
         updateCheck,
@@ -560,6 +571,8 @@ export const useStore = create<State>()(
         disclaimerAccepted,
         tabHintSeen,
         eventFilters,
+        flowBars,
+        flowSupply,
         eventsOn,
         eventsSeen,
         names,

@@ -1,6 +1,7 @@
 // Insider dealings, filings and news of one symbol: from cleaned source rows to the events the list and the chart
 // show. Pure functions; the fetching lives in src/data/events/, the screens in the renderer.
 import { wall } from './calendar.ts'
+import { unusualDays, type FlowAsset, type FlowSeries } from './chain.ts'
 import { alpacaKnows, isCrypto } from './types.ts'
 
 export type Role = 'vorstand' | 'aufsichtsrat' | 'fuehrung' | 'nahestehend'
@@ -33,11 +34,11 @@ export interface NewsItem {
   url: string
 }
 export interface SourceNote {
-  part: 'insider' | 'filings' | 'news'
-  state: 'no-key' | 'no-source' | 'no-isin' | 'home' | 'error' | 'truncated' | 'via-pc'
+  part: 'insider' | 'filings' | 'news' | 'flows'
+  state: 'no-key' | 'no-source' | 'no-isin' | 'home' | 'error' | 'truncated' | 'via-pc' | 'only-btc-eth'
   /** via-pc: why the PC could not help (not paired, PC app too old, or not reachable). */
   reason?: 'not-paired' | 'unknown-op' | 'offline'
-  source?: 'BaFin' | 'Finnhub'
+  source?: 'BaFin' | 'Finnhub' | 'Coin Metrics'
 }
 export interface EventsResult {
   deals: InsiderDeal[]
@@ -51,13 +52,15 @@ export interface EventsResult {
   via?: 'pc'
   /** No insider source here, but a US listing of the same company (Wikidata). */
   adr?: { symbol: string; exchange: string }
+  /** BTC and ETH: coins moving onto and off exchanges, one number per day (Coin Metrics). */
+  flows?: FlowSeries
   fetchedAt: number
 }
 
 export interface ChartEvent {
   id: string
-  kind: 'insider' | 'cluster' | 'transfer' | 'filing' | 'news'
-  group: 'insider' | 'filings' | 'news'
+  kind: 'insider' | 'cluster' | 'transfer' | 'filing' | 'news' | 'flow'
+  group: 'insider' | 'filings' | 'news' | 'chain'
   level: 1 | 2 | 3
   date: string
   /** News only (unix seconds). */
@@ -78,6 +81,8 @@ export interface ChartEvent {
   title?: string
   url?: string
   origin?: string
+  /** Flow: an unusual day of coins moving onto (net > 0) or off exchanges; `since` = last larger day, null = none. */
+  flow?: { asset: FlowAsset; in: number; out: number; net: number; supply?: number; since: string | null; dataFrom: string }
 }
 
 /** Exchange suffixes besides the US for which Finnhub's free plan has usable insider data (Task 1: none, HTTP 403). */
@@ -184,7 +189,7 @@ const isBig = (d: InsiderDeal): boolean => (d.volume ?? 0) >= 100_000 && (d.curr
 
 /** Turns deals, filings and news into list entries, newest first (on one day the cluster before its buys). News get
  * the date of their exchange zone (`timeZone`), like the bars they sit on. */
-export function buildEvents(r: Pick<EventsResult, 'deals' | 'filings' | 'news'>, timeZone = 'UTC'): ChartEvent[] {
+export function buildEvents(r: Pick<EventsResult, 'deals' | 'filings' | 'news'> & Pick<Partial<EventsResult>, 'flows'>, timeZone = 'UTC'): ChartEvent[] {
   const deals = mergeDeals(r.deals)
 
   // Transfers: a day whose buys and sells sum up to the same amount (within 1 %), or a related party off-venue.
@@ -250,8 +255,15 @@ export function buildEvents(r: Pick<EventsResult, 'deals' | 'filings' | 'news'>,
     id: `N|${n.time}|${n.url}`, kind: 'news', group: 'news', level: 1, date: wall(n.time, timeZone).date,
     time: n.time, title: n.headline, url: n.url, origin: n.source
   }))
+  // Unusual exchange-flow days: estimates a day late, so they never blink (level 2).
+  const flows = r.flows
+    ? unusualDays(r.flows.days).map(({ day, net, since }): ChartEvent => ({
+        id: `FL|${r.flows!.asset}|${day.date}`, kind: 'flow', group: 'chain', level: 2, date: day.date,
+        flow: clean({ asset: r.flows!.asset, in: day.in, out: day.out, net, supply: day.supply, since, dataFrom: r.flows!.days[0].date })
+      }))
+    : []
   const rank = (e: ChartEvent) => (e.kind === 'cluster' ? 0 : 1)
-  return [...clusters, ...dealEvents, ...filings, ...news].sort(
+  return [...clusters, ...dealEvents, ...filings, ...news, ...flows].sort(
     (a, b) => b.date.localeCompare(a.date) || rank(a) - rank(b) || (b.time ?? 0) - (a.time ?? 0)
   )
 }

@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { shortMoney } from '../../../shared/eventChart'
+import { flowSummary } from '../../../shared/chain'
 import { delayDays, summary, type ChartEvent, type SourceNote } from '../../../shared/events'
 import { locale, t } from '../../../shared/i18n'
-import { TF_SECONDS } from '../../../shared/types'
-import { formatPrice } from '../lib/format'
+import { isCrypto, TF_SECONDS } from '../../../shared/types'
+import { formatPrice, wholeCoins } from '../lib/format'
 import { useEventsData } from '../services/events'
 import { useEventsUi } from '../store/eventsUi'
 import { useStore } from '../store/useStore'
@@ -20,12 +21,37 @@ const day = (date: string, year = false): string =>
 const percent = (v: number): string => `${v >= 0 ? '+' : ''}${(v * 100).toLocaleString(locale(), { maximumFractionDigits: 0 })} %`
 let jumps = 0
 const BAFIN_CREDIT = '© Bundesanstalt für Finanzdienstleistungsaufsicht / www.bafin.de'
+const CC_BY_NC = 'https://creativecommons.org/licenses/by-nc/4.0/'
+const coins = wholeCoins
+/** "netto 6.722 BTC auf Börsen eingezahlt" / "… von Börsen abgezogen"; under half a coin either way is even. */
+const netText = (net: number, asset: string): string =>
+  Math.round(net) === 0 ? t('netto ausgeglichen')
+  : net > 0 ? t('netto {n} {coin} auf Börsen eingezahlt', { n: coins(net), coin: asset })
+  : t('netto {n} {coin} von Börsen abgezogen', { n: coins(net), coin: asset })
+
+/** One checkbox of the list head; bigger to tap on the phone (`page`). */
+function Check({ checked, onChange, label, page, disabled }: { checked: boolean; onChange(on: boolean): void; label: string; page?: boolean; disabled?: boolean }) {
+  return (
+    <label className={`flex cursor-pointer items-center gap-1 ${page ? 'min-h-12' : ''} ${disabled ? 'opacity-50' : ''}`}>
+      <input type="checkbox" className={page ? 'h-5 w-5' : ''} checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      {label}
+    </label>
+  )
+}
+
+/** Phone: switching events off sits in the list head (the PC has the Events button in the chart). */
+const OffButton = () => (
+  <button onClick={toggleEvents} className="min-h-11 rounded-lg bg-line px-3 text-slate-200">
+    {t('Events ausschalten')}
+  </button>
+)
 export const jumpTo = (id: string): void => useEventsUi.setState({ jump: { id, n: ++jumps } })
 
 /** Coloured label of an entry: buys green, sells red, everything else neutral. */
 export function EventTag({ e }: { e: ChartEvent }) {
   const [text, color] =
-    e.kind === 'filing' ? [t('8-K'), 'bg-line text-slate-300']
+    e.kind === 'flow' ? [t('Börsen'), e.flow!.net > 0 ? 'bg-slate-400/20 text-slate-300' : 'bg-indigo-400/20 text-indigo-300']
+    : e.kind === 'filing' ? [t('8-K'), 'bg-line text-slate-300']
     : e.kind === 'news' ? [t('News'), 'bg-line text-slate-300']
     : e.kind === 'transfer' ? [t('Übertragung'), 'bg-line text-slate-300']
     : e.side === 'sell' ? [t('VERK.'), 'bg-red-500/20 text-red-400']
@@ -40,6 +66,24 @@ export function EventLines({ e, since }: { e: ChartEvent; since?: number }) {
       <>
         <p className="text-slate-200">{t('Cluster: {n} Insider kaufen binnen 5 Tagen', { n: e.persons ?? 0 })}</p>
         {e.volume !== undefined && <p className="text-muted">{t('zusammen {sum}', { sum: shortMoney(e.volume, e.currency) })}</p>}
+      </>
+    )
+  }
+  if (e.kind === 'flow') {
+    const f = e.flow!
+    const record = f.net > 0
+      ? f.since ? t('Größter Netto-Zufluss seit {d}', { d: day(f.since, true) }) : t('Größter Netto-Zufluss seit Datenbeginn ({d})', { d: day(f.dataFrom, true) })
+      : f.since ? t('Größter Netto-Abfluss seit {d}', { d: day(f.since, true) }) : t('Größter Netto-Abfluss seit Datenbeginn ({d})', { d: day(f.dataFrom, true) })
+    const facts = [
+      record,
+      t('rein {n}', { n: coins(f.in) }),
+      t('raus {n}', { n: coins(f.out) }),
+      f.supply !== undefined ? t('auf Börsen danach {n}', { n: coins(f.supply) }) : undefined
+    ].filter(Boolean)
+    return (
+      <>
+        <p className="text-slate-200">{netText(f.net, f.asset)}</p>
+        <p className="text-muted">{facts.join(' · ')}</p>
       </>
     )
   }
@@ -107,6 +151,7 @@ export function EventStack({ events, day }: { events: ChartEvent[]; day: string 
       ))}
       {events.length > STACK_MAX && <p className="text-muted">{t('+ {n} weitere – in der Liste', { n: events.length - STACK_MAX })}</p>}
       {events[0]?.deal && <p className="text-[10px] text-muted">{t('Quelle: {source}', { source: events[0].deal.source })}</p>}
+      {events[0]?.flow && <p className="text-[10px] text-muted">{t('Schätzung von Coin Metrics')}</p>}
     </>
   )
 }
@@ -121,6 +166,7 @@ function noteText(n: SourceNote): string {
     case 'truncated': return t('Die Liste kann unvollständig sein (sehr viele Meldungen).')
     case 'via-pc': return n.reason === 'unknown-op' ? t('Insider-Daten kommen über den gekoppelten PC – bitte KandleOS am PC aktualisieren.') : t('Insider-Daten kommen über den gekoppelten PC.')
     case 'no-isin': return t('ISIN unbekannt – BaFin-Daten nicht abrufbar.')
+    case 'only-btc-eth': return t('Für Krypto zeigt KandleOS Börsenflüsse – die gibt es nur für BTC und ETH.')
   }
 }
 
@@ -193,7 +239,12 @@ export default function EventsPanel({ page, onJump }: { page?: boolean; onJump?(
   const sum = summary(events, new Date().toISOString().slice(0, 10))
   const amount = (volume?: number) => (volume !== undefined ? ` (${shortMoney(volume, sum.currency)})` : '')
   const list = events.filter((e) => filters[e.group])
-  const box = page ? 'h-5 w-5' : ''
+  const flows = result?.flows
+  const flowSum = flows ? flowSummary(flows.days) : null
+  const flowBars = useStore((s) => s.flowBars)
+  const flowSupply = useStore((s) => s.flowSupply)
+  // From the open symbol, not the result: while loading (or after a failed call) the list must not show the stock head.
+  const crypto = useStore((s) => isCrypto(s.symbol))
 
   if (!on) {
     return (
@@ -207,6 +258,32 @@ export default function EventsPanel({ page, onJump }: { page?: boolean; onJump?(
   }
   return (
     <div className="text-xs">
+      {crypto ? (
+        (flows || page) && (
+        <div className="space-y-1 border-b border-line px-3 py-2">
+          {flows && flowSum && (
+            <p className="font-medium text-slate-200">
+              {t('{n} Tage: {net}', { n: flowSum.days, net: netText(flowSum.net, flows.asset) })}
+              {flowSum.supply !== undefined && <> · {t('auf Börsen {n} {coin}', { n: coins(flowSum.supply), coin: flows.asset })}</>}
+            </p>
+          )}
+          {flows && (
+            <>
+              <p className="text-[10px] text-muted">
+                {t('Zuflüsse auf Börsen sind keine Verkäufe. Die Zahlen sind Schätzungen von Coin Metrics über rund 24 Börsen und kommen einen Tag später.')}
+              </p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+                <Check page={page} checked={filters.chain} onChange={(on) => setFilter('chain', on)} label={t('Auffällige Tage')} />
+                <Check page={page} checked={flowBars} onChange={useStore.getState().setFlowBars} label={t('Balken unter dem Chart')} />
+                <Check page={page} checked={flowSupply} disabled={!flowBars} onChange={useStore.getState().setFlowSupply} label={t('Bestand auf Börsen zeigen')} />
+              </div>
+              {intraday && flowBars && <p className="text-[10px] text-amber-400/90">{t('Börsenflüsse gibt es nur als Tageswerte – die Balken erscheinen ab Tageskerzen.')}</p>}
+            </>
+          )}
+          {page && <OffButton />}
+        </div>
+        )
+      ) : (
       <div className="space-y-1 border-b border-line px-3 py-2">
         {insiderOk && (
           <p className="font-medium text-slate-200">
@@ -230,19 +307,13 @@ export default function EventsPanel({ page, onJump }: { page?: boolean; onJump?(
               ['news', t('News')]
             ] as const
           ).map(([group, label]) => (
-            <label key={group} className={`flex cursor-pointer items-center gap-1 ${page ? 'min-h-12' : ''}`}>
-              <input type="checkbox" className={box} checked={filters[group]} onChange={(e) => setFilter(group, e.target.checked)} />
-              {label}
-            </label>
+            <Check key={group} page={page} checked={filters[group]} onChange={(on) => setFilter(group, on)} label={label} />
           ))}
         </div>
-        {page && (
-          <button onClick={toggleEvents} className="min-h-11 rounded-lg bg-line px-3 text-slate-200">
-            {t('Events ausschalten')}
-          </button>
-        )}
+        {page && <OffButton />}
         {intraday && <p className="text-[10px] text-amber-400/90">{t('Marker nur für die geladenen Tage – Tageskerzen zeigen alle.')}</p>}
       </div>
+      )}
 
       {state === 'loading' && !result && <p className="px-3 py-3 text-muted">{t('Lade Events …')}</p>}
       {state === 'error' && <p className="px-3 py-3 text-down">{error}</p>}
@@ -303,6 +374,16 @@ export default function EventsPanel({ page, onJump }: { page?: boolean; onJump?(
       {list.map((e) => (
         <Entry key={e.id} e={e} page={page} onJump={onJump} />
       ))}
+      {flows && (
+        <p className="px-3 py-2 text-[10px] text-muted">
+          {/* CC BY-NC 4.0 asks to name the source and the licence; the data may not be used commercially. */}
+          {t('Daten: Coin Metrics Community ·')}{' '}
+          <a href={CC_BY_NC} target="_blank" rel="noreferrer" className="underline hover:text-slate-200">
+            CC BY-NC 4.0
+          </a>{' '}
+          · {t('nur für nicht kommerzielle Nutzung')}
+        </p>
+      )}
       {insiderOk && result && (
         <p className="px-3 py-2 text-[10px] text-muted">
           {/* BaFin's terms ask for this exact credit; it stays German in both languages. */}
