@@ -1,6 +1,6 @@
 import { MismatchDirection, type IChartApi, type ISeriesApi, type MouseEventParams, type SeriesType, type Time } from 'lightweight-charts'
 import { useEffect, useRef, useState } from 'react'
-import { spread } from './tagSpread'
+import { coveredTicks, spread } from './tagSpread'
 
 /**
  * One rounded tag on a price axis. Without `price` it shows the series' latest value; `series` defaults to the candles
@@ -12,6 +12,29 @@ export type Tag = { price?: number; series?: ISeriesApi<SeriesType>; color: stri
 type Cross = { y: number; price: string; x?: number; time?: string }
 // Everything a tag shows, taken in the same frame, so a tag added mid-list never shows another tag's value for a frame.
 type Placed = { y: number; text: string; tag: Tag; i: number }
+
+// The axis numbers each series' price scale last drew. The library keeps them to itself; they pass through the series'
+// tick formatter, which is where `noteTicks` catches them.
+const ticksOf = new WeakMap<ISeriesApi<SeriesType>, number[]>()
+
+/** Call from a series' `tickmarksFormatter` with the prices it gets, so PriceTags can hide the axis numbers under its tags. */
+export function noteTicks(series: ISeriesApi<SeriesType>, prices: number[]): void {
+  ticksOf.set(series, prices)
+}
+
+/** Same as `noteTicks`, for a series with the default number format: switches it to a custom one that formats alike. */
+export function trackTicks(series: ISeriesApi<SeriesType>): void {
+  const fmt = series.priceFormatter()
+  const minMove = (series.options().priceFormat as { minMove?: number }).minMove ?? 0.01
+  series.applyOptions({
+    priceFormat: {
+      type: 'custom',
+      minMove,
+      formatter: (p: number) => fmt.format(p),
+      tickmarksFormatter: (ps: number[]) => (noteTicks(series, ps), ps.map((p) => fmt.format(p)))
+    }
+  })
+}
 
 /** Top of each pane in chart px: pane heights plus the 1 px separators between them. */
 function paneTops(chart: IChartApi): number[] {
@@ -29,7 +52,7 @@ function paneTops(chart: IChartApi): number[] {
  * belongs to runs right into it. `right` is the space to the right of the chart (the PC's analysis panel).
  */
 export default function PriceTags({ chart, series, tags, right = 0, crossColor }: { chart: IChartApi; series: ISeriesApi<'Candlestick'>; tags: Tag[]; right?: number; crossColor: string }) {
-  const [pos, setPos] = useState<{ at: Placed[]; w: number }>({ at: [], w: 0 })
+  const [pos, setPos] = useState<{ at: Placed[]; ticks: number[]; w: number }>({ at: [], ticks: [], w: 0 })
   const [cross, setCross] = useState<Cross | null>(null)
   const tagsRef = useRef(tags)
   tagsRef.current = tags
@@ -74,8 +97,17 @@ export default function PriceTags({ chart, series, tags, right = 0, crossColor }
       raw.sort((a, b) => a.y - b.y)
       const moved = spread(raw.map((p) => p.y))
       const at = raw.map((p, k) => ({ ...p, y: moved[k] }))
-      const next = { at, w: chart.priceScale('right').width() }
-      const sig = `${at.map((a) => `${a.i}:${a.y}:${a.text}:${a.tag.color}:${a.tag.label ?? ''}`).join(',')}:${next.w}`
+      // Axis numbers per pane, from the series whose formatter the pane's scale uses (the first one that noted any).
+      const ticks = panes.flatMap((pane, k) => {
+        const s = pane.getSeries().find((x) => ticksOf.has(x))
+        if (!s) return []
+        return (ticksOf.get(s) ?? []).flatMap((p) => {
+          const y = s.priceToCoordinate(p)
+          return y === null || y < 0 || y > pane.getHeight() ? [] : [Math.round(tops[k] + y)]
+        })
+      })
+      const next = { at, ticks, w: chart.priceScale('right').width() }
+      const sig = `${at.map((a) => `${a.i}:${a.y}:${a.text}:${a.tag.color}:${a.tag.label ?? ''}`).join(',')}:${ticks.join(',')}:${next.w}`
       if (sig !== last) {
         last = sig
         idle = 0
@@ -112,6 +144,11 @@ export default function PriceTags({ chart, series, tags, right = 0, crossColor }
   }, [chart, series])
 
   const text = 'rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-[13px] tabular-nums'
+  // Axis numbers a tag (or the crosshair's) runs into get a patch in the chart's background, before all tags, so a
+  // patch never covers the edge of a neighbouring tag.
+  const { background, fontSize } = chart.options().layout
+  const bg = (background as { color?: string }).color ?? 'transparent'
+  const covered = coveredTicks(pos.ticks, [...pos.at.map((a) => a.y), ...(cross?.price ? [cross.y] : [])], fontSize / 2)
   const axisTag = (key: string, y: number, value: string, style: { background: string; color: string }, label?: string, z = 'z-10') => (
     <span key={key} className={`pointer-events-none absolute ${z} -translate-y-1/2`} style={{ top: y, right }}>
       <span className={`block text-center ${text}`} style={{ ...style, width: pos.w }}>
@@ -132,6 +169,13 @@ export default function PriceTags({ chart, series, tags, right = 0, crossColor }
   const timeX = cross?.x === undefined ? 0 : Math.min(Math.max(cross.x, half), chart.timeScale().width() - half)
   return (
     <>
+      {covered.map((y) => (
+        <span
+          key={`cover:${y}`}
+          className="pointer-events-none absolute z-10 -translate-y-1/2"
+          style={{ top: y, right, width: pos.w, height: fontSize + 4, background: bg }}
+        />
+      ))}
       {pos.at.map(({ i, y, text: value, tag: g }) =>
         axisTag(`${g.label ?? 'tag'}:${i}`, y, value, { background: g.color, color: g.ink ?? '#fff' }, g.label)
       )}

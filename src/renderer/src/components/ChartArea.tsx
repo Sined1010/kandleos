@@ -46,7 +46,7 @@ import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
 import { ask, tell } from '../../../mobile/MessageBox'
 import MobileKiButton from '../../../mobile/MobileKiButton'
-import PriceTags, { type Tag } from '../../../mobile/PriceTag'
+import PriceTags, { noteTicks, trackTicks, type Tag } from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
 import { useQuotes, useStore } from '../store/useStore'
@@ -335,7 +335,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
             type: 'custom',
             minMove: 10 ** -precision,
             formatter: format,
-            tickmarksFormatter: (ps: number[]) => ps.map((p) => (p < 0 && !negative ? '' : format(p)))
+            // noteTicks: PriceTags hides the axis numbers its tags run into.
+            tickmarksFormatter: (ps: number[]) => (noteTicks(api.candles, ps), ps.map((p) => (p < 0 && !negative ? '' : format(p))))
           }
         })
         api.candles.setData(bars.map(toBar))
@@ -463,6 +464,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
         { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false },
         pane
       )
+      // An oscillator's own axis: PriceTags hides the numbers its value tag runs into (pane 0 goes by the candles).
+      if (pane > 0) trackTicks(series)
       list.push({ series, calc })
       return series
     }
@@ -532,6 +535,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     if (m.on) {
       const calc = once((c) => macd(c, m.fast, m.slow, m.signal))
       const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
+      trackTicks(hist)
       list.push({ series: hist, calc: (c, d) => calc(c, d).hist, color: (v) => (v >= 0 ? UP : DOWN) + '99' })
       const macdLine = line('#42a5f5', (c, d) => calc(c, d).line, pane)
       legend(pane, `MACD ${m.fast} ${m.slow} ${m.signal}`, '#42a5f5', [macdLine, line('#ff9800', (c, d) => calc(c, d).signal, pane++), hist])
