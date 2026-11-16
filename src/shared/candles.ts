@@ -1,4 +1,4 @@
-import { barZone, periodIndex, periodStart, utcOffset } from './calendar.ts'
+import { barZone, periodIndex, periodStart, utcOffset, wall } from './calendar.ts'
 import type { Candle } from './types'
 
 /** Groups bars into buckets; `bucketOf` gives each bar's bucket start time. */
@@ -82,6 +82,18 @@ export function mergeTick(last: Candle, price: number, time: number, seconds: nu
     const period = periodIndex(time, months, zone)
     if (period <= periodIndex(last.time, months, zone)) return fold()
     return { time: periodStart(period, months, zone), open: price, high: price, low: price, close: price, volume: 0 }
+  }
+  if (seconds === 86400) {
+    // Day bars by their date in `zone`, not 24 h after the last stamp: a live bar stamped with its last quote (16:00)
+    // would otherwise take the next morning and, after a weekend, open a bar dated Sunday. The new bar keeps the
+    // source's time of day (Yahoo 09:30, Finnhub and Alpaca midnight), so it matches the history after a reload.
+    const day = wall(time, zone).date
+    const lastDay = wall(last.time, zone).date
+    if (day <= lastDay) return fold()
+    const guess = last.time + ((Date.parse(day) - Date.parse(lastDay)) / 1000)
+    // Same wall-clock time across a daylight-saving change.
+    const t = guess + utcOffset(last.time, zone) - utcOffset(guess, zone)
+    return { time: t, open: price, high: price, low: price, close: price, volume: 0 }
   }
   const from = last.time + utcOffset(last.time, zone)
   const local = time + utcOffset(time, zone)

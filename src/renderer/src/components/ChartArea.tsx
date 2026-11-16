@@ -398,9 +398,9 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           const q = s.quotes[symbol]
           const arr = dataRef.current
           if (!q || q === prev.quotes[symbol] || !arr.length) return
-          // Month-based bars end at calendar month edges, read in the zone the source dates its bars in; intraday bars
+          // Day and month-based bars end at calendar edges, read in the zone the source dates its bars in; intraday bars
           // step on the exchange's clock (2h/4h bars are built on it).
-          const zone = months ? barZone(arr.map((c) => c.time), timezoneRef.current) : timezoneRef.current
+          const zone = months || seconds === 86400 ? barZone(arr.map((c) => c.time), timezoneRef.current) : timezoneRef.current
           // With extended hours shown, pre-market and after-hours prices move the chart too.
           const tick = extended && q.ext && q.ext.time >= q.time ? q.ext : q
           push(mergeTick(arr[arr.length - 1], tick.price, tick.time, seconds, months, zone))
@@ -476,8 +476,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
             phase: phaseAt(symbol, exchangeZone, Date.now() / 1000),
             extended,
             lastTime,
-            // The zone the live ticks are laid on (mergeTick below), read at each check.
-            zone: timezoneRef.current,
+            // The zone the live ticks are laid on (mergeTick below; day bars by the zone the source dates them in).
+            zone: TF_SECONDS[timeframe] === 86400 ? barZone(data.slice(-50).map((c) => c.time), timezoneRef.current) : timezoneRef.current,
             now: Date.now() / 1000
           })
       )

@@ -110,3 +110,24 @@ test('mergeTick steps 4h stock bars on the exchange clock across a DST weekend',
   // Without a zone (crypto) the grid stays UTC, as before.
   assert.equal(mergeTick(last, 2, last.time + 14400 + 60, 14400).time, last.time + 14400)
 })
+
+test('mergeTick opens day bars by the trading date and keeps the time of day of the source', () => {
+  const ny = 'America/New_York'
+  const bar = (time: number) => ({ time, open: 1, high: 2, low: 1, close: 2, volume: 5 })
+  const et = (d: number, h: number, m = 0) => Date.UTC(2026, 10, d, h + 5, m) / 1000 // November: ET = UTC-5
+  // Yahoo stamps day bars at the open (09:30 ET): Wednesday's first tick opens Wednesday 09:30, like Yahoo's history.
+  assert.equal(mergeTick(bar(et(17, 9, 30)), 3, et(18, 9, 31), 86400, 0, ny).time, et(18, 9, 30))
+  // More of Tuesday stays in Tuesday.
+  assert.equal(mergeTick(bar(et(17, 9, 30)), 3, et(17, 15, 59), 86400, 0, ny).time, et(17, 9, 30))
+  // A live bar stamped with its last quote (Tue 16:00): Wednesday 09:31 is still a new day, not more of Tuesday.
+  const late = mergeTick(bar(et(17, 16)), 3, et(18, 9, 31), 86400, 0, ny)
+  assert.equal(new Date((late.time - 5 * 3600) * 1000).toISOString().slice(0, 10), '2026-11-18')
+  // Friday's bar, Monday's first tick: Monday 09:30, not Sunday.
+  assert.equal(mergeTick(bar(et(20, 9, 30)), 3, et(23, 9, 31), 86400, 0, ny).time, et(23, 9, 30))
+  // Across the end of daylight saving time (1 Nov 2026) the bar stays at 09:30 local.
+  const fri = Date.UTC(2026, 9, 30, 13, 30) / 1000 // 09:30 EDT
+  assert.equal(mergeTick(bar(fri), 3, Date.UTC(2026, 10, 2, 14, 31) / 1000, 86400, 0, ny).time, Date.UTC(2026, 10, 2, 14, 30) / 1000)
+  // Finnhub labels days at 00:00 UTC (read in UTC), Alpaca at 00:00 ET: both keep their midnight.
+  assert.equal(mergeTick(bar(Date.UTC(2026, 10, 17) / 1000), 3, et(18, 9, 31), 86400, 0, 'UTC').time, Date.UTC(2026, 10, 18) / 1000)
+  assert.equal(mergeTick(bar(et(17, 0)), 3, et(18, 9, 31), 86400, 0, ny).time, et(18, 0))
+})

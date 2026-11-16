@@ -180,8 +180,10 @@ test('lastBarRunning: a finished bar stays finished at the opening bell until th
 test('lastBarRunning follows the live candle: running while a tick would still fold into the last bar', () => {
   const day = 86400
   const h = 3600
-  // Yahoo's live day bar stamped yesterday 16:00: the app folds ticks into it for 24 hours, so it still runs at 09:31.
-  assert.equal(lastBarRunning({ step: day, phase: 'open', extended: false, lastTime: day + 16 * h, now: 2 * day + 9.5 * h, zone: 'UTC' }), true)
+  // Yahoo's live day bar stamped yesterday 16:00: at 09:31 a tick opens today's bar, so yesterday's is finished.
+  assert.equal(lastBarRunning({ step: day, phase: 'open', extended: false, lastTime: day + 16 * h, now: 2 * day + 9.5 * h, zone: 'UTC' }), false)
+  // Today's bar, stamped at the open, runs until the date changes.
+  assert.equal(lastBarRunning({ step: day, phase: 'open', extended: false, lastTime: 2 * day + 9.5 * h, now: 2 * day + 15 * h, zone: 'UTC' }), true)
   // Two days old: a tick now would open a new bar.
   assert.equal(lastBarRunning({ step: day, phase: 'open', extended: false, lastTime: 0, now: 2 * day + 9.5 * h, zone: 'UTC' }), false)
   // Delayed quotes (Yahoo: often 15 min) still land in an hourly bar shortly after its hour.
