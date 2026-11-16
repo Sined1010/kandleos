@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
 
 
 
-![KandleOS with a calibrated Chronos-2 forecast for Bitcoin (weekly candles): forecast candles, uncertainty ranges, the forecast summary, the values of one forecast step and colored drawings](docs/screenshot.webp)
+![KandleOS with Bitcoin on daily candles: a calibrated Chronos-2 forecast with uncertainty ranges and the values of one forecast step, EMA 20/50/200, RSI, the daily flow of BTC onto and off exchanges, Fibonacci and trend line drawings, a price alarm, three chart tabs and the watchlist with pinned values and folders](docs/screenshot.webp)
 
 ## Why KandleOS?
 
