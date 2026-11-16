@@ -415,3 +415,16 @@ test('different sync formats are refused on both sides, before anything is merge
   const reply = { format: SYNC_FORMAT + 1, units: {}, stamps: {}, pcNow: 1, baseId: 'b' }
   assert.throws(() => receiveSync(slice(), emptySync(), 'pc', sent, reply, 1), /sync-format/)
 })
+
+import { DEFAULT_INDICATORS } from '../renderer/src/lib/indicatorDefaults.ts'
+import { cleanIndicators } from './sync.ts'
+
+test('cleanIndicators keeps the Keltner factor as a decimal and adds new indicators switched off', () => {
+  const out = cleanIndicators(DEFAULT_INDICATORS, { squeeze: { on: true, kcMult: 1.5, period: 20.4 } })
+  assert.equal(out.squeeze.on, true)
+  assert.equal(out.squeeze.kcMult, 1.5)
+  assert.equal(out.squeeze.period, 20)
+  const old = cleanIndicators(DEFAULT_INDICATORS, { sma: { on: true, period: 20 } })
+  assert.deepEqual([old.squeeze.on, old.adx.on, old.vp.on], [false, false, false])
+  assert.equal(old.vp.rows, 30)
+})

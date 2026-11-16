@@ -102,7 +102,7 @@ export function cleanIndicators(base: Indicators, raw: unknown): Indicators {
       const x = r[field]
       if (typeof v === 'boolean' && typeof x === 'boolean') cfg[field] = x
       else if (typeof v === 'number' && typeof x === 'number' && Number.isFinite(x) && x > 0)
-        cfg[field] = Math.min(500, field === 'mult' ? x : Math.max(1, Math.round(x)))
+        cfg[field] = Math.min(500, field === 'mult' || field === 'kcMult' ? x : Math.max(1, Math.round(x)))
     }
   }
   return out as unknown as Indicators
@@ -364,7 +364,8 @@ const MAX_VALUE = 300_000
  * behind sliceOf (checkDrawing, TIMEFRAMES, RANGES, alarms, tabs, charts) accept something new.
  */
 // 2: pinned watchlist symbols (pin:<symbol>, order:pins); a format-1 device would drop them and unpin everywhere.
-export const SYNC_FORMAT = 2
+// 3: anchored VWAP drawings (avwap) and the squeeze, ADX and volume-profile indicators.
+export const SYNC_FORMAT = 3
 const formatOf = (v: Record<string, unknown>): number => (typeof v.format === 'number' && Number.isFinite(v.format) ? v.format : 1)
 
 export interface SyncRequest {

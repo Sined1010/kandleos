@@ -18,6 +18,7 @@ import {
   rayEnd,
   sinePrice
 } from '../lib/geometry'
+import { anchoredVwap, anchorIndex } from '../lib/indicators'
 import { THEME } from '../lib/theme'
 import { IS_MOBILE } from '../lib/platform'
 import { aimAt, pinchRange, type PinchStart } from '../lib/touchAim'
@@ -29,6 +30,8 @@ const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
 const COLOR = THEME.drawing
 const SELECTED = THEME.selected
+// Violet, not amber: amber belongs to the AI forecast alone.
+const AVWAP = '#a78bfa'
 const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043', triangle: '#42a5f5', wxy: '#ec407a', wxyxz: '#ffca28' }
 const WAVE_LABELS = {
   elliott: ['0', '1', '2', '3', '4', '5'],
@@ -114,6 +117,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const [, redraw] = useState(0)
   const times = useMemo(() => data.map((c) => c.time), [data])
   const step = TF_SECONDS[timeframe]
+  // Month bars differ in length, so their step is only a rough guide (anchorIndex).
+  const exact = !TF_MONTHS[timeframe]
   // Bar times plus the coming bars on the exchange's trading calendar. Points right of the last candle are
   // stored as real trading times (not "last bar + n × step", which lands in nights and weekends), so a
   // drawing keeps its place when the bars change, e.g. when pre-market and after-hours candles are added.
@@ -183,6 +188,23 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
   const toX = (time: number) => (times.length ? xAt(logicalOf(time)) : null)
   const fmt = (price: number) => series.priceFormatter().format(price)
+  const dateLabel = (time: number) =>
+    new Date(time * 1000).toLocaleString(locale(), {
+      dateStyle: 'short',
+      timeStyle: step < 86400 ? 'short' : undefined,
+      // Day and longer bars: the date they carry, as on the time axis (ChartArea).
+      timeZone: step < 86400 ? undefined : barZone(times.slice(-50), timeZone ?? 'UTC')
+    })
+
+  // Anchored VWAP values per drawing; computed again only for new bars or a moved anchor, not every frame.
+  const avwapCache = useRef(new Map<string, { data: Candle[]; at: number; values: number[] }>())
+  const avwapOf = (id: string, at: number) => {
+    const hit = avwapCache.current.get(id)
+    if (hit && hit.data === data && hit.at === at) return hit.values
+    const values = anchoredVwap(data, at)
+    avwapCache.current.set(id, { data, at, values })
+    return values
+  }
 
   const logicalAt = (e: { clientX: number; clientY: number }) => {
     const rect = svgRef.current!.getBoundingClientRect()
@@ -223,7 +245,10 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           ? { ...o, price: o.price + dPrice }
           : o.type === 'vline'
             ? { ...o, time: shiftTime(o.time) }
-            : d.handle === 'move'
+            : o.type === 'avwap'
+              ? // The anchor only moves along the time axis; its price is never used.
+                { ...o, points: [{ time: Math.min(d.handle === 'move' ? shiftTime(o.points[0].time) : cursor.time, lastTime), price: o.points[0].price }] }
+              : d.handle === 'move'
               ? withPoints(o, pointsOf(o).map((p) => ({ time: shiftTime(p.time), price: p.price + dPrice })))
               : withPoints(o, pointsOf(o).map((p, i) => (i === d.handle ? cursor : p)))
       dragRef.current = { ...d, current }
@@ -257,7 +282,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
   const addPoint = (p: Point | null) => {
     if (!p || tool === 'cursor') return
-    const pts = [...draft, p]
+    // An AVWAP right of the last bar would draw nothing and could not be picked again: it starts at the last bar.
+    const pts = [...draft, tool === 'avwap' && times.length ? { ...p, time: Math.min(p.time, lastTime) } : p]
     if (pts.length < CLICKS[tool]) return setDraft(pts)
     const id = crypto.randomUUID()
     addDrawing(build(tool, id, pts))
@@ -353,13 +379,77 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           <line x1={x} x2={x} y1={0} y2={height} stroke={stroke} strokeWidth={selected ? 2 : 1} />
           {hit('ew-resize') && <line x1={x} x2={x} y1={0} y2={height} {...hit('ew-resize')} />}
           <text x={x + 4} y={height - 6} fill={stroke} fontSize={11}>
-            {new Date(d.time * 1000).toLocaleString(locale(), {
-              dateStyle: 'short',
-              timeStyle: step < 86400 ? 'short' : undefined,
-              // Day and longer bars: the date they carry, as on the time axis (ChartArea).
-              timeZone: step < 86400 ? undefined : barZone(times.slice(-50), timeZone ?? 'UTC')
-            })}
+            {dateLabel(d.time)}
           </text>
+        </g>
+      )
+    }
+
+    if (d.type === 'avwap') {
+      const at = anchorIndex(times, d.points[0].time, step, exact)
+      const color = d.color ?? AVWAP
+      // Clicking the note or the line selects the drawing, so it can be moved, recoloured or deleted.
+      const pick = preview ? undefined : (e: React.PointerEvent) => startDrag(e, d, 'move')
+      // Placing and dragging keep the anchor on a bar; it can still fall outside them, e.g. on an after-hours
+      // bar once pre/after market is switched off. A note keeps it visible and selectable.
+      if (at === 'before' || at === 'after') {
+        return (
+          <text key={d.id} x={8} y={height - 24} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+            {at === 'before' ? t('AVWAP: Anker vor den geladenen Kerzen') : t('AVWAP: Anker nach der letzten Kerze')}
+          </text>
+        )
+      }
+      const values = avwapOf(d.id, at)
+      const ax = toX(data[at].time)
+      if (ax === null) return null
+      if (values.every(Number.isNaN)) {
+        return (
+          <text key={d.id} x={ax + 4} y={height - 24} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+            {t('AVWAP: kein Volumen')}
+          </text>
+        )
+      }
+      // Only the bars in view: a line over 10,000 bars would cost as many coordinate look-ups every frame.
+      const view = chart.timeScale().getVisibleRange()
+      const from = view ? anchorIndex(times, view.from as number, step, exact) : at
+      const to = view ? anchorIndex(times, view.to as number, step, exact) : data.length - 1
+      const first = Math.max(at, typeof from === 'number' ? from - 1 : at)
+      const last = to === 'before' ? -1 : to === 'after' ? data.length - 1 : Math.min(data.length - 1, to + 1)
+      const line: string[] = []
+      // Zoomed far out several bars share a pixel: one point per pixel keeps the line the same and the frame fast.
+      let lastX = -Infinity
+      for (let j = first; j <= last; j++) {
+        const x = Number.isNaN(values[j]) ? null : toX(data[j].time)
+        if (x === null || (x - lastX < 1 && j !== last)) continue
+        const y = toY(values[j])
+        if (y === null) continue
+        line.push(`${x},${y}`)
+        lastX = x
+      }
+      const ay = Number.isNaN(values[at]) ? toY(data[at].low) : toY(values[at])
+      return (
+        <g key={d.id}>
+          <polyline points={line.join(' ')} fill="none" stroke={color} strokeWidth={selected ? 2 : 1.5} />
+          {!preview && line.length > 1 && <polyline points={line.join(' ')} {...hit()!} />}
+          {ay !== null && (
+            <>
+              <text x={ax} y={ay - 8} fill={color} fontSize={11} textAnchor="middle" style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move' }} onPointerDown={pick}>
+                AVWAP {dateLabel(data[at].time)}
+              </text>
+              {(selected || preview) && (
+                <circle
+                  cx={ax}
+                  cy={ay}
+                  r={5}
+                  fill={THEME.bg}
+                  stroke={color}
+                  strokeWidth={1.5}
+                  style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'ew-resize' }}
+                  onPointerDown={preview ? undefined : (e) => startDrag(e, d, 0)}
+                />
+              )}
+            </>
+          )}
         </g>
       )
     }

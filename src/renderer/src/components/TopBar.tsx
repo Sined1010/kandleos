@@ -11,6 +11,7 @@ import Logo from './Logo'
 import SavedCharts from './SavedCharts'
 import SymbolSearch from './SymbolSearch'
 import UpdateBadge from './UpdateBadge'
+import { SETUPS, setupOn, setupPatch, setupsOf } from '../lib/setups'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
   const symbol = useStore((s) => s.symbol)
@@ -256,12 +257,15 @@ const ROWS: Record<keyof Indicators, { label: string; params: [string, string, n
   ema: { label: 'EMA', params: [['period', msg('Periode')]] },
   ema3: { label: msg('3-fach EMA'), params: [['fast', msg('Kurz')], ['mid', msg('Mittel')], ['slow', msg('Lang')]] },
   bb: { label: 'Bollinger Bands', params: [['period', msg('Periode')], ['mult', msg('StdAbw'), 0.1]] },
+  squeeze: { label: 'Squeeze', params: [['period', msg('Periode')], ['mult', 'BB', 0.1], ['kcMult', 'Keltner', 0.1]] },
   vwap: { label: 'VWAP', params: [] },
+  vp: { label: 'Volume Profile', params: [['rows', msg('Stufen')]] },
   supertrend: { label: 'Supertrend', params: [['period', msg('ATR-Periode')], ['mult', msg('Faktor'), 0.1]] },
   rsi: { label: 'RSI', params: [['period', msg('Periode')]] },
   macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']] },
   stoch: { label: msg('Stochastik'), params: [['period', msg('Periode')], ['smoothK', '%K'], ['smoothD', '%D']] },
-  atr: { label: 'ATR', params: [['period', msg('Periode')]] }
+  atr: { label: 'ATR', params: [['period', msg('Periode')]] },
+  adx: { label: 'ADX', params: [['period', msg('Periode')]] }
 }
 
 /**
@@ -295,13 +299,49 @@ function NumberField(p: { label: string; title: string; min: number; max: number
 export function IndicatorMenu({ onClose }: { onClose: () => void }) {
   const indicators = useStore((s) => s.indicators)
   const setIndicator = useStore((s) => s.setIndicator)
+  const setIndicators = useStore((s) => s.setIndicators)
+  // Setup whose explanation is open.
+  const [info, setInfo] = useState<string | null>(null)
 
   return (
     <>
       <div className="fixed inset-0 z-10" onClick={onClose} />
-      <div className="absolute left-0 top-full z-20 mt-1 w-80 rounded-lg border border-line bg-panel/95 backdrop-blur p-2 shadow-2xl shadow-black/50">
+      {/* Scrolls instead of running off a small window or phone screen; above the forecast button (z-30). */}
+      <div className="absolute left-0 top-full z-40 mt-1 max-h-[calc(100dvh-7rem)] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-panel/95 backdrop-blur p-2 shadow-2xl shadow-black/50">
+        <div className="px-1 pb-1 text-[11px] uppercase tracking-wide text-muted">{t('Setups')}</div>
+        {SETUPS.map((s) => (
+          <div key={s.id} className="rounded px-1 py-1.5 hover:bg-bg">
+            <div className="flex items-center gap-2">
+              <label className="flex flex-1 cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={setupOn(indicators, s)}
+                  onChange={(e) => setIndicators(setupPatch(indicators, s, e.target.checked))}
+                  className="accent-accent"
+                />
+                <span className="text-white">{t(s.label)}</span>
+              </label>
+              <button
+                onClick={() => setInfo((o) => (o === s.id ? null : s.id))}
+                aria-label={t('Was bedeutet das?')}
+                aria-expanded={info === s.id}
+                title={t('Was bedeutet das?')}
+                className="rounded p-0.5 text-muted hover:text-white"
+              >
+                <Info size={14} />
+              </button>
+            </div>
+            {info === s.id && (
+              <p className="mt-1 pl-6 text-xs leading-relaxed text-slate-300">
+                {t(s.info)} <span className="text-muted">{t('Keine Anlageberatung')}.</span>
+              </p>
+            )}
+          </div>
+        ))}
+        <div className="my-1 border-t border-line" />
         {(Object.keys(ROWS) as (keyof Indicators)[]).map((name) => {
           const cfg = indicators[name] as unknown as Record<string, number | boolean>
+          const of = setupsOf(name)
           return (
             <div key={name} className="flex items-center gap-2 rounded px-1 py-1.5 hover:bg-bg">
               <label className="flex flex-1 cursor-pointer items-center gap-2">
@@ -312,6 +352,11 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
                   className="accent-accent"
                 />
                 <span className="text-white">{t(ROWS[name].label)}</span>
+                {of.map((s) => (
+                  <span key={s.id} className="whitespace-nowrap text-xs text-muted">
+                    · {t(s.short)}
+                  </span>
+                ))}
               </label>
               {ROWS[name].params.map(([field, label, step = 1]) => (
                 <NumberField

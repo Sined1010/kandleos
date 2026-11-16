@@ -9,6 +9,7 @@ import type { Lang } from '../../../shared/i18n'
 import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
 import { cleanIndicators, emptySync, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
+import { DEFAULT_INDICATORS } from '../lib/indicatorDefaults'
 
 export type Point = { time: number; price: number }
 /** `color` is the user's choice; missing means the tool's own colours. */
@@ -19,7 +20,7 @@ export type Drawing = { color?: string } & (
   // Tools added later store their clicks as a point list; the older shapes above keep their saved format.
   | {
       id: string
-      type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure' | 'fibext' | 'fibfan' | 'fibtime' | 'triangle' | 'wxy' | 'wxyxz' | 'sine'
+      type: 'ray' | 'rect' | 'channel' | 'elliott' | 'abc' | 'measure' | 'fibext' | 'fibfan' | 'fibtime' | 'triangle' | 'wxy' | 'wxyxz' | 'sine' | 'avwap'
       points: Point[]
     }
   | { id: string; type: 'text'; points: Point[]; text: string; size?: number }
@@ -86,13 +87,18 @@ export interface Indicators {
   sma: { on: boolean; period: number }
   ema: { on: boolean; period: number }
   bb: { on: boolean; period: number; mult: number }
+  /** Bollinger bands (`mult`) inside the Keltner channel (`kcMult` × average true range). */
+  squeeze: { on: boolean; period: number; mult: number; kcMult: number }
   ema3: { on: boolean; fast: number; mid: number; slow: number }
   vwap: { on: boolean }
+  /** Volume profile of the visible bars in `rows` price levels. */
+  vp: { on: boolean; rows: number }
   supertrend: { on: boolean; period: number; mult: number }
   rsi: { on: boolean; period: number }
   macd: { on: boolean; fast: number; slow: number; signal: number }
   stoch: { on: boolean; period: number; smoothK: number; smoothD: number }
   atr: { on: boolean; period: number }
+  adx: { on: boolean; period: number }
 }
 
 interface State {
@@ -183,6 +189,8 @@ interface State {
   updateLatest: string | null
   updateCheckedAt: number
   setIndicator: <K extends keyof Indicators>(name: K, patch: Partial<Indicators[K]>) => void
+  /** Replaces several indicators in one change (a setup's check box). */
+  setIndicators: (patch: Partial<Indicators>) => void
   setTool: (tool: Tool) => void
   select: (id: string | null) => void
   addDrawing: (d: Drawing) => void
@@ -306,18 +314,7 @@ export const useStore = create<State>()(
       updateLatest: null,
       updateCheckedAt: 0,
       finnhubKey: window.api.keyGet(),
-      indicators: {
-        sma: { on: true, period: 20 },
-        ema: { on: false, period: 50 },
-        bb: { on: false, period: 20, mult: 2 },
-        ema3: { on: false, fast: 20, mid: 50, slow: 200 },
-        vwap: { on: false },
-        supertrend: { on: false, period: 10, mult: 3 },
-        rsi: { on: true, period: 14 },
-        macd: { on: false, fast: 12, slow: 26, signal: 9 },
-        stoch: { on: false, period: 14, smoothK: 3, smoothD: 3 },
-        atr: { on: false, period: 14 }
-      },
+      indicators: structuredClone(DEFAULT_INDICATORS),
       drawings: {},
       tool: 'cursor',
       selectedId: null,
@@ -365,6 +362,7 @@ export const useStore = create<State>()(
       },
       setIndicator: (name, patch) =>
         set((s) => ({ indicators: { ...s.indicators, [name]: { ...s.indicators[name], ...patch } } })),
+      setIndicators: (patch) => set((s) => ({ indicators: { ...s.indicators, ...patch } })),
       setTool: (tool) => set({ tool, selectedId: null }),
       select: (selectedId) => set({ selectedId }),
       addDrawing: (d) => set((s) => withDrawings(s, [...(s.drawings[drawingsKey(s)] ?? []), d])),

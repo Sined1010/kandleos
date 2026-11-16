@@ -21,6 +21,7 @@ export const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
   wxy: 4,
   wxyxz: 6,
   sine: 2,
+  avwap: 1,
   text: 1
 }
 

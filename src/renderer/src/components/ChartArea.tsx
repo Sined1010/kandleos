@@ -1,5 +1,6 @@
 import {
   CandlestickSeries,
+  createSeriesMarkers,
   createChart,
   CrosshairMode,
   HistogramSeries,
@@ -38,9 +39,10 @@ import {
   type CandleProvider
 } from '../../../shared/types'
 import { BandSeries, ShadeSeries } from '../lib/bandSeries'
+import { VolumeProfileView } from '../lib/volumeProfileView'
 import { ipcError, wholeCoins } from '../lib/format'
 import { THEME } from '../lib/theme'
-import { atr, bollinger, ema, macd, rsi, sma, stochastic, supertrend, vwap } from '../lib/indicators'
+import { adx, atr, bollinger, ema, lastBarRunning, macd, rsi, sma, squeeze, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { sessionLine } from '../lib/sessionLine'
 import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
@@ -461,6 +463,79 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     return () => api.chart.removeSeries(shade)
   },[api, extended, data.length, exchangeZone, symbol])
 
+  // Whether the last bar is still forming: the squeeze leaves it unjudged until it is finished. Re-checked every
+  // 30 s so the bell (close, open) is noticed; an unchanged answer does not re-render.
+  const [lastRunning, setLastRunning] = useState(true)
+  const lastTime = data.at(-1)?.time
+  useEffect(() => {
+    const check = () =>
+      setLastRunning(
+        lastTime === undefined ||
+          lastBarRunning({
+            step: TF_SECONDS[timeframe],
+            phase: phaseAt(symbol, exchangeZone, Date.now() / 1000),
+            extended,
+            lastTime,
+            // The zone the live ticks are laid on (mergeTick below), read at each check.
+            zone: timezoneRef.current,
+            now: Date.now() / 1000
+          })
+      )
+    check()
+    const id = setInterval(check, 30_000)
+    return () => clearInterval(id)
+  }, [symbol, exchangeZone, timeframe, extended, lastTime])
+
+  // Squeeze: grey behind the bars while the Bollinger bands lie inside the Keltner channel, a neutral dot where
+  // that ends. Rebuilt when bars are added or loaded and when the last bar finishes, not on every tick.
+  const sq = indicators.squeeze
+  // Changes when a bar is added or loaded, on another symbol (same bar count and start: BTC and ETH) and when the
+  // last bar is final; not on a tick of the running bar.
+  const sqKey = `${data.length}|${data[0]?.time}|${data[0]?.close}|${data.at(-2)?.close}|${lastRunning ? '' : data.at(-1)?.close}`
+  useEffect(() => {
+    if (!api || !sq.on || !data.length) return
+    const { on, released } = squeeze(data, sq.period, sq.mult, sq.kcMult, lastRunning)
+    const shade = api.chart.addCustomSeries(
+      new ShadeSeries(),
+      {
+        priceScaleId: 'squeeze',
+        priceLineVisible: false,
+        lastValueVisible: false,
+        autoscaleInfoProvider: () => null,
+        // Bluer than the grey of pre-market and after-hours, so both stay apart.
+        fill: 'rgba(165, 180, 252, 0.07)'
+      },
+      0
+    )
+    shade.setSeriesOrder(0)
+    shade.setData(data.flatMap((c, i) => (on[i] ? [{ time: ts(c.time), shade: true as const }] : [])))
+    const dots = createSeriesMarkers(
+      api.candles,
+      data.flatMap((c, i) =>
+        released[i] ? [{ time: ts(c.time), position: 'belowBar' as const, shape: 'circle' as const, color: '#e6e8f2', size: 0.6 }] : []
+      )
+    )
+    return () => {
+      dots.detach()
+      api.chart.removeSeries(shade)
+    }
+  }, [api, sq.on, sq.period, sq.mult, sq.kcMult, sqKey])
+
+  // Volume profile behind the candles; it recomputes itself when the view or the bars in it change.
+  const vp = indicators.vp
+  const vpView = useRef<VolumeProfileView | null>(null)
+  useEffect(() => {
+    if (!api || !vp.on) return
+    const view = new VolumeProfileView(vp.rows, t('Volume Profile: kein Volumen'))
+    api.candles.attachPrimitive(view)
+    vpView.current = view
+    return () => {
+      api.candles.detachPrimitive(view)
+      vpView.current = null
+    }
+  }, [api, vp.on, vp.rows])
+  useEffect(() => vpView.current?.setCandles(data), [data, api, vp.on, vp.rows])
+
   // A preset with the already loaded candle size only needs a scroll; otherwise the load above applies it.
   // Declared after the load effect, which empties dataRef first when the candle size changes.
   useEffect(() => {
@@ -494,7 +569,11 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     const groups: LegendGroup[] = []
     const legend = (pane: number, label: string, color: string, series: ISeriesApi<SeriesType>[], osc?: boolean) =>
       groups.push({ pane, label, color, series, osc })
-    const { sma: s, ema: e, ema3, bb, vwap: vw, supertrend: st, rsi: r, macd: m, stoch, atr: at } = indicators
+    const { sma: s, ema: e, ema3, bb, vwap: vw, supertrend: st, rsi: r, macd: m, stoch, atr: at, adx: ad, squeeze: sqz } = indicators
+    // The squeeze draws in its own effect (shaded bars, dots); the legend only names it.
+    if (sqz.on) legend(0, `Squeeze ${sqz.period} ${sqz.mult} ${sqz.kcMult}`, '#a5b4fc', [])
+    // The profile spreads each bar's volume over its range (no tick data); the legend says so.
+    if (indicators.vp.on) legend(0, `Volume Profile ${indicators.vp.rows} · ${t('Schätzung aus Kerzen')}`, '#22d3ee', [])
     // Indicators with several lines are computed once per data change, not once per line.
     const once = <T,>(f: (c: number[], d: Candle[]) => T) => {
       let seen: Candle[] | undefined
@@ -564,6 +643,12 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       const series = line('#b0bec5', (_, d) => atr(d, at.period), pane)
       valueTag(series, '#b0bec5')
       legend(pane++, `ATR ${at.period}`, '#b0bec5', [series])
+    }
+    if (ad.on) {
+      // Pink, not amber: amber belongs to the AI forecast alone.
+      const series = line('#f472b6', (_, d) => adx(d, ad.period), pane)
+      guides(series, '#f472b6', [25])
+      legend(pane++, `ADX ${ad.period}`, '#f472b6', [series], true)
     }
     if (flowBars) {
       // Net flow per bar: grey = more coins onto exchanges, indigo = more withdrawn; unusual days full, the rest faint.

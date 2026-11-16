@@ -392,6 +392,18 @@ export const EN: Record<string, string> = {
   Lang: 'Long',
   StdAbw: 'StdDev',
   'ATR-Periode': 'ATR period',
+  Stufen: 'Rows',
+  Setups: 'Setups',
+  'Volatilitäts-Ausbruch': 'Volatility breakout',
+  Ausbruch: 'Breakout',
+  'Volume Profile: kein Volumen': 'Volume Profile: no volume',
+  'Schätzung aus Kerzen': 'estimated from candles',
+  'Anchored VWAP (1 Klick auf die Anker-Kerze)': 'Anchored VWAP (1 click on the anchor candle)',
+  'AVWAP: Anker vor den geladenen Kerzen': 'AVWAP: anchor before the loaded candles',
+  'AVWAP: kein Volumen': 'AVWAP: no volume',
+  'AVWAP: Anker nach der letzten Kerze': 'AVWAP: anchor after the last candle',
+  'Werden die Bollinger-Bänder ungewöhnlich eng (grau hinterlegt), folgt oft eine starke Bewegung. Die Richtung zeigt der Supertrend, die Stärke ein ADX über 25. Die ATR hilft, den Abstand für einen Stop zu wählen.':
+    'When the Bollinger Bands get unusually tight (grey background), a strong move often follows. The Supertrend shows the direction, an ADX above 25 the strength. The ATR helps to choose the distance for a stop.',
   Faktor: 'Factor',
   Stochastik: 'Stochastic',
 

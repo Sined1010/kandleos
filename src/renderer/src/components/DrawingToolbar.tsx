@@ -1,5 +1,6 @@
 import {
   Activity,
+  Anchor,
   AudioWaveform,
   ChartNoAxesColumnIncreasing,
   ChartNoAxesGantt,
@@ -32,6 +33,7 @@ export const TOOLS: [Tool, LucideIcon, string][] = [
   ['ray', MoveUpRight, msg('Strahl – Trendlinie bis zum Rand verlängert (2 Klicks)')],
   ['hline', Minus, msg('Horizontale Linie (1 Klick)')],
   ['vline', SeparatorVertical, msg('Vertikale Linie (1 Klick)')],
+  ['avwap', Anchor, msg('Anchored VWAP (1 Klick auf die Anker-Kerze)')],
   ['channel', Columns2, msg('Parallelkanal (3 Klicks: Linie, dann Abstand)')],
   ['rect', RectangleHorizontal, msg('Rechteck / Zone (2 Klicks)')],
   ['fib', ChartNoAxesGantt, msg('Fibonacci Retracement (2 Klicks: Hoch → Tief)')],
