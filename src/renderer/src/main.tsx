@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import ChartBoundary from './components/ChartBoundary'
 import './index.css'
 import './wire'
 import { createCandleCache } from '../../mobile/candleCache'
@@ -9,4 +10,9 @@ import { setCandleCache } from './services/marketData'
 setCandleCache(createCandleCache({ read: async () => null, write: async () => {}, rename: async () => {}, remove: async () => {} }))
 
 // No StrictMode: its mount/unmount/remount cycle would run chart effects against an already removed chart instance.
-createRoot(document.getElementById('root')!).render(<App />)
+// Last net: one broken piece outside the chart shows a note instead of a blank window.
+createRoot(document.getElementById('root')!).render(
+  <ChartBoundary whole>
+    <App />
+  </ChartBoundary>
+)

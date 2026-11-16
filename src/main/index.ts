@@ -26,7 +26,7 @@ import { createRemoteOps } from './remoteOps'
 import { alpacaHasKeys, setAlpacaKeys, useAlpacaKeyStore } from '../data/alpaca'
 import { alpacaKeysFromDisk, finnhubKey, saveAlpacaKeysToDisk, saveFinnhubKey } from './keys'
 import { addFirewallRule, hasFirewallRule, otherFirewalls } from './firewall'
-import { configureLink, linkStatus, removeDevice, resumeLink, setLinkEnabled, setVpnHost, startPairing } from './link'
+import { cancelPairing, configureLink, linkStatus, removeDevice, resumeLink, setLinkEnabled, setVpnHost, startPairing } from './link'
 import { hiddenStart, keepRunning, notify, setAutostart, showWindow, syncTray } from './tray'
 import {
   companyInfo,
@@ -130,6 +130,7 @@ ipcMain.handle('link:set-enabled', async (_e, on) => {
   return status
 })
 ipcMain.handle('link:start-pairing', () => startPairing())
+ipcMain.handle('link:cancel-pairing', (_e, code) => cancelPairing(code))
 ipcMain.handle('link:remove', (_e, id) => removeDevice(id))
 ipcMain.handle('link:set-vpn-host', (_e, host) => setVpnHost(host))
 ipcMain.handle('link:firewall', () => hasFirewallRule())

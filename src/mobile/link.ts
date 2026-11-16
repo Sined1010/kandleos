@@ -75,7 +75,8 @@ export async function pairWith(code: PairingCode): Promise<void> {
   const p = await load()
   // The known PC's new addresses go in front of the old ones, never instead: a link with this PC's id and wrong
   // addresses (anyone can send one) must not cut the phone off. Only answers sealed with the device key count anyway.
-  if (p?.pcId === code.pc) await save({ ...p, addrs: [...new Set([...code.addrs, ...p.addrs])].slice(0, 8), port: code.port })
+  // The address that answered last always stays; the port is fixed (LINK_PORT), a link cannot change it.
+  if (p?.pcId === code.pc) await save({ ...p, addrs: [...new Set([...code.addrs.slice(0, 7), ...p.addrs])].slice(0, 8) })
   else {
     const { keys } = await client.pair(code, deviceName())
     await applyKeys(keys)
@@ -97,15 +98,19 @@ export async function unpair(): Promise<void> {
  * PC says that it replaces the current pairing.
  */
 async function openLink(url: string): Promise<void> {
-  const code = decodePairing(url)
-  if (!code) return
+  const decoded = decodePairing(url)
+  if (!decoded) return
+  // Shown and used are the same list: no harmless-looking first addresses with the sender's own one hidden behind.
+  const code = { ...decoded, addrs: decoded.addrs.slice(0, 8) }
   const p = await load()
   const question = !p
     ? t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name })
     : p.pcId === code.pc
       ? t('Neue Adressen für den PC „{name}“ übernehmen?', { name: p.pcName })
       : t('Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.', { current: p.pcName, name: code.name })
-  if (!(await ask(question, t('Koppeln'), p && p.pcId !== code.pc ? { danger: true } : undefined))) return
+  // The addresses are the one part of a forged link that is hard to disguise: a stranger's PC is not on your network.
+  const where = t('Adressen im Code: {addrs}', { addrs: code.addrs.join(', ') })
+  if (!(await ask(`${question} ${where}`, t('Koppeln'), p && p.pcId !== code.pc ? { danger: true } : undefined))) return
   try {
     await pairWith(code)
     tell(t('Mit „{name}“ gekoppelt.', { name: code.name }))

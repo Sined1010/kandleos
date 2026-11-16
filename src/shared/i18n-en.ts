@@ -982,6 +982,7 @@ export const EN: Record<string, string> = {
   'Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.':
     'Pair with the PC “{name}”? The watchlist, drawings and alarms will then sync with it.',
   'Mit „{name}“ gekoppelt.': 'Paired with “{name}”.',
+  'Adressen im Code: {addrs}': 'Addresses in the code: {addrs}',
   'Neue Adressen für den PC „{name}“ übernehmen?': 'Take over new addresses for the PC “{name}”?',
   'Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.':
     'The phone is paired with “{current}”. Pair with “{name}” instead? The watchlist, drawings and alarms then go to that PC. Only pair with codes your own PC is showing right now.',
@@ -1045,6 +1046,7 @@ export const EN: Record<string, string> = {
   // Chart error boundary
   'Der Chart konnte nicht angezeigt werden.': 'The chart could not be shown.',
   'Erneut versuchen': 'Try again',
+  'KandleOS konnte nicht angezeigt werden.': 'KandleOS could not be shown.',
   // Symbol search: filter and kind of each hit
   Alle: 'All',
   Aktien: 'Stocks',

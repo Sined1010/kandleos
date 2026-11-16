@@ -98,6 +98,8 @@ public final class AlarmFetch {
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setConnectTimeout(15000);
         con.setReadTimeout(15000);
+        // With key headers (Alpaca) a redirect would carry them to wherever it points; 3xx ends up as "HTTP 30x" below.
+        if (headers.containsKey("APCA-API-KEY-ID")) con.setInstanceFollowRedirects(false);
         for (Map.Entry<String, String> h : headers.entrySet()) con.setRequestProperty(h.getKey(), h.getValue());
         try {
             int code = con.getResponseCode();

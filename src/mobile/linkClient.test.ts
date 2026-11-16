@@ -133,3 +133,14 @@ test('call hands its time limit to http; without one it is 4 s', async () => {
   await c.call('hello')
   assert.deepEqual(limits, [120_000, 4000])
 })
+
+test('an address that never finishes its reply is given up after twice the time limit, and the queue goes on', async () => {
+  const pc = fakePc(['10.0.0.2'])
+  const http: Http = (url, init) => (url.includes('10.0.0.1') ? new Promise(() => {}) : pc.http(url, init))
+  const { c } = client(http)
+  const t0 = Date.now()
+  assert.deepEqual(await c.call('hello', undefined, 20), { pcNow: 1 })
+  assert.ok(Date.now() - t0 < 1000)
+  // The address that answered moved to the front, so the next call does not wait at all.
+  assert.deepEqual(await c.call('hello', undefined, 20), { pcNow: 1 })
+})

@@ -228,6 +228,7 @@ export async function createMobileApi(): Promise<Api> {
       status: notHere,
       setEnabled: notHere,
       startPairing: notHere,
+      cancelPairing: notHere,
       remove: notHere,
       setVpnHost: notHere,
       setAutostart: notHere,

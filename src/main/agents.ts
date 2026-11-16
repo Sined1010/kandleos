@@ -31,6 +31,8 @@ const UV_BUILDS: Partial<Record<NodeJS.Platform, { file: string; sha256: string;
 }
 const TRADINGAGENTS = { version: '0.7.1', commit: 'c4544913a14ed3df5f1ed7b9e8483270ce20682a' }
 const PYTHON_VERSION = '3.13'
+// Longest stdout line kept from the bridge; its "done" line with all reports stays well below this.
+const MAX_LINE = 32 * 1024 * 1024
 
 const base = (): string => join(app.getPath('userData'), 'agents')
 const build = () => (process.arch === 'x64' ? UV_BUILDS[process.platform] : undefined)
@@ -46,8 +48,9 @@ const lockFile = (): string => resource('requirements.lock')
 // TradingAgents is a source archive; the setuptools that builds it is pinned the same way.
 const buildConstraints = (): string => resource('build-constraints.txt')
 let lockHashCache: string | undefined
-/** Part of the install marker, so an updated lock file sets the environment up again. */
-const lockHash = (): string => (lockHashCache ??= createHash('sha256').update(readFileSync(lockFile())).digest('hex'))
+/** Part of the install marker, so an updated lock or build-constraint file sets the environment up again. */
+const lockHash = (): string =>
+  (lockHashCache ??= createHash('sha256').update(readFileSync(lockFile())).update(readFileSync(buildConstraints())).digest('hex'))
 
 // uv keeps its cache and the Python it downloads next to the environment, so removing the folder removes all.
 const uvEnv = (): NodeJS.ProcessEnv => ({
@@ -375,6 +378,8 @@ async function runChecked(req: AgentsRequest, onEvent: (e: AgentsEvent) => void,
       child.stdout.setEncoding('utf8')
       child.stdout.on('data', (chunk: string) => {
         buffer += chunk
+        // A line without end (a library dumping data) must not grow without bound; the bridge's own lines are far smaller.
+        if (buffer.length > MAX_LINE && !buffer.includes('\n')) buffer = ''
         let nl: number
         while ((nl = buffer.indexOf('\n')) >= 0) {
           const line = buffer.slice(0, nl)

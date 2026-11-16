@@ -36,11 +36,13 @@ export default function PairWizard({ onClose, onStatus }: { onClose: () => void;
   const [until, setUntil] = useState<number | null>(null)
   const [others, setOthers] = useState<string[] | null>(null)
   const firstButton = useRef<HTMLButtonElement>(null)
+  const shown = useRef<string | null>(null)
 
   const fail = (e: unknown) => setStep({ kind: 'error', message: ipcError(e) })
 
   const showCode = async () => {
     const code = await window.api.link.startPairing()
+    shown.current = code
     const s = await window.api.link.status()
     onStatus(s)
     setUntil(s.pairingUntil)
@@ -58,6 +60,9 @@ export default function PairWizard({ onClose, onStatus }: { onClose: () => void;
     })().catch(fail)
     // Once, when the wizard opens.
   }, [])
+
+  // However the wizard closes (×, Esc, a button), the code it showed stops working; a phone already paired keeps its key.
+  useEffect(() => () => void (shown.current && window.api.link.cancelPairing(shown.current)), [])
 
   // While the code is shown: count down and notice the new phone.
   useEffect(() => {

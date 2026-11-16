@@ -24,7 +24,14 @@ export interface LinkDeps {
 }
 
 const TIMEOUT_MS = 4000
-const url = (addr: string, port: number) => `http://${addr.includes(':') ? `[${addr}]` : addr}:${port}/k`
+// Connect and read time out on their own, but the read timer restarts with every byte: a host at a saved address that
+// trickles its reply would hold the one call queue for ever. Both limits together are the most a reply may take.
+const deadline = <T>(p: Promise<T>, ms: number): Promise<T> =>
+  new Promise((ok, fail) => {
+    const id = setTimeout(() => fail(new Error('timeout')), ms)
+    p.then(ok, fail).finally(() => clearTimeout(id))
+  })
+const url =(addr: string, port: number) => `http://${addr.includes(':') ? `[${addr}]` : addr}:${port}/k`
 
 export function createLinkClient(deps: LinkDeps) {
   /** Sends one sealed message to the first address that answers with a reply to exactly this message. */
@@ -33,17 +40,14 @@ export function createLinkClient(deps: LinkDeps) {
     for (const addr of addrs) {
       let reply: unknown
       try {
-        const res = await deps.http(url(addr, port), {
-          method: 'POST',
-          body: JSON.stringify(env),
-          headers: { 'Content-Type': 'application/json' },
-          timeoutMs
-        })
-        if (!res.ok) continue
-        reply = await res.json()
+        const res = deps
+          .http(url(addr, port), { method: 'POST', body: JSON.stringify(env), headers: { 'Content-Type': 'application/json' }, timeoutMs })
+          .then((r) => (r.ok ? r.json() : undefined))
+        reply = await deadline(res, 2 * timeoutMs)
       } catch {
         continue
       }
+      if (reply === undefined) continue
       // Anything not sealed with our key (another PC on an old address, a stranger) is not an answer.
       const opened = await openEnvelope(key, reply as Envelope, ctr - 1, 'res')
       // Only the answer to this very message counts (same counter), never an old one.

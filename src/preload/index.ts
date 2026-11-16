@@ -104,6 +104,7 @@ const api = {
     status: (): Promise<LinkStatus> => ipcRenderer.invoke('link:status'),
     setEnabled: (on: boolean): Promise<LinkStatus> => ipcRenderer.invoke('link:set-enabled', on),
     startPairing: (): Promise<string> => ipcRenderer.invoke('link:start-pairing'),
+    cancelPairing: (code: string): Promise<void> => ipcRenderer.invoke('link:cancel-pairing', code),
     remove: (id: string): Promise<LinkStatus> => ipcRenderer.invoke('link:remove', id),
     setVpnHost: (host: string): Promise<LinkStatus> => ipcRenderer.invoke('link:set-vpn-host', host),
     setAutostart: (on: boolean): Promise<LinkStatus> => ipcRenderer.invoke('link:set-autostart', on),

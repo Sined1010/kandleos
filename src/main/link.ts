@@ -3,9 +3,10 @@
 import { app } from 'electron'
 import { createServer, type Server } from 'node:http'
 import { hostname, networkInterfaces } from 'node:os'
-import { encodePairing, isPrivateAddress, LINK_PORT, toB64url } from '../shared/link'
+import { decodePairing, encodePairing, isPrivateAddress, LINK_PORT, toB64url } from '../shared/link'
 import { handleRequest, mergeDevices, type LinkDevice, type LinkState, type SourceKeys } from './linkHandler'
 import { t } from '../shared/i18n'
+import { createSlots } from './slots'
 import { read, save, Unreadable } from './keys'
 
 interface LinkFile {
@@ -155,8 +156,12 @@ function start(): Promise<void> {
     onError(error)
   })
   // Strangers are dropped as they connect, so they cannot hold the few slots below until their headers time out.
+  // Half of the slots per address: one host cannot lock the phone out, and phones behind one VPN address still fit.
+  const slots = createSlots(4)
   s.on('connection', (sock) => {
-    if (!isPrivateAddress(sock.remoteAddress ?? '')) sock.destroy()
+    const addr = sock.remoteAddress ?? ''
+    if (!isPrivateAddress(addr) || !slots.take(addr)) return void sock.destroy()
+    sock.once('close', () => slots.give(addr))
   })
   // Up to 8 MB per request may be buffered before it is decrypted: few connections, and none that dawdles.
   s.maxConnections = 8
@@ -208,6 +213,11 @@ export function startPairing(): string {
   const exp = Date.now() + PAIRING_MS
   pairing = { key, exp }
   return encodePairing({ v: 1, pc: load().pcId, name: hostname(), addrs: addresses(), port: LINK_PORT, key, exp: Math.floor(exp / 1000) })
+}
+
+/** The wizard closed: its code stops working at once, not after 5 minutes. Only that code, never a newer one. */
+export function cancelPairing(code: unknown): void {
+  if (pairing && typeof code === 'string' && decodePairing(code)?.key === pairing.key) pairing = null
 }
 
 const KEEP_REMOVED = 20
