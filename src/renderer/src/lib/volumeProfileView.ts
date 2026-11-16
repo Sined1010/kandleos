@@ -46,7 +46,8 @@ class Renderer implements IPrimitivePaneRenderer {
       if (p === 'none') {
         ctx.fillStyle = '#8b91ad'
         ctx.textAlign = 'right'
-        ctx.fillText(this.owner.noVolume, w - 8, 16)
+        // Bottom right: the top right of the pane is under the forecast button.
+        ctx.fillText(this.owner.noVolume, w - 8, mediaSize.height - 8)
       } else if (p) {
         const max = p.rows[p.poc]
         p.rows.forEach((v, k) => {

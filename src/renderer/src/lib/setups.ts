@@ -17,7 +17,7 @@ export const SETUPS: Setup[] = [
     label: msg('Volatilitäts-Ausbruch'),
     short: msg('Ausbruch'),
     info: msg(
-      'Werden die Bollinger-Bänder ungewöhnlich eng (grau hinterlegt), folgt oft eine starke Bewegung. Die Richtung zeigt der Supertrend, die Stärke ein ADX über 25. Die ATR hilft, den Abstand für einen Stop zu wählen.'
+      'Werden die Bollinger-Bänder ungewöhnlich eng (blau hinterlegt), folgt oft eine starke Bewegung. Die Richtung zeigt der Supertrend, die Stärke ein ADX über 25. Die ATR hilft, den Abstand für einen Stop zu wählen.'
     ),
     members: ['bb', 'squeeze', 'supertrend', 'adx', 'atr']
   }

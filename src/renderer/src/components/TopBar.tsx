@@ -344,19 +344,22 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
           const of = setupsOf(name)
           return (
             <div key={name} className="flex items-center gap-2 rounded px-1 py-1.5 hover:bg-bg">
-              <label className="flex flex-1 cursor-pointer items-center gap-2">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={cfg.on as boolean}
                   onChange={(e) => setIndicator(name, { on: e.target.checked })}
                   className="accent-accent"
                 />
-                <span className="text-white">{t(ROWS[name].label)}</span>
-                {of.map((s) => (
-                  <span key={s.id} className="whitespace-nowrap text-xs text-muted">
-                    · {t(s.short)}
-                  </span>
-                ))}
+                {/* Name and setup tag wrap under each other when a row with three fields is short of room (phone). */}
+                <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+                  <span className="text-white">{t(ROWS[name].label)}</span>
+                  {of.map((s) => (
+                    <span key={s.id} className="whitespace-nowrap text-xs text-muted">
+                      · {t(s.short)}
+                    </span>
+                  ))}
+                </span>
               </label>
               {ROWS[name].params.map(([field, label, step = 1]) => (
                 <NumberField

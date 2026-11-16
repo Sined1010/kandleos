@@ -502,8 +502,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
         priceLineVisible: false,
         lastValueVisible: false,
         autoscaleInfoProvider: () => null,
-        // Bluer than the grey of pre-market and after-hours, so both stay apart.
-        fill: 'rgba(165, 180, 252, 0.07)'
+        // Brand indigo, clearly apart from the neutral grey of pre-market and after-hours (checked side by side).
+        fill: 'rgba(99, 102, 241, 0.13)'
       },
       0
     )
