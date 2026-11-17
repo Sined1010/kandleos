@@ -341,7 +341,7 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
         <div className="my-1 border-t border-line" />
         {(Object.keys(ROWS) as (keyof Indicators)[]).map((name) => {
           const cfg = indicators[name] as unknown as Record<string, number | boolean>
-          const of = setupsOf(name)
+          const of = setupsOf(name).filter((s) => setupOn(indicators, s))
           return (
             <div key={name} className="flex items-center gap-2 rounded px-1 py-1.5 hover:bg-bg">
               <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
