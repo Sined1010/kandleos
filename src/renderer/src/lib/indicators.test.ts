@@ -138,6 +138,16 @@ test('volumeProfile finds the POC and grows the value area to 70 %', () => {
   assert.equal(volumeProfile([], 10), null)
 })
 
+test('volumeProfile grows the value area towards the bigger neighbour, also at the edge', () => {
+  // One-price bars, one per row: rows hold exactly these volumes.
+  const rowsOf = (vols: number[]) => volumeProfile(vols.map((v, i) => b(i, i, i, v)), vols.length)!
+  const p = rowsOf([2, 4, 10, 5, 1]) // 70 % of 22 = 15.4: 10 → +5 above → +4 below
+  assert.equal(p.poc, 2)
+  assert.deepEqual([p.vaLow, p.vaHigh], [1, 3])
+  const edge = rowsOf([3, 3, 4]) // POC in the top row: only room to grow downwards
+  assert.deepEqual([edge.poc, edge.vaLow, edge.vaHigh], [2, 1, 2])
+})
+
 test('anchorIndex finds the candle holding a time', () => {
   const times = [100, 200, 300]
   assert.equal(anchorIndex(times, 250, 100), 1)

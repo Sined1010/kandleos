@@ -128,6 +128,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     () => (times.length ? [...times, ...futureTimes(times, step, FUTURE_BARS, timeZone, TF_MONTHS[timeframe])] : times),
     [times.length, lastTime, step, timeZone, timeframe]
   )
+  // Month bars differ in length: the last one ends where the calendar starts the next one, not after 30 days.
+  const anchorStep = exact ? step : (axis[times.length] ?? lastTime + step) - lastTime
 
   // Lightweight Charts has no event for price-scale changes (axis drag, autoscale), so compare a
   // cheap viewport signature every frame and re-render only when it actually moved.
@@ -386,15 +388,17 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     }
 
     if (d.type === 'avwap') {
-      const at = anchorIndex(times, d.points[0].time, step, exact)
+      const at = anchorIndex(times, d.points[0].time, anchorStep, exact)
       const color = d.color ?? AVWAP
+      // Each AVWAP's note gets its own line, so several notes at the same spot stay readable.
+      const noteY = height - 24 - 14 * drawings.filter((x) => x.type === 'avwap').findIndex((x) => x.id === d.id)
       // Clicking the note or the line selects the drawing, so it can be moved, recoloured or deleted.
       const pick = preview ? undefined : (e: React.PointerEvent) => startDrag(e, d, 'move')
       // Placing and dragging keep the anchor on a bar; it can still fall outside them, e.g. on an after-hours
       // bar once pre/after market is switched off. A note keeps it visible and selectable.
       if (at === 'before' || at === 'after') {
         return (
-          <text key={d.id} x={8} y={height - 24} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+          <text key={d.id} x={8} y={noteY} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
             {at === 'before' ? t('AVWAP: Anker vor den geladenen Kerzen') : t('AVWAP: Anker nach der letzten Kerze')}
           </text>
         )
@@ -404,15 +408,15 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       if (ax === null) return null
       if (values.every(Number.isNaN)) {
         return (
-          <text key={d.id} x={ax + 4} y={height - 24} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+          <text key={d.id} x={ax + 4} y={noteY} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
             {t('AVWAP: kein Volumen')}
           </text>
         )
       }
       // Only the bars in view: a line over 10,000 bars would cost as many coordinate look-ups every frame.
       const view = chart.timeScale().getVisibleRange()
-      const from = view ? anchorIndex(times, view.from as number, step, exact) : at
-      const to = view ? anchorIndex(times, view.to as number, step, exact) : data.length - 1
+      const from = view ? anchorIndex(times, view.from as number, anchorStep, exact) : at
+      const to = view ? anchorIndex(times, view.to as number, anchorStep, exact) : data.length - 1
       const first = Math.max(at, typeof from === 'number' ? from - 1 : at)
       const last = to === 'before' ? -1 : to === 'after' ? data.length - 1 : Math.min(data.length - 1, to + 1)
       const line: string[] = []
@@ -433,7 +437,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           {!preview && line.length > 1 && <polyline points={line.join(' ')} {...hit()!} />}
           {ay !== null && (
             <>
-              <text x={ax} y={ay - 8} fill={color} fontSize={11} textAnchor="middle" style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move' }} onPointerDown={pick}>
+              {/* Near an edge the label grows inward, so it is not cut off at the last or first bar. */}
+              <text x={ax} y={ay - 8} fill={color} fontSize={11} textAnchor={ax > width - 60 ? 'end' : ax < 60 ? 'start' : 'middle'} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move' }} onPointerDown={pick}>
                 AVWAP {dateLabel(data[at].time)}
               </text>
               {(selected || preview) && (
