@@ -29,6 +29,14 @@ electronFuses:
   onlyLoadAppFromAsar: true
   enableEmbeddedAsarIntegrityValidation: true
   enableCookieEncryption: true
+# Electron itself is checked against the checksums of the electron npm package (node_modules/electron/checksums.json),
+# not only against SHASUMS256.txt from the same GitHub release as the zip. Copy both lines anew with every Electron
+# update; a missing or wrong entry stops the build. Without unsafelyDisableChecksums electron-builder drops the list.
+electronDownload:
+  unsafelyDisableChecksums: false
+  checksums:
+    electron-v44.9.3-win32-x64.zip: 41a1ffa0541cb0f2c9b9fe920dd2cef1793ad0ea2ada1a9582958880f4d1b23c
+    electron-v44.9.3-linux-x64.zip: 6e7fd2d450d442507b846ace4ae6e2bd17e1b1653e86a033b5231abfc23e6df4
 
 win:
   target: nsis
@@ -46,7 +54,11 @@ nsis:
   artifactName: KandleOS-Setup-${version}.${ext}
   oneClick: false
   perMachine: false # per-user install, no admin rights needed
+  # Setup never asks for admin rights itself; "for all users" needs it started as admin.
+  allowElevation: false
   allowToChangeInstallationDirectory: true
+  # Removes the phone-pairing firewall rule on uninstall.
+  include: windows/installer.nsh
   createDesktopShortcut: always
   createStartMenuShortcut: true
 
