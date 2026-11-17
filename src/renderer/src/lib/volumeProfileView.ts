@@ -7,6 +7,7 @@ import type {
   SeriesAttachedParameter,
   Time
 } from 'lightweight-charts'
+import { t } from '../../../shared/i18n'
 import type { Candle } from '../../../shared/types'
 import { volumeProfile, type VolumeProfile } from './indicators'
 
@@ -47,7 +48,8 @@ class Renderer implements IPrimitivePaneRenderer {
         ctx.fillStyle = '#8b91ad'
         ctx.textAlign = 'right'
         // Bottom right: the top right of the pane is under the forecast button.
-        ctx.fillText(this.owner.noVolume, w - 8, mediaSize.height - 8)
+        // Translated on each draw, so the note follows a language switch.
+        ctx.fillText(t('Volume Profile: kein Volumen'), w - 8, mediaSize.height - 8)
       } else if (p) {
         const max = p.rows[p.poc]
         p.rows.forEach((v, k) => {
@@ -99,11 +101,7 @@ export class VolumeProfileView implements ISeriesPrimitive<Time> {
   private readonly views = [new View(this)]
   private cache: { key: string; profile: VolumeProfile | 'none' | null } = { key: '', profile: null }
 
-  /** `noVolume`: the (translated) note shown when the bars in view carry no volume. */
-  constructor(
-    rows: number,
-    readonly noVolume: string
-  ) {
+  constructor(rows: number) {
     this.rows = rows
   }
 

@@ -526,7 +526,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   const vpView = useRef<VolumeProfileView | null>(null)
   useEffect(() => {
     if (!api || !vp.on) return
-    const view = new VolumeProfileView(vp.rows, t('Volume Profile: kein Volumen'))
+    const view = new VolumeProfileView(vp.rows)
     api.candles.attachPrimitive(view)
     vpView.current = view
     return () => {

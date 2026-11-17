@@ -1,6 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { stampChanges, unitsOf, type SyncSlice } from './sync.ts'
+import { DEFAULT_INDICATORS } from '../renderer/src/lib/indicatorDefaults.ts'
+import {
+  answerSync,
+  applyUnits,
+  capTabs,
+  checkSyncRequest,
+  cleanIndicators,
+  emptySync,
+  firstMerge,
+  mergeUnits,
+  receiveSync,
+  sliceOf,
+  stampChanges,
+  SYNC_FORMAT,
+  unitsOf,
+  type SyncSlice
+} from './sync.ts'
 
 const indicators = { sma: { on: true, period: 20 } } as unknown as SyncSlice['indicators']
 const slice = (over: Partial<SyncSlice> = {}): SyncSlice => ({
@@ -53,7 +69,6 @@ test('stampChanges stamps changed, new and deleted units, keeps the rest', () =>
 })
 
 // ── mergeUnits: base = last agreed state, mine = PC, theirs = phone; offset turns phone stamps into PC time ──
-import { capTabs, firstMerge, mergeUnits } from './sync.ts'
 
 const pcU = (over: Partial<SyncSlice> = {}) => unitsOf(slice(over))
 
@@ -214,7 +229,6 @@ test('capTabs keeps the first three tabs and saves a dropped tab with drawings a
 })
 
 // ── applyUnits: put the merge result onto the store as it is now (it may have changed meanwhile) ──
-import { applyUnits, sliceOf } from './sync.ts'
 
 test('sliceOf rebuilds the slice from its units, keeping per-device bits', () => {
   const s = slice({ folders: [{ id: 'f1', name: 'Crypto', symbols: ['BTCUSDT', 'ETHUSDT'], collapsed: true }] })
@@ -276,7 +290,6 @@ test('drawings, tabs and charts missing what they are drawn with are skipped', (
 })
 
 // ── one full round: phone sends, PC answers, phone receives ──
-import { answerSync, checkSyncRequest, emptySync, receiveSync, SYNC_FORMAT } from './sync.ts'
 
 const labels = { fromPhone: 'Tab vom Handy', clash: ' (Handy)' }
 
@@ -415,9 +428,6 @@ test('different sync formats are refused on both sides, before anything is merge
   const reply = { format: SYNC_FORMAT + 1, units: {}, stamps: {}, pcNow: 1, baseId: 'b' }
   assert.throws(() => receiveSync(slice(), emptySync(), 'pc', sent, reply, 1), /sync-format/)
 })
-
-import { DEFAULT_INDICATORS } from '../renderer/src/lib/indicatorDefaults.ts'
-import { cleanIndicators } from './sync.ts'
 
 test('cleanIndicators keeps the Keltner factor as a decimal and adds new indicators switched off', () => {
   const out = cleanIndicators(DEFAULT_INDICATORS, { squeeze: { on: true, kcMult: 1.5, period: 20.4 } })

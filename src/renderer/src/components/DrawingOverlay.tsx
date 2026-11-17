@@ -207,6 +207,11 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     avwapCache.current.set(id, { data, at, values })
     return values
   }
+  // Deleted drawings and another symbol's drawings leave the cache, so it does not keep old bar arrays alive.
+  useEffect(() => {
+    const ids = new Set(drawings.map((d) => d.id))
+    for (const id of avwapCache.current.keys()) if (!ids.has(id)) avwapCache.current.delete(id)
+  }, [drawings])
 
   const logicalAt = (e: { clientX: number; clientY: number }) => {
     const rect = svgRef.current!.getBoundingClientRect()
