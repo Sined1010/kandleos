@@ -82,3 +82,6 @@ linux:
   syncDesktopName: true # window <-> launcher icon association (WM_CLASS / Wayland app_id)
   synopsis: Technische Chartanalyse
   artifactName: KandleOS-${version}-${arch}.${ext}
+appImage:
+  # No --no-sandbox in the menu entry: AppRun itself adds it only where user namespaces are blocked.
+  executableArgs: []
