@@ -90,6 +90,11 @@ The tar.gz installs to `~/.local/share/kandleos-app` and adds a launcher to the 
 For Electron's sandbox the script asks for your `sudo` password once (recommended). If you skip it, KandleOS
 runs without the sandbox and shows a warning.
 
+To update: close KandleOS, then choose **KandleOS aktualisieren** in the app menu or run
+`bash ~/.local/share/kandleos-app/install.sh --update`. It downloads the latest tar.gz from the GitHub releases,
+checks it against `SHA256SUMS.txt` and installs it; your data stays. This works from the first version that
+includes it; older installations update once by hand as above.
+
 To uninstall: `bash ~/.local/share/kandleos-app/install.sh --uninstall` (your data in `~/.config/kandleos` is kept).
 
 ### Android (8.0 or newer)
