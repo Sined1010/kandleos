@@ -1,0 +1,6 @@
+- New indicators: Squeeze, ADX, Volume Profile, and the "Volatility breakout" setup
+- Anchored VWAP drawing tool
+- Exchange flows for BTC and ETH (with events on)
+- Safer phone pairing; Alpaca alarms never follow redirects
+- Daily candles start with the source's date; event labels stay on the right candle
+- Update the PC and the phone together: 0.9.0 does not sync with 0.8.x

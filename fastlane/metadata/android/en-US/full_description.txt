@@ -1,0 +1,23 @@
+KandleOS is a free, open-source app for technical chart analysis. The Android app works on its own and can be paired with KandleOS on your Windows or Linux PC.
+
+<b>On the phone</b>
+<ul>
+<li>Candlestick charts from 1 minute to 12 months, with volume and live prices</li>
+<li>Indicators such as SMA, EMA, Bollinger Bands, Squeeze, VWAP, Volume Profile, Supertrend, RSI, MACD, Stochastic, ATR and ADX</li>
+<li>Drawing tools: trend lines, channels, Fibonacci, Elliott waves, anchored VWAP, text and more</li>
+<li>Watchlist with folders, as a list or as folder tiles, with pinned symbols and sorting by daily change</li>
+<li>Saved charts with their drawings</li>
+<li>Price alarms, also in the background</li>
+<li>Insider deals (BaFin, Finnhub) and, for BTC and ETH, daily exchange flows (Coin Metrics), off until you switch them on</li>
+</ul>
+
+<b>Paired with your PC</b>
+Watchlist, drawings, saved charts and alarms stay in sync, directly over your home network or VPN, end-to-end encrypted, without a server in between. The AI price forecast (Chronos-2) and the optional TradingAgents analysis are computed by your PC, which needs to be on. Every forecast comes with a backtest that shows how accurate past forecasts were, and whether they beat simply assuming "the price stays the same".
+
+<b>Data sources</b>
+Crypto from Binance. Stocks from Alpaca (your own free key), from Yahoo Finance only if you opt in for private use, and optionally Finnhub. Exchange flows are Coin Metrics Community estimates under CC BY-NC 4.0 (non-commercial use).
+
+<b>Private</b>
+No account, no ads, no tracking. Your watchlist and drawings stay on your devices.
+
+License: GPL-3.0-or-later. Not investment advice: prices may be delayed or wrong, and forecasts are statistical aids, not recommendations.
