@@ -39,8 +39,9 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
   Older candles load automatically as you scroll back (up to 10,000), and for US stocks a price line shows the pre-/post-market price.
   2h and 4h stock candles follow the exchange's session (e.g. 9:30 and 13:30 in New York), also across daylight saving changes.
   Switching back to a chart you opened before shows it at once while fresh prices load
-- **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, VWAP, Supertrend, RSI, MACD, Stochastic, ATR, with a legend in the chart showing their values
-- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
+- **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, Squeeze, VWAP, Volume Profile (with POC and value area), Supertrend, RSI, MACD, Stochastic, ATR, ADX, with a legend in the chart showing their values.
+  The "Volatility breakout" setup switches on Bollinger Bands, Squeeze, Supertrend, ADX and ATR with one click and explains how to read them
+- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, anchored VWAP, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
 - **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
 - **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu.
   The daily change shows as a colored pill, ⏰ marks symbols with an active alarm, each folder shows its average change,

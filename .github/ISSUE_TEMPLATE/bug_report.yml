@@ -1,0 +1,62 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! Security problems go through [SECURITY.md](https://github.com/Sined1010/kandleos/blob/main/SECURITY.md), not here.
+        **Never paste API keys** (Alpaca, Finnhub, LLM providers) into an issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open BTCUSDT, 1D
+        2. Click "AI forecast"
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: KandleOS version
+      description: Shown in the About dialog (desktop) or ⋮ → About (Android).
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows
+        - Linux (AppImage)
+        - Linux (.deb)
+        - Linux (tar.gz)
+        - Android
+        - Run from source
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Data source
+      multiple: true
+      options:
+        - Crypto (Binance)
+        - Alpaca
+        - Yahoo
+        - Finnhub
+        - Not data related
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or log
+      description: On Linux the log is at `~/.cache/kandleos.log`. Please remove anything personal first.
