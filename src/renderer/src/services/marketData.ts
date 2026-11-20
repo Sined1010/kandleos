@@ -274,7 +274,8 @@ export function watchQuotes(
           if (Date.now() - lastReport > 5000) report()
         },
         (ws) => {
-          stocks.forEach((symbol) => ws.send(JSON.stringify({ type: 'subscribe', symbol })))
+          // US listings only: Finnhub answers e.g. WEED.TO with "Invalid symbol", which would mark the feed as failed.
+          stocks.filter(alpacaKnows).forEach((symbol) => ws.send(JSON.stringify({ type: 'subscribe', symbol })))
           wsOpen = true
           report()
         },
