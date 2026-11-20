@@ -36,6 +36,11 @@ android {
             }
         }
     }
+    // No Google-encrypted dependency list in the APK: F-Droid and IzzyOnDroid flag it, nobody can read it but Google.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     buildTypes {
         // Own app id, so test builds install next to the released app instead of replacing it (and its data).
         debug {
