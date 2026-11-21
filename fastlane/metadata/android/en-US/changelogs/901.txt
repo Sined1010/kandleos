@@ -1,0 +1,4 @@
+- Finnhub: no more false "error" status when the watchlist has non-US stocks
+- The APK no longer contains Google's encrypted dependency list
+- Reproducible build: the license list is sorted the same on every machine
+- Syncs with 0.9.0, so PC and phone can be updated one at a time
