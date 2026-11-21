@@ -104,5 +104,6 @@ THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRI
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`, '')
-writeFileSync(join(root, 'resources', 'THIRD_PARTY_LICENSES.txt'), out.join('\n'))
+// LF only: some packages ship CRLF texts, and the file must match Git's copy (and the APK) on every machine.
+writeFileSync(join(root, 'resources', 'THIRD_PARTY_LICENSES.txt'), out.join('\n').replace(/\r\n?/g, '\n'))
 console.log(`THIRD_PARTY_LICENSES.txt: ${entries.length} Pakete`)

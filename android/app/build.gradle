@@ -1,8 +1,8 @@
 apply plugin: 'com.android.application'
 
-// Version from package.json: "0.5.0" → versionName 0.5.0, versionCode 500 (major·10000 + minor·100 + patch).
-def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
-def (vMajor, vMinor, vPatch) = appVersion.tokenize('.').collect { it as int }
+// Version from package.json: "version" → versionName, "versionCode" (major·10000 + minor·100 + patch, checked by
+// src/shared/version.test.ts) as a plain number, because F-Droid's update check reads it from there.
+def pkg = new groovy.json.JsonSlurper().parse(file('../../package.json'))
 
 // Release signing: KANDLEOS_SIGNING names a .properties file outside the repo with storeFile, storePassword,
 // keyAlias and keyPassword (see android/build-apk.cmd). Without it the release APK stays unsigned.
@@ -17,8 +17,8 @@ android {
         applicationId "io.github.sined1010.kandleos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode vMajor * 10000 + vMinor * 100 + vPatch
-        versionName appVersion
+        versionCode pkg.versionCode as int
+        versionName pkg.version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
