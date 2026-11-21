@@ -51,7 +51,8 @@ function collect(name, from) {
 }
 for (const name of roots) collect(name, root)
 
-const entries = [...seen.values()].sort((a, b) => a.key.localeCompare(b.key))
+// Plain code-unit order, not localeCompare: the same file on every machine (F-Droid rebuilds the APK to compare).
+const entries = [...seen.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 const line = '='.repeat(78)
 const out = [
   'KandleOS – Lizenzen von Drittanbietern',
