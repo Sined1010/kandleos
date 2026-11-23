@@ -35,8 +35,8 @@ electronFuses:
 electronDownload:
   unsafelyDisableChecksums: false
   checksums:
-    electron-v44.9.3-win32-x64.zip: 41a1ffa0541cb0f2c9b9fe920dd2cef1793ad0ea2ada1a9582958880f4d1b23c
-    electron-v44.9.3-linux-x64.zip: 6e7fd2d450d442507b846ace4ae6e2bd17e1b1653e86a033b5231abfc23e6df4
+    electron-v44.11.3-win32-x64.zip: 97fca9b8e9b90cdc88c1efd44160ca4b89b15101721d93c8befcbeb35b93fb59
+    electron-v44.11.3-linux-x64.zip: f2390c1e7803e5f4d59d46a92fd7067d0b13c237d0dec886b00e63d0078078d4
 
 win:
   target: nsis
