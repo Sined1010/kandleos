@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChartTab, Drawing, Indicators } from '../store/useStore'
-import { findByName, groupCharts, isDirty, linkedChart, loadTarget, toolCounts, type SavedChart } from './charts.ts'
+import { findByName, groupCharts, isDirty, linkedChart, loadTarget, toolCounts, withoutAlarmEnds, type SavedChart } from './charts.ts'
 
 const trend: Drawing = { id: 't1', type: 'trend', p1: { time: 1, price: 10 }, p2: { time: 2, price: 20 } }
 const hline: Drawing = { id: 'h1', type: 'hline', price: 15 }
@@ -93,4 +93,15 @@ test('loadTarget picks the tab a saved chart opens in', () => {
   })
   const three = [tab('a', 'ETHUSDT'), tab('b', 'AAPL'), tab('c', 'NVDA')]
   assert.deepEqual(loadTarget(c, { tabs: three, activeTab: 'a', drawings: { 'a:ETHUSDT': [hline] } }, 3), { kind: 'confirm' })
+})
+
+test('alarm ends are not part of a saved chart: no false "changed" from them', () => {
+  const line = { id: 'h', type: 'hline', price: 5 } as Drawing
+  const withEnd = { ...line, alarmUntil: 900 } as Drawing
+  assert.deepEqual(withoutAlarmEnds([withEnd]), [line])
+  const saved = { id: 'c', name: 'n', symbol: 'AAPL', timeframe: '1D', drawings: [line], indicators: {} as Indicators, savedAt: 1 } as SavedChart
+  assert.equal(isDirty(saved, '1D', [withEnd]), false)
+  assert.equal(isDirty({ ...saved, drawings: [withEnd] }, '1D', [line]), false)
+  const tab = { id: 't', symbol: 'AAPL', timeframe: '1D', range: null, chartId: 'c' } as ChartTab
+  assert.deepEqual(loadTarget(saved, { tabs: [tab], activeTab: 't', drawings: { 't:AAPL': [withEnd] } }, 3), { kind: 'here' })
 })

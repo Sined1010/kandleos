@@ -438,3 +438,19 @@ test('cleanIndicators keeps the Keltner factor as a decimal and adds new indicat
   assert.deepEqual([old.squeeze.on, old.adx.on, old.vp.on], [false, false, false])
   assert.equal(old.vp.rows, 30)
 })
+
+test('format 4: a line alarm with a broken line is dropped on the way in', () => {
+  const s = slice()
+  const units = unitsOf(s)
+  units['alarm:bad'] = JSON.stringify({ id: 'bad', symbol: 'AAPL', op: 'above', price: 1, createdAt: 1, line: { key: 5 } })
+  assert.equal(sliceOf(units, s).alarms.some((a) => a.id === 'bad'), false)
+  assert.equal(SYNC_FORMAT, 4)
+})
+
+test('format 4: a line alarm survives the trip with its line', () => {
+  const s = slice()
+  const line = { key: 't1:AAPL', drawing: 'd1', part: 'top' }
+  const a = { id: 'la', symbol: 'AAPL', op: 'below' as const, price: 210, createdAt: 100, line }
+  const back = sliceOf(unitsOf({ ...s, alarms: [...s.alarms, a] }), s).alarms.find((x) => x.id === 'la')
+  assert.deepEqual(back, a)
+})

@@ -126,6 +126,32 @@ export function phaseAt(symbol: string, timeZone: string | undefined, t: number)
   return s.phase(date, sec)
 }
 
+/**
+ * Regular trading time of a symbol between `from` and `to` (unix seconds) as sorted `[start, end)` intervals, cut to
+ * the window. Pre-/after-market and midday breaks do not count. Crypto trades always; null when the hours are unknown.
+ */
+export function openSessions(symbol: string, timeZone: string | undefined, from: number, to: number): [number, number][] | null {
+  if (isCrypto(symbol)) return from < to ? [[from, to]] : []
+  const s = scheduleFor(symbol, timeZone)
+  if (!s) return null
+  const out: [number, number][] = []
+  const last = wall(to, s.zone).date
+  for (let d = wall(from, s.zone).date; d <= last; d = nextDate(d)) {
+    const cuts = [0, ...s.edges(d)]
+    for (let i = 0; i < cuts.length; i++) {
+      if (s.phase(d, cuts[i]) !== 'open') continue
+      const start = Math.max(from, fromWall(d, cuts[i], s.zone))
+      const end = Math.min(to, i + 1 < cuts.length ? fromWall(d, cuts[i + 1], s.zone) : fromWall(nextDate(d), 0, s.zone))
+      if (start >= end) continue
+      // Markets open across midnight (futures, currencies) continue the previous interval.
+      const prev = out[out.length - 1]
+      if (prev && prev[1] === start) prev[1] = end
+      else out.push([start, end])
+    }
+  }
+  return out
+}
+
 /** Trading status of a symbol at `now` (unix seconds); null when its exchange hours are unknown. */
 export function marketStatus(symbol: string, timeZone: string | undefined, now = Date.now() / 1000): MarketStatus | null {
   if (isCrypto(symbol)) return { phase: 'open' }

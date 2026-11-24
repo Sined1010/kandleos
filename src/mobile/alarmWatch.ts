@@ -1,14 +1,14 @@
 import { App as CapApp } from '@capacitor/app'
-import { alarmClock } from '../shared/alarms'
-import { t } from '../shared/i18n'
+import { alarmClock, isArmed } from '../shared/alarms'
 import { createAlarmWatch } from '../renderer/src/lib/alarmCore'
-import { alarmTitle } from '../renderer/src/services/alarmWatch'
+import { knotsFor } from '../renderer/src/lib/lineAlarms'
+import { alarmBody, alarmTitle } from '../renderer/src/services/alarmWatch'
 import { fetchCandles } from '../renderer/src/services/marketData'
 import { useQuotes, useStore } from '../renderer/src/store/useStore'
 import { planAlarm } from './alarmPlan'
 import { KandleNative, type NativeAlarm } from './native'
 
-const armed = () => useStore.getState().alarms.filter((a) => a.triggeredAt === undefined)
+const armed = () => useStore.getState().alarms.filter(isArmed)
 /** Android wants an int id per notification; one per alarm, so a repeat replaces instead of stacking. */
 export const notificationId = (id: string) => parseInt(id.replace(/-/g, '').slice(0, 7), 16)
 
@@ -27,8 +27,9 @@ const watch = createAlarmWatch({
     return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
   },
   loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
-  notify: (a) => KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: t('Kurs-Alarm von KandleOS') }).catch(() => {}),
-  collect: collectNative
+  notify: (a) => KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: alarmBody(a) }).catch(() => {}),
+  collect: collectNative,
+  knotsFor: (a, now) => knotsFor(a, useStore.getState().drawings, now)
 })
 
 /** The armed alarms go to the Android background check (AlarmWorker / AlarmService). */
@@ -36,12 +37,34 @@ async function syncNative(): Promise<void> {
   await collectNative()
   const s = useStore.getState()
   alpacaKeys = await window.api.alpacaHasKeys()
+  const now = Math.floor(Date.now() / 1000)
   const alarms: NativeAlarm[] = armed().flatMap((a) => {
     const p = planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys })
     if ('skip' in p) return []
-    return [{ id: a.id, symbol: a.symbol, title: alarmTitle(a), op: a.op, price: a.price, checkedUntil: a.checkedUntil ?? a.createdAt, ...p }]
+    const base = { id: a.id, symbol: a.symbol, title: alarmTitle(a), op: a.op, price: a.price, checkedUntil: a.checkedUntil ?? a.createdAt, ...p }
+    if (!a.line) return [base]
+    // Line alarms: the table the background check reads, and the text it fills in ({price} = where it was touched).
+    const table = knotsFor(a, s.drawings, now)
+    return table === 'missing' || !table.knots.length ? [] : [{ ...base, knots: table.knots, body: alarmBody(a, '{price}') }]
   })
   await KandleNative.setAlarms({ alarms, instant: s.instantAlarms }).catch(() => {})
+}
+
+// A catch-up writes each alarm on its own; one hand-over after the burst instead of one per write.
+let syncTimer: ReturnType<typeof setTimeout> | undefined
+function scheduleSync(): void {
+  clearTimeout(syncTimer)
+  syncTimer = setTimeout(() => {
+    syncTimer = undefined
+    void syncNative()
+  }, 300)
+}
+/** Hands over at once what is still waiting (the app goes to the background and may be swiped away). */
+function flushSync(): void {
+  if (syncTimer === undefined) return
+  clearTimeout(syncTimer)
+  syncTimer = undefined
+  void syncNative()
 }
 
 /** What the background check found while the app was closed, then the app's own catch-up. */
@@ -62,8 +85,11 @@ export function startAlarmWatch(): () => void {
   })
   void refresh()
   const resume = CapApp.addListener('resume', () => void refresh())
+  const pause = CapApp.addListener('pause', flushSync)
   const offSync = useStore.subscribe((s, prev) => {
-    if (s.alarms !== prev.alarms || s.instantAlarms !== prev.instantAlarms) void syncNative()
+    // A moved line or a new alarm end changes the table the background check reads.
+    const lineMoved = s.drawings !== prev.drawings && s.alarms.some((a) => a.line && s.drawings[a.line.key] !== prev.drawings[a.line.key])
+    if (s.alarms !== prev.alarms || s.instantAlarms !== prev.instantAlarms || lineMoved) scheduleSync()
     // An alarm re-armed or deleted (here or on the PC) loses its old "reached" notification: Android would update
     // that one without a sound at the next hit.
     if (s.alarms !== prev.alarms)
@@ -74,6 +100,9 @@ export function startAlarmWatch(): () => void {
   return () => {
     off()
     offSync()
+    clearTimeout(syncTimer)
+    syncTimer = undefined
     void resume.then((l) => l.remove())
+    void pause.then((l) => l.remove())
   }
 }

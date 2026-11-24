@@ -1,18 +1,31 @@
-// Price alarms: "tell me when AAPL reaches 230". The same rule runs in the app and in the Android
-// background check (android/.../AlarmCheck.java), so keep both in step. Times are in seconds.
+// Price alarms: "tell me when AAPL reaches 230", or when it touches a drawn line (lineAlarm.ts). The same rule runs
+// in the app and in the Android background check (android/.../AlarmCheck.java), so keep both in step. Times are in
+// seconds.
+import { linePrice, type Knot } from './lineAlarm.ts'
 
 export interface Alarm {
   id: string
   symbol: string
   /** Fires when a bar's high reaches `price` (above) or its low falls to it (below). */
   op: 'above' | 'below'
+  /** Fixed alarms: the price. Line alarms: where the line was when armed (the line itself decides). */
   price: number
   createdAt: number
   triggeredAt?: number
   triggeredPrice?: number
   /** Bars before this time are already checked. */
   checkedUntil?: number
+  /** A line alarm: drawing list key (`<tabId>:<symbol>`), drawing id and which of its lines (lineParts). */
+  line?: { key: string; drawing: string; part: string }
+  /** The line's end passed without a touch. */
+  expiredAt?: number
 }
+
+/** Still waiting: neither reached nor run out. */
+export const isArmed = (a: Alarm): boolean => a.triggeredAt === undefined && a.expiredAt === undefined
+
+/** Whether a symbol has an alarm still waiting (the bell in the watchlist). */
+export const armedFor = (alarms: Alarm[], symbol: string): boolean => alarms.some((a) => a.symbol === symbol && isArmed(a))
 
 /**
  * "Now" for alarms (seconds), on the exchange's clock: the latest quote's time when there is one. Alarm times are
@@ -27,13 +40,59 @@ export function newAlarm(symbol: string, price: number, current: number, now = M
   return { id: crypto.randomUUID(), symbol, op: price > current ? 'above' : 'below', price, createdAt: now }
 }
 
-/** First bar since the last check that reached the alarm price; bars starting earlier do not count. */
-export function hit(a: Alarm, bars: { time: number; high: number; low: number }[]): { time: number; price: number } | null {
-  if (a.triggeredAt !== undefined) return null
-  const from = a.checkedUntil ?? a.createdAt
-  const bar = bars.find((b) => b.time >= from && (a.op === 'above' ? b.high >= a.price : b.low <= a.price))
-  return bar ? { time: bar.time, price: a.price } : null
+/** A line alarm, armed against where the line is now (`lineNow`); like newAlarm. */
+export function newLineAlarm(symbol: string, line: NonNullable<Alarm['line']>, lineNow: number, current: number, now: number): Alarm | 'at-price' {
+  const a = newAlarm(symbol, lineNow, current, now)
+  return a === 'at-price' ? a : { ...a, line }
 }
+
+/**
+ * A moved line starts watching anew, like re-arming: no old bars against the new line, and a line dragged across the
+ * price does not fire at once. Alarms that already fired or ran out stay as they are.
+ */
+export function restartLine(a: Alarm, now: number, current: number, lineNow: number): Alarm {
+  if (!isArmed(a)) return a
+  const { checkedUntil: _, ...rest } = a
+  const op = current === lineNow ? a.op : lineNow > current ? 'above' : 'below'
+  return { ...rest, op, price: lineNow, createdAt: now }
+}
+
+/**
+ * First bar since the last check that reached the alarm price; bars starting earlier do not count. A line alarm
+ * compares each bar with the line at that bar's time (`knots`); without a table it never fires.
+ */
+export function hit(a: Alarm, bars: { time: number; high: number; low: number }[], knots?: Knot[]): { time: number; price: number } | null {
+  if (!isArmed(a)) return null
+  const from = a.checkedUntil ?? a.createdAt
+  for (const b of bars) {
+    if (b.time < from) continue
+    const price = a.line ? (knots ? linePrice(knots, b.time) : null) : a.price
+    if (price !== null && (a.op === 'above' ? b.high >= price : b.low <= price)) return { time: b.time, price }
+  }
+  return null
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0
+const optTime = (v: unknown) => v === undefined || (typeof v === 'number' && Number.isFinite(v))
+
+/** The alarm if it has every field it needs (from the other device or a backup), else null. */
+export function checkAlarm(v: unknown): Alarm | null {
+  if (!isObj(v) || !str(v.id) || !str(v.symbol) || typeof v.price !== 'number' || (v.op !== 'above' && v.op !== 'below') || typeof v.createdAt !== 'number') return null
+  if (!optTime(v.triggeredAt) || !optTime(v.expiredAt) || !optTime(v.checkedUntil)) return null
+  // A line that cannot be read must not turn into a fixed-price alarm at the arming price.
+  if (v.line !== undefined && !(isObj(v.line) && str(v.line.key) && str(v.line.drawing) && str(v.line.part))) return null
+  // The drawing list of this symbol in some tab ("<tab>:<symbol>"), never an object property name like __proto__.
+  if (v.line && !((v.line.key as string).length > v.symbol.length + 1 && (v.line.key as string).endsWith(':' + v.symbol))) return null
+  return v as unknown as Alarm
+}
+
+/** Removes the line alarms of these drawings (all of the list `key` without ids). */
+export const dropAlarmsOf = (alarms: Alarm[], key: string, drawingIds?: string[]): Alarm[] =>
+  alarms.filter((a) => !(a.line?.key === key && (!drawingIds || drawingIds.includes(a.line.drawing))))
+
+/** Removes the line alarms of every drawing in a chart tab. */
+export const dropAlarmsOfTab = (alarms: Alarm[], tabId: string): Alarm[] => alarms.filter((a) => !a.line?.key.startsWith(tabId + ':'))
 
 /**
  * Where the next check starts after looking at bars up to `newest` (the newest bar may still move, so it is

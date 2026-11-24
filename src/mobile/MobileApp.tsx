@@ -203,7 +203,7 @@ export default function MobileApp() {
       )}
       {page === 'alarms' && alarmFor && (
         <Layer id="alarms" title={t('Kurs-Alarme')} onClose={() => setPage(null)}>
-          <AlarmPage symbol={alarmFor} />
+          <AlarmPage symbol={alarmFor} onOpen={() => setPage(null)} />
         </Layer>
       )}
       {page === 'licenses' && (

@@ -2,7 +2,7 @@
 // key and a JSON value; each device remembers the units it last agreed on with its partner (the base) and when it
 // last changed each unit (stamps). Comparing base, mine and theirs per unit shows who changed what; nothing in the
 // store's actions has to know about sync.
-import type { Alarm } from './alarms.ts'
+import { checkAlarm, type Alarm } from './alarms.ts'
 import { checkDrawing } from './drawings.ts'
 import { TIMEFRAMES, type Timeframe } from './types.ts'
 import type { ChartTab, Drawing, Folder, Indicators } from '../renderer/src/store/useStore.ts'
@@ -302,8 +302,8 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
   const indicators = parse<unknown>(u.indicators, null)
   const alarms = inOrder(
     keys.filter((k) => k.startsWith('alarm:')).flatMap((k) => {
-      const a = parse<unknown>(u[k], null)
-      if (!isObj(a) || !str(a.id) || !str(a.symbol) || typeof a.price !== 'number' || (a.op !== 'above' && a.op !== 'below') || typeof a.createdAt !== 'number') return []
+      const a = checkAlarm(parse<unknown>(u[k], null))
+      if (!a) return []
       // The check point stays per device, but never before the (re)arm time: an alarm armed again on the other
       // device must not count the bar that fired it last time.
       const kept = keep.alarms.find((x) => x.id === a.id)?.checkedUntil
@@ -365,7 +365,8 @@ const MAX_VALUE = 300_000
  */
 // 2: pinned watchlist symbols (pin:<symbol>, order:pins); a format-1 device would drop them and unpin everywhere.
 // 3: anchored VWAP drawings (avwap) and the squeeze, ADX and volume-profile indicators.
-export const SYNC_FORMAT = 3
+// 4: line alarms (alarm `line`, `expiredAt`, drawing `alarmUntil`); a format-3 device would check them at a fixed price.
+export const SYNC_FORMAT = 4
 const formatOf = (v: Record<string, unknown>): number => (typeof v.format === 'number' && Number.isFinite(v.format) ? v.format : 1)
 
 export interface SyncRequest {

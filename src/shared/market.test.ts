@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { marketStatus, phaseAt } from './market.ts'
+import { marketStatus, openSessions, phaseAt } from './market.ts'
 
 const utc = (m: number, d: number, h = 0, min = 0) => Date.UTC(2026, m - 1, d, h, min) / 1000
 const NY = 'America/New_York'
@@ -54,4 +54,30 @@ test('phaseAt classifies single bars: US pre-market, regular session and after-h
   assert.equal(phaseAt('AAPL', NY, utc(10, 21, 13, 30)), 'open') // 09:30
   assert.equal(phaseAt('AAPL', NY, utc(10, 21, 20)), 'post') // 16:00
   assert.equal(phaseAt('SAP.DE', 'Europe/Berlin', utc(10, 21, 6)), 'closed') // XETRA has no pre-market
+})
+
+test('openSessions: regular sessions only, weekend in between is skipped (EST = UTC-5)', () => {
+  // Friday 2026-11-20 00:00 New York .. Monday 2026-11-23 23:59 New York
+  assert.deepEqual(openSessions('AAPL', NY, utc(11, 20, 5), utc(11, 24, 4, 59)), [
+    [utc(11, 20, 14, 30), utc(11, 20, 21)],
+    [utc(11, 23, 14, 30), utc(11, 23, 21)]
+  ])
+})
+
+test('openSessions: Thanksgiving is missing, the day after ends at 13:00', () => {
+  assert.deepEqual(openSessions('AAPL', NY, utc(11, 26, 5), utc(11, 28, 5)), [[utc(11, 27, 14, 30), utc(11, 27, 18)]])
+})
+
+test('openSessions: Tokyo lunch break splits the day', () => {
+  // Tuesday 2026-10-20, Tokyo = UTC+9
+  assert.deepEqual(openSessions('7203.T', 'Asia/Tokyo', utc(10, 19, 15), utc(10, 20, 14)), [
+    [utc(10, 20, 0), utc(10, 20, 2, 30)],
+    [utc(10, 20, 3, 30), utc(10, 20, 6, 30)]
+  ])
+})
+
+test('openSessions: cut to the window; crypto trades always; unknown hours give null', () => {
+  assert.deepEqual(openSessions('AAPL', NY, utc(11, 20, 18), utc(11, 20, 19)), [[utc(11, 20, 18), utc(11, 20, 19)]])
+  assert.deepEqual(openSessions('BTCUSDT', undefined, 100, 200), [[100, 200]])
+  assert.equal(openSessions('^GDAXI', undefined, 100, 200), null)
 })

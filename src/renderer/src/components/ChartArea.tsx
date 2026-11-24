@@ -53,7 +53,9 @@ import MobileKiButton from '../../../mobile/MobileKiButton'
 import PriceTags, { noteTicks, trackTicks, type Tag } from '../../../mobile/PriceTag'
 import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
-import { useQuotes, useStore } from '../store/useStore'
+import { drawingsKey, useQuotes, useStore } from '../store/useStore'
+import { alarmClock, isArmed } from '../../../shared/alarms'
+import { lineNow } from '../lib/lineAlarms'
 import AgentsPanel from './AgentsPanel'
 import ForecastQuality from './ForecastQuality'
 import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
@@ -1000,8 +1002,18 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     // Primitives, so the 15 s quote refresh does not rebuild an unchanged line.
   }, [api, session?.price, session?.kind])
 
-  // Armed price alarms of this symbol as dashed lines (set on the phone).
-  const alarmPrices = useStore((s) => s.alarms.filter((a) => a.symbol === symbol && a.triggeredAt === undefined).map((a) => a.price).join(','))
+  // Armed price alarms of this symbol as dashed lines (set on the phone). Line alarms show along their line instead
+  // (DrawingOverlay), with a tag where the line is now.
+  const alarmPrices = useStore((s) => s.alarms.filter((a) => a.symbol === symbol && !a.line && isArmed(a)).map((a) => a.price).join(','))
+  const listKey = useStore(drawingsKey)
+  const lineAlarmList = useStore((s) => s.alarms)
+  const drawingLists = useStore((s) => s.drawings)
+  const quoteTime = useQuotes((s) => s.quotes[symbol]?.time)
+  const lineTags = lineAlarmList.flatMap((a) => {
+    if (a.line?.key !== listKey || !isArmed(a)) return []
+    const price = lineNow(a, drawingLists, alarmClock(quoteTime))
+    return price === null ? [] : [{ price, color: ALARM, ink: THEME.bg, label: '⏰' }]
+  })
   useEffect(() => {
     if (!api || !alarmPrices) return
     const lines = alarmPrices.split(',').map((p) =>
@@ -1172,6 +1184,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
               { price: data[data.length - 1].close, color: data[data.length - 1].close >= data[data.length - 1].open ? UP : DOWN },
               ...(session ? [{ price: session.price, ...SESSION_TAG[session.kind], label: t(SESSION_TITLE[session.kind]) }] : []),
               ...(alarmPrices ? alarmPrices.split(',').map((p) => ({ price: Number(p), color: ALARM, ink: THEME.bg, label: '⏰' })) : []),
+              ...lineTags,
               ...levels.flatMap(([price, color, label]) => (price === null ? [] : [{ price, color, label }])),
               ...valueTags
             ]}

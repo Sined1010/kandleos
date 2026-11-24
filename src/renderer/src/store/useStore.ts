@@ -1,19 +1,24 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { isCrypto, type Quote, type StockSource, type Timeframe } from '../../../shared/types'
-import { drawingsKey, type SavedChart } from '../lib/charts'
+import { drawingsKey, withoutAlarmEnds, type SavedChart } from '../lib/charts'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo, type WatchSort } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
-import { mergeTriggered, type Alarm, type NativeTrigger } from '../../../shared/alarms'
+import { alarmClock, checkAlarm, dropAlarmsOf, dropAlarmsOfTab, mergeTriggered, newLineAlarm, restartLine, type Alarm, type NativeTrigger } from '../../../shared/alarms'
+import { endAhead, lineMoved, lineParts } from '../../../shared/lineAlarm'
+import { lineNow } from '../lib/lineAlarms'
 import { cleanIndicators, emptySync, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
 import { DEFAULT_INDICATORS } from '../lib/indicatorDefaults'
 
 export type Point = { time: number; price: number }
-/** `color` is the user's choice; missing means the tool's own colours. */
-export type Drawing = { color?: string } & (
+/**
+ * `color` is the user's choice; missing means the tool's own colours. `alarmUntil`: end of the alarms on its lines
+ * (seconds); missing = no end (shared/lineAlarm.ts).
+ */
+export type Drawing = { color?: string; alarmUntil?: number } & (
   | { id: string; type: 'trend' | 'fib'; p1: Point; p2: Point }
   | { id: string; type: 'hline'; price: number }
   | { id: string; type: 'vline'; time: number }
@@ -218,6 +223,13 @@ interface State {
   rearmAlarm: (id: string, now: number) => void
   /** Takes in what the Android background check found (shared/alarms.ts mergeTriggered). */
   applyNative: (list: NativeTrigger[]) => void
+  /**
+   * Alarm on one line of a drawing in the visible chart on or off (shared/lineAlarm.ts). `now` on the exchange's
+   * clock, `current` the last price. 'at-price': the price is on the line; 'no-price': the line has no price.
+   */
+  toggleLineAlarm: (drawingId: string, part: string, now: number, current: number) => 'at-price' | 'no-price' | void
+  /** End of the alarms on a drawing's lines (seconds); undefined = no end. */
+  setAlarmUntil: (drawingId: string, until: number | undefined) => void
 }
 
 const chartTab = (symbol: string, timeframe: Timeframe, range: RangeId | null): ChartTab => ({
@@ -241,6 +253,12 @@ const showTab = (t: ChartTab) => ({
   tool: 'cursor' as const
 })
 const withDrawings = (s: State, list: Drawing[]) => ({ drawings: { ...s.drawings, [drawingsKey(s)]: list } })
+/** The drawing lists with one drawing's passed alarm end removed (shared/lineAlarm.ts endAhead). */
+const endsAhead = (drawings: Record<string, Drawing[]>, key: string, id: string, now: number) => {
+  const list = drawings[key]
+  const d = list?.find((x) => x.id === id)
+  return d && endAhead(d, now) !== d ? { ...drawings, [key]: list.map((x) => (x === d ? endAhead(x, now) : x)) } : drawings
+}
 const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
 const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
   folders: s.folders.map((f) => (f.id === id ? fn(f) : f))
@@ -253,7 +271,7 @@ const keepPins = (pinned: string[], folders: Folder[]) => ({ folders, pinned: pi
 
 export const useStore = create<State>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       symbol: firstTab.symbol,
       timeframe: firstTab.timeframe,
       tabs: [firstTab],
@@ -269,12 +287,13 @@ export const useStore = create<State>()(
           const i = s.tabs.findIndex((t) => t.id === id)
           if (s.tabs.length < 2 || i < 0) return {}
           const tabs = s.tabs.filter((t) => t.id !== id)
-          // A closed tab's drawings can never be shown again.
+          // A closed tab's drawings can never be shown again, nor their line alarms fire.
           const drawings = Object.fromEntries(Object.entries(s.drawings).filter(([k]) => !k.startsWith(`${id}:`)))
+          const alarms = dropAlarmsOfTab(s.alarms, id)
           // Closing the active tab shows its right neighbour, or the left one at the end.
           return id === s.activeTab
-            ? { tabs, drawings, ...showTab(tabs[Math.min(i, tabs.length - 1)]) }
-            : { tabs, drawings }
+            ? { tabs, drawings, alarms, ...showTab(tabs[Math.min(i, tabs.length - 1)]) }
+            : { tabs, drawings, alarms }
         }),
       selectTab: (id) =>
         set((s) => {
@@ -367,13 +386,53 @@ export const useStore = create<State>()(
       select: (selectedId) => set({ selectedId }),
       addDrawing: (d) => set((s) => withDrawings(s, [...(s.drawings[drawingsKey(s)] ?? []), d])),
       updateDrawing: (d) =>
-        set((s) => withDrawings(s, (s.drawings[drawingsKey(s)] ?? []).map((x) => (x.id === d.id ? d : x)))),
+        set((s) => {
+          const key = drawingsKey(s)
+          const old = (s.drawings[key] ?? []).find((x) => x.id === d.id)
+          const next = withDrawings(s, (s.drawings[key] ?? []).map((x) => (x.id === d.id ? d : x)))
+          if (!old || !lineMoved(old, d) || !s.alarms.some((a) => a.line?.key === key && a.line.drawing === d.id)) return next
+          // A moved line starts watching anew (shared/alarms.ts restartLine).
+          const q = useQuotes.getState().quotes[s.symbol]
+          const now = alarmClock(q?.time)
+          // A line the edit took away (a ray turned to the left) takes its alarm with it.
+          const alarms = s.alarms.filter((a) => a.line?.key !== key || a.line.drawing !== d.id || lineParts(d).includes(a.line.part)).map((a) => {
+            if (a.line?.key !== key || a.line.drawing !== d.id) return a
+            const at = lineNow(a, next.drawings, now)
+            return at === null ? a : restartLine(a, now, q?.price ?? at, at)
+          })
+          return { ...next, alarms }
+        }),
       removeDrawing: (id) =>
         set((s) => ({
           ...withDrawings(s, (s.drawings[drawingsKey(s)] ?? []).filter((d) => d.id !== id)),
+          alarms: dropAlarmsOf(s.alarms, drawingsKey(s), [id]),
           selectedId: null
         })),
-      clearDrawings: () => set((s) => ({ ...withDrawings(s, []), selectedId: null })),
+      clearDrawings: () => set((s) => ({ ...withDrawings(s, []), alarms: dropAlarmsOf(s.alarms, drawingsKey(s)), selectedId: null })),
+      toggleLineAlarm: (drawingId, part, now, current) => {
+        const s = get()
+        const key = drawingsKey(s)
+        const mine = s.alarms.find((a) => a.line?.key === key && a.line.drawing === drawingId && a.line.part === part)
+        if (mine) return void set({ alarms: s.alarms.filter((a) => a !== mine) })
+        const line = { key, drawing: drawingId, part }
+        const at = lineNow({ id: '', symbol: s.symbol, op: 'above', price: 0, createdAt: now, line }, s.drawings, now)
+        if (at === null) return 'no-price'
+        const a = newLineAlarm(s.symbol, line, at, current, now)
+        if (a === 'at-price') return a
+        // An end that has passed would let the new alarm run out at once.
+        set({ alarms: [...s.alarms, a], drawings: endsAhead(s.drawings, key, drawingId, now) })
+      },
+      setAlarmUntil: (drawingId, until) =>
+        set((s) =>
+          withDrawings(
+            s,
+            (s.drawings[drawingsKey(s)] ?? []).map((x) => {
+              if (x.id !== drawingId) return x
+              const { alarmUntil: _, ...rest } = x
+              return (until === undefined ? rest : { ...rest, alarmUntil: until }) as Drawing
+            })
+          )
+        ),
       charts: [],
       alarms: [],
       sync: emptySync(),
@@ -387,7 +446,7 @@ export const useStore = create<State>()(
             name: name.trim(),
             symbol: s.symbol,
             timeframe: s.timeframe,
-            drawings: structuredClone(s.drawings[drawingsKey(s)] ?? []),
+            drawings: withoutAlarmEnds(structuredClone(s.drawings[drawingsKey(s)] ?? [])),
             indicators: structuredClone(s.indicators),
             savedAt: Date.now()
           }
@@ -403,7 +462,8 @@ export const useStore = create<State>()(
         set((s) => {
           const c = s.charts.find((x) => x.id === id)
           if (!c) return {}
-          const drawings = structuredClone(c.drawings)
+          // Saved charts carry no alarms: no alarm end on the copies.
+          const drawings = withoutAlarmEnds(structuredClone(c.drawings))
           if (where === 'new') {
             if (s.tabs.length >= MAX_TABS) return {}
             const t = { ...chartTab(c.symbol, c.timeframe, null), chartId: id }
@@ -422,6 +482,8 @@ export const useStore = create<State>()(
             timeframe: c.timeframe,
             range: null,
             drawings: { ...s.drawings, [drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })]: drawings },
+            // The replaced drawings take their line alarms with them; the copies keep the same ids.
+            alarms: dropAlarmsOf(s.alarms, drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })),
             selectedId: null,
             tool: 'cursor' as const
           }
@@ -437,11 +499,18 @@ export const useStore = create<State>()(
       removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
       rearmAlarm: (id, now) =>
         set((s) => ({
+          // A run-out line alarm armed again: its passed end goes, so it watches again (a new end can be dragged).
+          drawings: ((line) => (line ? endsAhead(s.drawings, line.key, line.drawing, now) : s.drawings))(s.alarms.find((a) => a.id === id)?.line),
           alarms: s.alarms.map((a) => {
             if (a.id !== id) return a
-            const { triggeredAt, triggeredPrice, ...armed } = a
+            const { triggeredAt, triggeredPrice, expiredAt, ...armed } = a
             // createdAt goes along with the sync (checkedUntil does not), so the other device starts there too.
-            return { ...armed, createdAt: now, checkedUntil: now }
+            const again = { ...armed, createdAt: now, checkedUntil: now }
+            if (!a.line) return again
+            // A line has moved on since: the direction follows from where the price is against the line now.
+            const at = lineNow(again, s.drawings, now)
+            const price = useQuotes.getState().quotes[a.symbol]?.price
+            return at === null || price === undefined ? again : restartLine(again, now, price, at)
           })
         })),
       applyNative: (list) => set((s) => ({ alarms: mergeTriggered(s.alarms, list) }))
@@ -505,7 +574,7 @@ export const useStore = create<State>()(
           eventFilters: { ...current.eventFilters, ...p.eventFilters },
           // Files from before saved charts have none.
           charts: p.charts ?? [],
-          alarms: p.alarms ?? [],
+          alarms: Array.isArray(p.alarms) ? p.alarms.flatMap((a: unknown) => checkAlarm(a) ?? []) : [],
           pinned: Array.isArray(p.pinned) ? p.pinned.filter((x) => typeof x === 'string') : [],
           sync: { ...emptySync(), ...p.sync }
         }

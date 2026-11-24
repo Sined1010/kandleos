@@ -1,5 +1,6 @@
 import { registerPlugin, WebPlugin } from '@capacitor/core'
 import type { NativeTrigger } from '../shared/alarms'
+import type { Knot } from '../shared/lineAlarm'
 import type { AlarmSource } from './alarmPlan'
 
 // Our own Android plugin (android/app/src/main/java/.../KandleNativePlugin.java).
@@ -20,7 +21,17 @@ export interface KandleNativePlugin {
   watchAnalysis(o: { symbol: string; started: number }): Promise<void>
   unwatchAnalysis(): Promise<void>
 }
-export type NativeAlarm = { id: string; symbol: string; title: string; op: 'above' | 'below'; price: number; checkedUntil: number } & AlarmSource
+export type NativeAlarm = {
+  id: string
+  symbol: string
+  title: string
+  op: 'above' | 'below'
+  price: number
+  checkedUntil: number
+  /** Line alarms: where the line runs (shared/lineAlarm.ts) and the notification text with `{price}` to fill in. */
+  knots?: Knot[]
+  body?: string
+} & AlarmSource
 
 /** Browser preview only (npm run dev:mobile): keys live in memory and are gone on reload — never in web storage. */
 class KandleNativeWeb extends WebPlugin implements KandleNativePlugin {

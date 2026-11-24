@@ -4,6 +4,8 @@ import { flushSync } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { CLICKS } from '../../../shared/drawings'
 import { locale, t } from '../../../shared/i18n'
+import { FIB_LEVELS, LINE_HORIZON, lineParts, linePrice } from '../../../shared/lineAlarm'
+import { lineTable } from '../lib/lineAlarms'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import {
@@ -24,14 +26,16 @@ import { IS_MOBILE } from '../lib/platform'
 import { aimAt, pinchRange, type PinchStart } from '../lib/touchAim'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import { Crosshair, Trash2 } from 'lucide-react'
-import { drawingsKey, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
+import { drawingsKey, useQuotes, useStore, type Drawing, type Point, type Tool } from '../store/useStore'
+import { alarmClock, isArmed } from '../../../shared/alarms'
 
-const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86']
 const COLOR = THEME.drawing
 const SELECTED = THEME.selected
 // Violet, not amber: amber belongs to the AI forecast alone.
 const AVWAP = '#a78bfa'
+// Same violet as the price alarms in ChartArea.
+const ALARM = '#a78bfa'
 const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043', triangle: '#42a5f5', wxy: '#ec407a', wxyxz: '#ffca28' }
 const WAVE_LABELS = {
   elliott: ['0', '1', '2', '3', '4', '5'],
@@ -101,6 +105,16 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const addDrawing = useStore((s) => s.addDrawing)
   const removeDrawing = useStore((s) => s.removeDrawing)
   const updateDrawing = useStore((s) => s.updateDrawing)
+  const listKey = useStore(drawingsKey)
+  const allAlarms = useStore((s) => s.alarms)
+  const toggleLineAlarm = useStore((s) => s.toggleLineAlarm)
+  const setAlarmUntil = useStore((s) => s.setAlarmUntil)
+  const quote = useQuotes((s) => s.quotes[symbol])
+  const alarmsOf = (id: string) => allAlarms.filter((a) => a.line?.key === listKey && a.line.drawing === id)
+  // End handle being dragged (shown before it is stored), and why the last alarm switch did nothing.
+  const [untilDrag, setUntilDrag] = useState<{ id: string; time: number } | null>(null)
+  const [alarmHint, setAlarmHint] = useState('')
+  useEffect(() => setAlarmHint(''), [selectedId])
   const svgRef = useRef<SVGSVGElement>(null)
   // Clicked points of the drawing in progress, plus the point under the mouse for the preview.
   const [draft, setDraft] = useState<Point[]>([])
@@ -517,7 +531,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     }
 
     if (d.type === 'ray') {
-      const [ex, ey] = rayEnd(xs[0], ys[0], xs[1], ys[1], width)
+      // With an armed alarm the part to the right comes from the alarm's own line (alarmLines), not a second one.
+      const [ex, ey] = alarmsOf(d.id).some(isArmed) ? [xs[1], ys[1]] : rayEnd(xs[0], ys[0], xs[1], ys[1], width)
       const ray = { x1: xs[0], y1: ys[0], x2: ex, y2: ey }
       return (
         <g key={d.id}>
@@ -760,6 +775,135 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     )
   }
 
+  // Line alarms: each armed line runs on dashed to its end, drawn from the same table the alarm checks, so what is
+  // shown is what reports. The end handle sets when the alarms stop (alarmUntil).
+  const now = alarmClock(quote?.time)
+  const view = chart.timeScale().getVisibleLogicalRange()
+  const rightTime = view && axis.length ? logicalToTime(axis, Math.ceil(view.to), step) : now
+  const leftTime = view && axis.length ? logicalToTime(axis, Math.floor(view.from), step) : now
+  const alarmLines = (d: Drawing) => {
+    const mine = alarmsOf(d.id)
+    if (!mine.length) return null
+    // A channel's lines end at its first two points; the third only sets the width.
+    const pts = d.type === 'channel' ? pointsOf(d).slice(0, 2) : pointsOf(d)
+    const lastPt = pts.length ? pts.reduce((a, b) => (a.time >= b.time ? a : b)) : null
+    const armed = mine.filter(isArmed)
+    if (!armed.length) {
+      // Reached or run out: a grey clock at the drawing until it is armed again or switched off.
+      const x = lastPt ? toX(lastPt.time) : width - 24
+      const y = lastPt ? toY(lastPt.price) : d.type === 'hline' ? toY(d.price) : null
+      return x === null || y === null ? null : (
+        <text key={`al-${d.id}`} x={x + 6} y={y - 6} fontSize={11} opacity={0.45} style={{ filter: 'grayscale(1)', pointerEvents: 'none' }}>
+          ⏰
+        </text>
+      )
+    }
+    const selected = d.id === selectedId
+    const until = untilDrag?.id === d.id ? untilDrag.time : d.alarmUntil
+    // Whole minutes and a table to the end (or a year from today), so the cached table holds while panning.
+    const minute = Math.floor(now / 60) * 60
+    const start = d.type === 'hline' || !lastPt ? minute : Math.min(minute, lastPt.time)
+    // While the end handle moves, the stored table (or a year) is reused and only the drawn part follows the handle.
+    const tableEnd = (untilDrag?.id === d.id ? undefined : d.alarmUntil) ?? Math.floor(now / 86_400) * 86_400 + LINE_HORIZON
+    const end = Math.min(until ?? Infinity, rightTime)
+    if (end <= start) return null
+    const color = selected ? ALARM : (d.color ?? COLOR)
+    const samples = [start, ...axis.filter((t) => t > Math.max(start, leftTime) && t < end), end]
+    const lines = armed.flatMap((a) => {
+      const k = lineTable(d, a.line!.part, symbol, start, tableEnd)
+      if (!k) return []
+      const xy = samples.flatMap((t) => {
+        const x = toX(t)
+        const p = linePrice(k, t)
+        const y = p === null ? null : toY(p)
+        return x === null || y === null ? [] : [[x, y] as const]
+      })
+      return xy.length ? [{ id: a.id, xy }] : []
+    })
+    if (!lines.length) return null
+    const [ex, ey] = lines[0].xy[lines[0].xy.length - 1]
+    return (
+      <g key={`al-${d.id}`}>
+        {/* A horizontal line already spans the chart; it only gets the clock and the end handle. */}
+        {d.type !== 'hline' &&
+          lines.map((l) => (
+            <polyline
+              key={l.id}
+              points={l.xy.map(([x, y]) => `${x},${y}`).join(' ')}
+              fill="none"
+              stroke={color}
+              strokeWidth={selected ? 1.8 : 1}
+              strokeOpacity={selected ? 1 : 0.45}
+              strokeDasharray={selected ? '7 5' : '5 5'}
+              pointerEvents="none"
+            />
+          ))}
+        {selected && until !== undefined ? (
+          <rect
+            x={ex - 6}
+            y={ey - 6}
+            width={12}
+            height={12}
+            rx={3}
+            fill={ALARM}
+            style={{ cursor: 'ew-resize', pointerEvents: 'all' }}
+            onPointerDown={(e) => startUntilDrag(e, d)}
+          />
+        ) : selected ? (
+          // No end yet: the handle sits at the right edge and pulling it left sets one.
+          <rect x={ex - 6} y={ey - 6} width={12} height={12} rx={3} fill="none" stroke={ALARM} strokeWidth={1.5} style={{ cursor: 'ew-resize', pointerEvents: 'all' }} onPointerDown={(e) => startUntilDrag(e, d)} />
+        ) : (
+          <text x={ex + 4} y={ey + 4} fontSize={11} opacity={0.8} pointerEvents="none">
+            ⏰
+          </text>
+        )}
+      </g>
+    )
+  }
+
+  // Dragging the end handle: the time under the pointer, never before now (exchange clock).
+  const startUntilDrag = (e: React.PointerEvent, d: Drawing) => {
+    e.stopPropagation()
+    e.preventDefault()
+    select(d.id)
+    const at = (ev: { clientX: number; clientY: number }) => {
+      const p = logicalAt(ev)
+      return p ? Math.max(now, logicalToTime(axis, Math.round(p.logical), step)) : null
+    }
+    // A click without dragging (a few pixels of jitter) leaves the end as it is.
+    const [x0, y0] = [e.clientX, e.clientY]
+    let last: number | null = null
+    const move = (ev: PointerEvent) => {
+      if (last === null && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return
+      const t = at(ev)
+      if (t === null) return
+      last = t
+      setUntilDrag({ id: d.id, time: t })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      if (last !== null) setAlarmUntil(d.id, last)
+      setUntilDrag(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
+  // The bar under a selected drawing: alarm on/off per line, and its end.
+  const switchAlarm = (d: Drawing, part: string) => {
+    const q = useQuotes.getState().quotes[symbol]
+    // Switching off needs no price; switching on does (the direction comes from it).
+    const on = alarmsOf(d.id).some((a) => a.line?.part === part)
+    if (!q && !on) return setAlarmHint(t('Aktueller Kurs nötig.'))
+    const r = toggleLineAlarm(d.id, part, alarmClock(q?.time), q?.price ?? 0)
+    setAlarmHint(r === 'at-price' ? t('Der Kurs liegt schon dort.') : r === 'no-price' ? t('Diese Linie hat hier keinen Preis.') : '')
+  }
+  const partLabel = (part: string) =>
+    part === 'top' ? t('oben') : part === 'mid' ? t('Mitte') : part === 'bottom' ? t('unten') : `${+(Number(part) * 100).toFixed(1)}`
+
   const textEdit = drawings.find((d): d is Extract<Drawing, { type: 'text' }> => d.id === editing && d.type === 'text')
   const editAt = textEdit && [toX(textEdit.points[0].time), toY(textEdit.points[0].price)]
   // An emptied text is removed rather than kept as an invisible drawing.
@@ -801,6 +945,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         }
       >
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
+        {/* While a drawing is dragged its alarms restart anyway; no new table on every pointer move. */}
+        {drawings.map((d) => (drag?.orig.id === d.id ? null : alarmLines(d)))}
         {preview && render(preview, true)}
         {IS_MOBILE && drawingMode && aim && (
           <g pointerEvents="none">
@@ -872,6 +1018,47 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
             <button onClick={() => removeDrawing(styled.id)} aria-label={t('Zeichnung löschen')} className="ml-1 flex h-9 w-9 items-center justify-center border-l border-line pl-2 text-down">
               <Trash2 size={22} />
             </button>
+          )}
+          {lineParts(styled).length > 0 && (
+            <div role="group" aria-label={t('Alarm')} className="ml-1 flex flex-wrap items-center gap-1 border-l border-line pl-2">
+              {lineParts(styled).length === 1 ? (
+                <button
+                  aria-pressed={alarmsOf(styled.id).length > 0}
+                  onClick={() => switchAlarm(styled, lineParts(styled)[0])}
+                  className={`${IS_MOBILE ? 'px-2.5 py-1.5 text-sm' : 'px-1.5 py-0.5'} rounded ${alarmsOf(styled.id).length ? 'bg-violet-500/25 text-violet-200 ring-1 ring-violet-400' : 'text-muted hover:bg-line hover:text-white'}`}
+                >
+                  ⏰ {t('Alarm')}
+                </button>
+              ) : (
+                <>
+                  <span aria-hidden>⏰</span>
+                  {lineParts(styled).map((part) => {
+                    const on = alarmsOf(styled.id).some((a) => a.line?.part === part)
+                    return (
+                      <button
+                        key={part}
+                        aria-pressed={on}
+                        onClick={() => switchAlarm(styled, part)}
+                        className={`${IS_MOBILE ? 'min-w-9 px-1.5 py-1.5 text-sm' : 'px-1 py-0.5'} rounded tabular-nums ${on ? 'bg-violet-500/25 text-violet-200 ring-1 ring-violet-400' : 'text-muted hover:bg-line hover:text-white'}`}
+                      >
+                        {partLabel(part)}
+                      </button>
+                    )
+                  })}
+                </>
+              )}
+              {alarmsOf(styled.id).length > 0 && (
+                <span className="flex items-center gap-1 rounded border border-dashed border-violet-400 px-1.5 py-0.5 tabular-nums text-violet-200">
+                  {styled.alarmUntil !== undefined ? t('bis {date}', { date: dateLabel(styled.alarmUntil) }) : t('ohne Ende')}
+                  {styled.alarmUntil !== undefined && (
+                    <button aria-label={t('Ende entfernen')} title={t('Ende entfernen')} onClick={() => setAlarmUntil(styled.id, undefined)} className="text-muted hover:text-white">
+                      ✕
+                    </button>
+                  )}
+                </span>
+              )}
+              {alarmHint && <span className="text-amber-500">{alarmHint}</span>}
+            </div>
           )}
           {styled.type === 'text' && (
             <div role="group" aria-label={t('Textgröße')} className="ml-1 flex items-center gap-0.5 border-l border-line pl-2">

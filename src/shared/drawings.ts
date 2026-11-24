@@ -33,6 +33,7 @@ const point = (p: unknown) => isObj(p) && finite(p.time) && finite(p.price)
 export function checkDrawing(v: unknown): Drawing | null {
   if (!isObj(v) || typeof v.id !== 'string' || typeof v.type !== 'string' || !Object.hasOwn(CLICKS, v.type)) return null
   if (v.color !== undefined && typeof v.color !== 'string') return null
+  if (v.alarmUntil !== undefined && !finite(v.alarmUntil)) return null
   const type = v.type as keyof typeof CLICKS
   const points = v.points
   const ok =

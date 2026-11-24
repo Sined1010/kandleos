@@ -7,7 +7,7 @@ import { ask } from '../../../mobile/MessageBox'
 
 /** Closes a tab after asking when something would be lost (unsaved changes to its saved chart, or its drawings). */
 export async function closeTabAsked(tabId: string): Promise<void> {
-  const { tabs, charts, drawings, names, closeTab } = useStore.getState()
+  const { tabs, charts, drawings, names, alarms, closeTab } = useStore.getState()
   const tab = tabs.find((x) => x.id === tabId)
   if (!tab) return
   const name = names[tab.symbol] ?? tab.symbol
@@ -17,10 +17,19 @@ export async function closeTabAsked(tabId: string): Promise<void> {
   const changed = saved && isDirty(saved, tab.timeframe, drawings[key] ?? [])
   // All drawings of this tab (any symbol) go with it, except those kept in its saved chart.
   const lost = Object.entries(drawings).reduce((n, [k, d]) => n + (k.startsWith(`${tab.id}:`) && !(saved && k === key) ? d.length : 0), 0)
-  // Lost drawings weigh more than unsaved changes, so they are named even when both apply.
-  const ok = lost
-    ? await ask(t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }), t('Tab schließen'), { danger: true })
-    : !changed || (await ask(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }), t('Verwerfen'), { danger: true }))
+  // Line alarms of the tab's drawings go with it, also of drawings kept in its saved chart (copies carry no alarm).
+  const armed = alarms.filter((a) => a.line?.key.startsWith(`${tab.id}:`)).length
+  const alarmNote = armed ? ' ' + t('Dabei werden {count} Linien-Alarme gelöscht.', { count: armed }) : ''
+  // Lost drawings and alarms weigh more than unsaved changes, so they are named even when both apply.
+  const ok =
+    lost || armed
+      ? await ask(
+          (lost ? t('Tab „{name}“ schließen? Seine Zeichnungen ({count}) gehen verloren.', { name, count: lost }) : t('Tab „{name}“ schließen?', { name })) +
+            alarmNote,
+          t('Tab schließen'),
+          { danger: true }
+        )
+      : !changed || (await ask(t('Ungespeicherte Änderungen an „{name}“ verwerfen?', { name: saved.name }), t('Verwerfen'), { danger: true }))
   if (ok) closeTab(tab.id)
 }
 

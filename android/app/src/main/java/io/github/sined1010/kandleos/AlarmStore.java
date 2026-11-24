@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The armed alarms as the app last sent them (setAlarms) and the triggers found in the background that
@@ -16,9 +17,13 @@ import java.util.List;
 public final class AlarmStore {
     private static final Object LOCK = new Object();
     private final SharedPreferences prefs;
+    // Line tables in a file of their own: SharedPreferences rewrites a whole file on every commit, and record() commits
+    // the armed list on every pass (every 15 s in instant mode).
+    private final SharedPreferences knotPrefs;
 
     public AlarmStore(Context c) {
         prefs = c.getApplicationContext().getSharedPreferences("kandleos_alarms", Context.MODE_PRIVATE);
+        knotPrefs = c.getApplicationContext().getSharedPreferences("kandleos_alarm_knots", Context.MODE_PRIVATE);
     }
 
     /** Armed alarms: {id, symbol, op, price, checkedUntil, source, providerSymbol}. */
@@ -32,16 +37,66 @@ public final class AlarmStore {
         }
     }
 
-    /** From the app; alarms that already fired here but were not collected yet stay out, so none fires twice. */
+    /**
+     * From the app; alarms that already fired here but were not collected yet stay out, so none fires twice. A line
+     * alarm's table ("knots", up to a year of points) goes to its own entry: record() rewrites the armed list on every
+     * pass, every 15 s in instant mode.
+     */
     public void setArmed(JSONArray list, boolean instant) {
         synchronized (LOCK) {
             List<String> fired = firedIds();
             JSONArray keep = new JSONArray();
+            SharedPreferences.Editor e = prefs.edit();
+            SharedPreferences.Editor k = knotPrefs.edit().clear();
             for (int i = 0; i < list.length(); i++) {
                 JSONObject a = list.optJSONObject(i);
-                if (a != null && !fired.contains(a.optString("id"))) keep.put(a);
+                if (a == null || fired.contains(a.optString("id"))) continue;
+                Object knots = a.remove("knots");
+                if (knots != null) k.putString(KNOTS + a.optString("id"), knots.toString());
+                keep.put(a);
             }
-            prefs.edit().putString("armed", keep.toString()).putBoolean("instant", instant).commit();
+            k.commit();
+            e.putString("armed", keep.toString()).putBoolean("instant", instant).commit();
+        }
+    }
+
+    private static final String KNOTS = "knots:";
+
+    /** A line alarm's table as times and prices; null for a fixed-price alarm or a broken table. */
+    public double[][] knotsOf(String id) {
+        synchronized (LOCK) {
+            String s = knotPrefs.getString(KNOTS + id, null);
+            if (s == null) return null;
+            try {
+                JSONArray arr = new JSONArray(s);
+                double[][] out = new double[2][arr.length()];
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONArray k = arr.getJSONArray(i);
+                    out[0][i] = k.getDouble(0);
+                    out[1][i] = k.getDouble(1);
+                }
+                return arr.length() > 0 ? out : null;
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+    }
+
+    /** Stops checking an alarm whose line table ran out; the app decides what that means when it opens. */
+    public void drop(String id) {
+        synchronized (LOCK) {
+            try {
+                JSONArray armed = new JSONArray(prefs.getString("armed", "[]"));
+                JSONArray next = new JSONArray();
+                for (int i = 0; i < armed.length(); i++) {
+                    JSONObject a = armed.getJSONObject(i);
+                    if (!a.getString("id").equals(id)) next.put(a);
+                }
+                prefs.edit().putString("armed", next.toString()).commit();
+                knotPrefs.edit().remove(KNOTS + id).commit();
+            } catch (Exception ignored) {
+                // a broken list is replaced with the next setAlarms from the app
+            }
         }
     }
 
@@ -119,6 +174,11 @@ public final class AlarmStore {
                 // Without a start (bad data from the app) only bars from now on count, never years of old ones.
                 long from = a.optLong("checkedUntil", 0);
                 if (from <= 0) from = System.currentTimeMillis() / 1000;
+                String id = a.getString("id");
+                if (a.has("body")) {
+                    checkLine(c, store, a, id, from);
+                    continue;
+                }
                 List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
                 double price = a.getDouble("price");
                 long at = AlarmCheck.hit(a.getString("op"), price, from, false, bars);
@@ -135,5 +195,35 @@ public final class AlarmStore {
         }
         // Read again: an alarm the app armed during this pass counts too, so the checks do not stop without it.
         return store.armed().length();
+    }
+
+    /** A line alarm: bars against where the line is at each bar; past the end of its table it is no longer checked. */
+    private static void checkLine(Context c, AlarmStore store, JSONObject a, String id, long from) throws Exception {
+        double[][] k = store.knotsOf(id);
+        // No readable table: nothing to check against, so it must not keep the checks running.
+        if (k == null) {
+            store.drop(id);
+            return;
+        }
+        long[] kt = new long[k[0].length];
+        for (int i = 0; i < kt.length; i++) kt[i] = (long) k[0][i];
+        double[] kp = k[1];
+        if (from > kt[kt.length - 1]) {
+            store.drop(id);
+            return;
+        }
+        List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
+        long at = AlarmCheck.hitLine(a.getString("op"), from, bars, kt, kp);
+        if (at >= 0) {
+            double price = AlarmCheck.linePrice(kt, kp, at);
+            if (store.record(id, at, true, price)) {
+                String body = a.getString("body").replace("{price}", AlarmCheck.formatPrice(price, Locale.getDefault()));
+                Notifier.show(c, Notifier.idOf(id), a.optString("title", a.getString("symbol")), body);
+            }
+        } else if (!bars.isEmpty()) {
+            long last = bars.get(bars.size() - 1).time;
+            if (last > kt[kt.length - 1]) store.drop(id);
+            else store.record(id, last, false, a.getDouble("price"));
+        }
     }
 }

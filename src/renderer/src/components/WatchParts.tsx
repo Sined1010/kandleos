@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { t } from '../../../shared/i18n'
+import { armedFor } from '../../../shared/alarms'
 import { formatChange } from '../lib/format'
 import { avgChange, sortSymbols, upDown, type WatchSort } from '../lib/watchlist'
 import { useQuotes, useStore } from '../store/useStore'
@@ -21,7 +22,7 @@ export function ChangePill({ change, className = '' }: { change?: number; classN
 /** Bell behind the name while the symbol has an alarm that has not gone off. */
 export function AlarmMark({ symbol }: { symbol: string }) {
   // A boolean, so other symbols' alarms do not re-render this row.
-  const on = useStore((s) => s.alarms.some((a) => a.symbol === symbol && !a.triggeredAt))
+  const on = useStore((s) => armedFor(s.alarms, symbol))
   if (!on) return null
   return (
     <span role="img" aria-label={t('Kurs-Alarm aktiv')} title={t('Kurs-Alarm aktiv')} className="inline-flex shrink-0 rounded bg-amber-500/15 px-0.5 text-amber-500">

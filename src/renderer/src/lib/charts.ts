@@ -15,9 +15,13 @@ export interface SavedChart {
 /** Drawings belong to a tab and its symbol, so two tabs on the same symbol are separate charts. */
 export const drawingsKey = (s: { activeTab: string; symbol: string }): string => `${s.activeTab}:${s.symbol}`
 
+/** Saved charts carry no alarms, so no alarm ends either (shared/lineAlarm.ts). */
+export const withoutAlarmEnds = (drawings: Drawing[]): Drawing[] => drawings.map(({ alarmUntil: _, ...d }) => d as Drawing)
+const sameDrawings = (a: Drawing[], b: Drawing[]) => JSON.stringify(withoutAlarmEnds(a)) === JSON.stringify(withoutAlarmEnds(b))
+
 /** Whether the chart shown differs from what was saved (contents, so undoing a change makes it clean again). */
 export function isDirty(saved: SavedChart, timeframe: Timeframe, drawings: Drawing[]): boolean {
-  return saved.timeframe !== timeframe || JSON.stringify(saved.drawings) !== JSON.stringify(drawings)
+  return saved.timeframe !== timeframe || !sameDrawings(saved.drawings, drawings)
 }
 
 export function toolCounts(drawings: Drawing[]): Partial<Record<Drawing['type'], number>> {
@@ -74,7 +78,7 @@ export function loadTarget(
   // Already in the active tab: load it there again, so the saved state comes back – after asking, if lines drawn since would be lost.
   if (open?.id === s.activeTab) {
     const now = s.drawings[drawingsKey({ activeTab: s.activeTab, symbol: chart.symbol })] ?? []
-    return now.length && JSON.stringify(now) !== JSON.stringify(chart.drawings) ? { kind: 'revert' } : { kind: 'here' }
+    return now.length && !sameDrawings(now, chart.drawings) ? { kind: 'revert' } : { kind: 'here' }
   }
   if (open) return { kind: 'switch', tabId: open.id }
   const active = s.tabs.find((t) => t.id === s.activeTab)
