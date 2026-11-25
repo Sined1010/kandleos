@@ -117,6 +117,16 @@ function scheduleFor(symbol: string, timeZone: string | undefined): Schedule | n
   return hours ? exchange(timeZone, hours) : null
 }
 
+/**
+ * Session start of the exchange a share trades on: the app builds its 1h/2h/4h bars from it (stocks.ts finish).
+ * Undefined for crypto, futures, currencies, German floor trading and unknown hours.
+ */
+export function shareOpen(symbol: string, timeZone: string | undefined): number | undefined {
+  if (isCrypto(symbol) || /=[FX]$/.test(symbol)) return undefined
+  const suffix = /\.([A-Z]{1,2})$/.exec(symbol)?.[1]
+  return suffix && GERMAN_FLOORS.has(suffix) ? undefined : sessionOpen(timeZone)
+}
+
 /** Session phase of a symbol at time `t` (unix seconds); null when its exchange hours are unknown. */
 export function phaseAt(symbol: string, timeZone: string | undefined, t: number): Phase | null {
   if (isCrypto(symbol)) return 'open'

@@ -2,6 +2,7 @@
 // in the app and in the Android background check (android/.../AlarmCheck.java), so keep both in step. Times are in
 // seconds.
 import { linePrice, type Knot } from './lineAlarm.ts'
+import { TIMEFRAMES, type Timeframe } from './types.ts'
 
 export interface Alarm {
   id: string
@@ -15,8 +16,11 @@ export interface Alarm {
   triggeredPrice?: number
   /** Bars before this time are already checked. */
   checkedUntil?: number
-  /** A line alarm: drawing list key (`<tabId>:<symbol>`), drawing id and which of its lines (lineParts). */
-  line?: { key: string; drawing: string; part: string }
+  /**
+   * A line alarm: drawing list key (`<tabId>:<symbol>`), drawing id, which of its lines (lineParts) and the timeframe it
+   * was armed on (the line runs on in its bars; lineAlarm.ts).
+   */
+  line?: { key: string; drawing: string; part: string; tf?: Timeframe }
   /** The line's end passed without a touch. */
   expiredAt?: number
 }
@@ -82,6 +86,8 @@ export function checkAlarm(v: unknown): Alarm | null {
   if (!optTime(v.triggeredAt) || !optTime(v.expiredAt) || !optTime(v.checkedUntil)) return null
   // A line that cannot be read must not turn into a fixed-price alarm at the arming price.
   if (v.line !== undefined && !(isObj(v.line) && str(v.line.key) && str(v.line.drawing) && str(v.line.part))) return null
+  const tf = isObj(v.line) ? v.line.tf : undefined
+  if (tf !== undefined && !TIMEFRAMES.includes(tf as Timeframe)) return null
   // The drawing list of this symbol in some tab ("<tab>:<symbol>"), never an object property name like __proto__.
   if (v.line && !((v.line.key as string).length > v.symbol.length + 1 && (v.line.key as string).endsWith(':' + v.symbol))) return null
   return v as unknown as Alarm

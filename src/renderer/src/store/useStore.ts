@@ -414,7 +414,8 @@ export const useStore = create<State>()(
         const key = drawingsKey(s)
         const mine = s.alarms.find((a) => a.line?.key === key && a.line.drawing === drawingId && a.line.part === part)
         if (mine) return void set({ alarms: s.alarms.filter((a) => a !== mine) })
-        const line = { key, drawing: drawingId, part }
+        // The line runs on in the bars of the timeframe it is armed on (lineAlarm.ts).
+        const line = { key, drawing: drawingId, part, tf: s.timeframe }
         const at = lineNow({ id: '', symbol: s.symbol, op: 'above', price: 0, createdAt: now, line }, s.drawings, now)
         if (at === null) return 'no-price'
         const a = newLineAlarm(s.symbol, line, at, current, now)

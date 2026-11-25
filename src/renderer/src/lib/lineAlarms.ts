@@ -3,6 +3,7 @@
 import type { Alarm } from '../../../shared/alarms.ts'
 import { t } from '../../../shared/i18n.ts'
 import { LINE_HORIZON, lineGeom, lineKnots, lineParts, linePrice, shapeKey, type Knot } from '../../../shared/lineAlarm.ts'
+import type { Timeframe } from '../../../shared/types.ts'
 import type { Drawing } from '../store/useStore.ts'
 
 export type LineTable = { knots: Knot[]; until?: number }
@@ -18,13 +19,16 @@ const DAY = 86_400
 const tables = new Map<string, Knot[] | null>()
 const MAX_TABLES = 200
 
-/** The table of one line of a drawing from `from` to `to`, computed once per shape and window; null without the line. */
-export function lineTable(d: Drawing, part: string, symbol: string, from: number, to: number): Knot[] | null {
-  const key = `${shapeKey(d)}|${part}|${symbol}|${from}|${to}`
+/**
+ * The table of one line of a drawing from `from` to `to`, counted in bars of `tf` where those differ in length
+ * (lineKnots); computed once per shape and window; null without the line.
+ */
+export function lineTable(d: Drawing, part: string, symbol: string, from: number, to: number, tf?: Timeframe): Knot[] | null {
+  const key = `${shapeKey(d)}|${part}|${symbol}|${from}|${to}|${tf ?? ''}`
   const hit = tables.get(key)
   if (hit !== undefined) return hit
-  const g = lineGeom(d, part, symbol)
-  const knots = g ? lineKnots(g, symbol, from, to) : null
+  const g = lineGeom(d, part, symbol, tf)
+  const knots = g ? lineKnots(g, symbol, from, to, tf) : null
   if (tables.size >= MAX_TABLES) tables.delete(tables.keys().next().value!)
   tables.set(key, knots)
   return knots
@@ -43,7 +47,7 @@ export function knotsFor(a: Alarm, drawings: Record<string, Drawing[]>, now: num
   const from = a.createdAt
   const until = d.alarmUntil
   const to = Math.min(until ?? Infinity, Math.floor(now / DAY) * DAY + LINE_HORIZON)
-  const knots = lineTable(d, a.line.part, a.symbol, from, to)
+  const knots = lineTable(d, a.line.part, a.symbol, from, to, a.line.tf)
   return knots ? { knots, ...(until !== undefined && { until }) } : 'missing'
 }
 
@@ -80,6 +84,6 @@ export function lineNow(a: Alarm, drawings: Record<string, Drawing[]>, now: numb
   if (!d || !a.line) return null
   // Read from a cached table over today and tomorrow instead of walking the calendar on every call.
   const day = Math.floor(now / DAY) * DAY
-  const knots = lineTable(d, a.line.part, a.symbol, day, day + 2 * DAY)
+  const knots = lineTable(d, a.line.part, a.symbol, day, day + 2 * DAY, a.line.tf)
   return knots && linePrice(knots, now)
 }

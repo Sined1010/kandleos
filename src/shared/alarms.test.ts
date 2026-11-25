@@ -153,3 +153,9 @@ test('checkAlarm: a line must name a drawing list of its own symbol ("<tab>:<sym
   assert.equal(checkAlarm({ ...lineAlarm(), line: { ...LINE, key: 't1:MSFT' } }), null)
   assert.ok(checkAlarm(lineAlarm()))
 })
+
+test('checkAlarm: a line keeps the timeframe it was armed on; an unknown one is dropped', () => {
+  const on4h = lineAlarm({ line: { ...lineAlarm().line!, tf: '4h' } })
+  assert.deepEqual(checkAlarm(on4h), on4h)
+  assert.equal(checkAlarm({ ...on4h, line: { ...on4h.line, tf: '3h' } }), null)
+})

@@ -1,9 +1,13 @@
 // Alarms on drawn lines: where a line lies at time t. The chart draws lines straight in candles, with nights and
 // weekends pushed together, so a line runs on in regular trading time and stays flat while the market is closed.
+// Shares on 1h/2h/4h have bars of unequal length (US 4h: 9:30-13:30 and 13:30-16:00): there a line alarm counts in
+// the bars of the timeframe it was armed on, as the chart draws it.
 // The app turns each alarmed line into a table of points ([time, price], straight in between); the PC/phone check
 // and the Android background check (AlarmCheck.java) only read that table, so all three agree.
-import { timeZoneForSymbol } from './calendar.ts'
-import { openSessions } from './market.ts'
+import { timeZoneForSymbol, utcOffset } from './calendar.ts'
+import { timeToLogical } from './candles.ts'
+import { openSessions, shareOpen } from './market.ts'
+import { TF_SECONDS, type Timeframe } from './types.ts'
 import { FIB_EXT_LEVELS, fibExtPrice } from '../renderer/src/lib/geometry.ts'
 import type { Drawing, Point } from '../renderer/src/store/useStore.ts'
 
@@ -58,10 +62,51 @@ function priceOn(symbol: string, g: { t1: number; p1: number; t2: number; p2: nu
   return g.p1 + ((g.p2 - g.p1) * along) / (span === 0 ? g.t2 - g.t1 : span)
 }
 
+/** Timeframes whose share bars differ in length within a day; shorter ones fill the session evenly. */
+const BAR_GRID = new Set<Timeframe>(['1h', '2h', '4h'])
+// Bars on either side of the window, so every time in it lies between two bars.
+const GRID_PAD = 7 * 86_400
+
+/**
+ * Bar starts of a share on `seconds` from `from` to `to`, on the grid aggregate() builds them on (stocks.ts finish):
+ * the exchange's clock from its session open. Regular hours only; null when the timeframe is not one of BAR_GRID or
+ * the symbol has no such grid (crypto, currencies, futures, floor trading, unknown hours).
+ */
+function barStarts(symbol: string, tf: Timeframe | undefined, from: number, to: number): number[] | null {
+  if (!tf || !BAR_GRID.has(tf)) return null
+  const zone = timeZoneForSymbol(symbol)
+  const open = shareOpen(symbol, zone)
+  const sessions = open === undefined ? null : openSessions(symbol, zone, from, to)
+  if (!sessions) return null
+  // shortcut: extended-hours bars (Yahoo with pre/post market) are not on this grid; with them shown the chart counts
+  // about twice the bars a day, so the alarm line rises more slowly than the drawn one. Add them if users need it.
+  const seconds = TF_SECONDS[tf]
+  const offset = open! % seconds
+  const out: number[] = []
+  for (const [a, b] of sessions) {
+    const shift = utcOffset(a, zone!)
+    for (let t = Math.floor((a + shift - offset) / seconds) * seconds + offset - shift; t < b; t += seconds)
+      if (!out.length || t > out[out.length - 1]) out.push(t)
+  }
+  return out.length > 1 ? out : null
+}
+
+/** A two-point line counted in bars of `tf` (as the chart draws it), with the bars it was measured on; null without a grid. */
+function barLine(g: { t1: number; p1: number; t2: number; p2: number }, symbol: string, tf: Timeframe | undefined, lo: number, hi: number) {
+  // Both anchors in one closed stretch (pre-/post-market points): they share a gap between two bars, so clock time.
+  if (g.t1 === g.t2 || spanOf(symbol, g) === 0) return null
+  const bars = barStarts(symbol, tf, Math.min(g.t1, g.t2, lo) - GRID_PAD, Math.max(g.t1, g.t2, hi) + GRID_PAD)
+  if (!bars) return null
+  const at = (t: number) => timeToLogical(bars, t, TF_SECONDS[tf!])
+  const l1 = at(g.t1)
+  const per = (g.p2 - g.p1) / (at(g.t2) - l1)
+  return { bars, price: (t: number) => g.p1 + per * (at(t) - l1) }
+}
+
 const through = (a: Point, b: Point) => ({ t1: a.time, p1: a.price, t2: b.time, p2: b.price })
 
 /** One line of a drawing; null when the drawing has no such line. */
-export function lineGeom(d: Drawing, part: string, symbol: string): LineGeom | null {
+export function lineGeom(d: Drawing, part: string, symbol: string, tf?: Timeframe): LineGeom | null {
   if (!lineParts(d).includes(part)) return null
   switch (d.type) {
     case 'hline':
@@ -80,8 +125,9 @@ export function lineGeom(d: Drawing, part: string, symbol: string): LineGeom | n
       return { flat: fibExtPrice(d.points[0].price, d.points[1].price, d.points[2].price, Number(part)) }
     case 'channel': {
       const base = through(d.points[0], d.points[1])
-      // The third click sets the parallel line; measured in trading time like the line itself.
-      const off = d.points[2].price - priceOn(symbol, base, d.points[2].time)
+      // The third click sets the parallel line; measured like the line itself (bars of tf, or trading time).
+      const t3 = d.points[2].time
+      const off = d.points[2].price - (barLine(base, symbol, tf, t3, t3)?.price(t3) ?? priceOn(symbol, base, t3))
       const shift = (by: number) => ({ ...base, p1: base.p1 + by, p2: base.p2 + by })
       if (part === 'mid') return shift(off / 2)
       return (part === 'top') === off > 0 ? shift(off) : base
@@ -108,13 +154,26 @@ export function endAhead(d: Drawing, now: number): Drawing {
 }
 
 /** Where a line lies at `t`. */
-export const lineAt = (g: LineGeom, symbol: string, t: number): number => ('flat' in g ? g.flat : priceOn(symbol, g, t))
+export const lineAt = (g: LineGeom, symbol: string, t: number, tf?: Timeframe): number =>
+  'flat' in g ? g.flat : (barLine(g, symbol, tf, t, t)?.price(t) ?? priceOn(symbol, g, t))
 
-/** Table of points from `from` to `to`: start, every session edge in between, end. */
-export function lineKnots(g: LineGeom, symbol: string, from: number, to: number): Knot[] {
+/**
+ * Table of points from `from` to `to`: start, every bend in between, end. A bend is a session edge, or on a bar grid
+ * (`tf`) a bar whose gap to the next one differs from the gap before it (the last bar of a day, the first after a night).
+ */
+export function lineKnots(g: LineGeom, symbol: string, from: number, to: number, tf?: Timeframe): Knot[] {
   if (to <= from) return []
   if ('flat' in g) return [[from, g.flat], [to, g.flat]]
   if (g.t1 === g.t2) return [[from, g.p2], [to, g.p2]]
+  const line = barLine(g, symbol, tf, from, to)
+  if (line) {
+    const { bars, price } = line
+    const knots: Knot[] = [[from, price(from)]]
+    for (let i = 1; i < bars.length - 1; i++)
+      if (bars[i] > from && bars[i] < to && bars[i] - bars[i - 1] !== bars[i + 1] - bars[i]) knots.push([bars[i], price(bars[i])])
+    knots.push([to, price(to)])
+    return knots
+  }
   const span = spanOf(symbol, g)
   const start = priceOn(symbol, g, from, span)
   const sessions = span === 0 ? null : openSessions(symbol, timeZoneForSymbol(symbol), from, to)

@@ -810,7 +810,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const color = selected ? ALARM : (d.color ?? COLOR)
     const samples = [start, ...axis.filter((t) => t > Math.max(start, leftTime) && t < end), end]
     const lines = armed.flatMap((a) => {
-      const k = lineTable(d, a.line!.part, symbol, start, tableEnd)
+      const k = lineTable(d, a.line!.part, symbol, start, tableEnd, a.line!.tf)
       if (!k) return []
       const xy = samples.flatMap((t) => {
         const x = toX(t)

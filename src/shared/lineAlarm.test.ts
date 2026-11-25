@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { FIB_LEVELS, endAhead, lineGeom, lineKnots, lineMoved, lineParts, linePrice, type LineGeom } from './lineAlarm.ts'
+import { FIB_LEVELS, endAhead, lineAt, lineGeom, lineKnots, lineMoved, lineParts, linePrice, type LineGeom } from './lineAlarm.ts'
+import { aggregate, timeToLogical } from './candles.ts'
+import { timeZoneForSymbol } from './calendar.ts'
+import { openSessions, sessionOpen } from './market.ts'
+import { TF_SECONDS } from './types.ts'
 import { fibExtPrice } from '../renderer/src/lib/geometry.ts'
 import type { Drawing } from '../renderer/src/store/useStore.ts'
 
@@ -103,4 +107,83 @@ test('endAhead: arming again drops an alarm end that has passed, keeps one still
   assert.equal(endAhead(d, 400), d)
   assert.equal(endAhead(d, 500).alarmUntil, undefined)
   assert.equal(endAhead({ id: 'h', type: 'hline', price: 1 } as Drawing, 900).alarmUntil, undefined)
+})
+
+// Line alarms armed on 1h/2h/4h: the chart draws a line straight in bars, and a US 4h day has a 4 h and a 2.5 h bar.
+// The oracle is the chart's own mapping (timeToLogical) over the bars the app builds (aggregate, as stocks.ts finish).
+const chartAxis = (symbol: string, seconds: number, from: number, to: number): number[] => {
+  const zone = timeZoneForSymbol(symbol)!
+  const fives = (openSessions(symbol, zone, from, to) ?? []).flatMap(([a, b]) =>
+    Array.from({ length: (b - a) / 300 }, (_, i) => ({ time: a + i * 300, open: 1, high: 1, low: 1, close: 1, volume: 0 }))
+  )
+  return aggregate(fives, seconds, (sessionOpen(zone) ?? 0) % seconds, zone).map((c) => c.time)
+}
+
+for (const tf of ['1h', '2h', '4h'] as const) {
+  test(`${tf}: the alarm line lies where the chart draws it, across a DST change, Thanksgiving and the half day`, () => {
+    const s = TF_SECONDS[tf]
+    // 2026-10-26 to 2026-12-05: summer time ends 1 Nov, Thanksgiving 26 Nov, early close 27 Nov.
+    const axis = chartAxis('AAPL', s, utc(10, 26), utc(12, 5))
+    const i = axis.findIndex((t) => t >= utc(10, 28))
+    const g: LineGeom = { t1: axis[i], p1: 100, t2: axis[i + 3], p2: 103 }
+    const L = (t: number) => timeToLogical(axis, t, s)
+    const chart = (t: number) => g.p1 + ((g.p2 - g.p1) * (L(t) - L(g.t1))) / (L(g.t2) - L(g.t1))
+    const knots = lineKnots(g, 'AAPL', utc(10, 29), utc(12, 4), tf)
+    for (let k = 1; k < axis.length - 1; k++) {
+      if (axis[k] < utc(10, 29) || axis[k + 1] > utc(12, 4)) continue
+      close(linePrice(knots, axis[k]), chart(axis[k])) // bar start
+      const mid = (axis[k] + axis[k + 1]) / 2 // inside the bar, or overnight / over the weekend
+      close(linePrice(knots, mid), chart(mid))
+    }
+  })
+}
+
+test('4h: the price at a time does not depend on where the table starts', () => {
+  const axis = chartAxis('AAPL', 14_400, utc(11, 2), utc(11, 21))
+  const g: LineGeom = { t1: axis[0], p1: 100, t2: axis[5], p2: 110 }
+  const a = lineKnots(g, 'AAPL', utc(11, 3), utc(11, 20), '4h')
+  const b = lineKnots(g, 'AAPL', utc(11, 10, 17, 7), utc(11, 25), '4h')
+  for (const t of [utc(11, 10, 18), utc(11, 12, 3), utc(11, 16, 15), utc(11, 19, 20, 30)]) close(linePrice(a, t), linePrice(b, t)!)
+})
+
+test('1h: a point only where the line bends, about two a trading day', () => {
+  const axis = chartAxis('AAPL', 3600, utc(11, 2), utc(11, 30))
+  const g: LineGeom = { t1: axis[0], p1: 100, t2: axis[3], p2: 101 }
+  const knots = lineKnots(g, 'AAPL', utc(11, 2), utc(11, 30), '1h')
+  // 19 trading days in that window (Thanksgiving off); start and end on top.
+  assert.ok(knots.length <= 2 * 19 + 2, `${knots.length} points`)
+})
+
+test('4h: the lines of a channel run parallel in bars, as the chart draws them', () => {
+  const axis = chartAxis('AAPL', 14_400, utc(11, 2), utc(11, 21))
+  const ch = { id: 'c', type: 'channel', points: [p(axis[0], 100), p(axis[4], 104), p(axis[7], 95)] } as Drawing
+  const L = (t: number) => timeToLogical(axis, t, 14_400)
+  const base = (t: number) => 100 + (4 * (L(t) - L(axis[0]))) / (L(axis[4]) - L(axis[0]))
+  const off = 95 - base(axis[7])
+  for (const t of [axis[7], axis[9], (axis[9] + axis[10]) / 2, axis[14]]) {
+    close(lineAt(lineGeom(ch, 'bottom', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t) + off)
+    close(lineAt(lineGeom(ch, 'top', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t))
+    close(lineAt(lineGeom(ch, 'mid', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t) + off / 2)
+  }
+})
+
+test('the bar grid only for shares on 1h/2h/4h: other timeframes, crypto and currencies keep the table they had', () => {
+  const share: LineGeom = { t1: utc(11, 20, 15), p1: 100, t2: utc(11, 20, 20), p2: 105 }
+  const crypto: LineGeom = { t1: utc(11, 20), p1: 100, t2: utc(11, 21), p2: 105 }
+  const range = [utc(11, 20, 15), utc(12, 4)] as const
+  for (const tf of ['1m', '5m', '30m', '1D', '1W', undefined] as const)
+    assert.deepEqual(lineKnots(share, 'AAPL', ...range, tf), lineKnots(share, 'AAPL', ...range))
+  assert.deepEqual(lineKnots(crypto, 'BTCUSDT', ...range, '4h'), lineKnots(crypto, 'BTCUSDT', ...range))
+  assert.deepEqual(lineKnots(share, 'EURUSD=X', ...range, '4h'), lineKnots(share, 'EURUSD=X', ...range))
+  assert.deepEqual(lineKnots(share, 'ES=F', ...range, '4h'), lineKnots(share, 'ES=F', ...range))
+  // German floor trading (8-22 h) has no 9:00 grid; a plain name ending in a floor code (…HA) is still a US share.
+  assert.deepEqual(lineKnots(share, 'SAP.HA', ...range, '4h'), lineKnots(share, 'SAP.HA', ...range))
+  assert.notDeepEqual(lineKnots(share, 'ALPHA', ...range, '4h'), lineKnots(share, 'ALPHA', ...range))
+})
+
+test('1h/2h/4h: both anchors in the same pre-market stretch keep clock time, not a fraction of one bar', () => {
+  // Tuesday 2026-11-17 05:00 and 06:00 New York (pre-market, off the regular-hours grid)
+  const g: LineGeom = { t1: utc(11, 17, 10), p1: 100, t2: utc(11, 17, 11), p2: 101 }
+  const range = [utc(11, 17, 10), utc(11, 21)] as const
+  for (const tf of ['1h', '2h', '4h'] as const) assert.deepEqual(lineKnots(g, 'AAPL', ...range, tf), lineKnots(g, 'AAPL', ...range))
 })

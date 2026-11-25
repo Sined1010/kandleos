@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import type { Alarm } from '../../../shared/alarms.ts'
 import type { Drawing } from '../store/useStore.ts'
 import { knotsFor, lineLabel, lineNow } from './lineAlarms.ts'
+import { linePrice } from '../../../shared/lineAlarm.ts'
 
 const hline = (over: Partial<Drawing> = {}) => ({ id: 'd', type: 'hline', price: 50, ...over }) as Drawing
 const alarm = (over: Partial<Alarm> = {}): Alarm => ({
@@ -62,4 +63,19 @@ test('knotsFor: a sync rebuilds the drawings as new objects; the same line keeps
 test('drawingOf: a list key that is an object property name finds nothing instead of crashing', () => {
   assert.equal(knotsFor(alarm({ line: { key: '__proto__', drawing: 'd', part: 'main' } }), {}, 1000), 'missing')
   assert.equal(lineNow(alarm({ line: { key: 'constructor', drawing: 'd', part: 'main' } }), {}, 1000), null)
+})
+
+test('knotsFor and lineNow count in the bars of the timeframe the alarm was armed on', () => {
+  // AAPL trend line between two 4h bars (Wed 2026-11-18 9:30 and 13:30 New York, EST = UTC-5).
+  const t1 = Date.UTC(2026, 10, 18, 14, 30) / 1000
+  const t2 = Date.UTC(2026, 10, 18, 18, 30) / 1000
+  const trend = { id: 'd', type: 'trend', p1: { time: t1, price: 100 }, p2: { time: t2, price: 101 } } as Drawing
+  const lists = { 't:AAPL': [trend] }
+  const on = (tf?: '4h') => alarm({ symbol: 'AAPL', createdAt: t1, line: { key: 't:AAPL', drawing: 'd', part: 'main', ...(tf && { tf }) } })
+  // Thursday 9:30 is two 4h bars on: 102 on the chart; in trading time (6.5 h a day) it was 101.625.
+  const thu = Date.UTC(2026, 10, 19, 14, 30) / 1000
+  const four = knotsFor(on('4h'), lists, t2)
+  assert.ok(four !== 'missing' && Math.abs(linePrice(four.knots, thu)! - 102) < 1e-9)
+  assert.ok(Math.abs(lineNow(on('4h'), lists, thu)! - 102) < 1e-9)
+  assert.ok(Math.abs(lineNow(on(), lists, thu)! - 101.625) < 1e-9)
 })
