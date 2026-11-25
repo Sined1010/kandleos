@@ -13,4 +13,6 @@ export const useEventsUi = create<{
   /** Written by the chart: change since the deal per event id, and the ids whose bar is loaded. */
   since: Record<string, number>
   loaded: Record<string, true>
-}>(() => ({ side: 'watchlist', selected: null, hovered: null, jump: null, since: {}, loaded: {} }))
+  /** Written by the chart: which side of a bar (time) has event badges, so pattern labels can keep clear. */
+  badgeSides: Record<number, 'above' | 'below' | 'both'>
+}>(() => ({ side: 'watchlist', selected: null, hovered: null, jump: null, since: {}, loaded: {}, badgeSides: {} }))

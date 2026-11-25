@@ -12,6 +12,8 @@ import { EventBadges, type Badge } from '../lib/eventBadges'
 import { IS_MOBILE } from '../lib/platform'
 import { openEvents, useEventsData } from '../services/events'
 import { useEventsUi } from '../store/eventsUi'
+import { usePatternsUi } from '../store/patternsUi'
+import { PATTERN_NAME } from '../../../shared/patterns'
 import { useStore } from '../store/useStore'
 import EventCard from '../../../mobile/EventCard'
 import { EventStack } from './EventsPanel'
@@ -38,6 +40,8 @@ const clusterOf = (e: ChartEvent, all: ChartEvent[]): ChartEvent | undefined =>
 export default function EventLayer({ chart, series, data, symbol, timeframe, timeZone, currency }: Props) {
   const all = useEventsData((s) => (s.symbol === symbol ? s.events : NO_EVENTS))
   const filters = useStore((s) => s.eventFilters)
+  const patternSpan = usePatternsUi((s) => s.span)
+  const patternNames = usePatternsUi((s) => s.current)
   const { hovered, selected, jump } = useEventsUi(useShallow((s) => ({ hovered: s.hovered, selected: s.selected, jump: s.jump })))
   const intraday = TF_SECONDS[timeframe] < 86400
   const events = useMemo(() => all.filter((e) => filters[e.group]), [all, filters])
@@ -102,6 +106,8 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
 
   // Badges (marker design A, lib/eventBadges.ts), drawn by a primitive on the candle series.
   const badges = useRef<EventBadges | null>(null)
+  // Re-attached when patterns are switched on: the later primitive draws on top, and badges belong above pattern pills.
+  const patternsOn = useStore((s) => s.indicators.patterns.on)
   useEffect(() => {
     const p = new EventBadges()
     series.attachPrimitive(p)
@@ -113,7 +119,7 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
         series.detachPrimitive(p)
       } catch {}
     }
-  }, [series])
+  }, [series, patternsOn])
   const focused = tmp !== undefined ? all.find((e) => e.id === focus) : undefined
   useEffect(() => {
     const list: Badge[] = marks.map((m) => ({
@@ -134,7 +140,15 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
       list.push({ id: 'tmp', time: tmp, kind: 'note', text: IS_MOBILE ? '' : text, strong: false, temp: true })
     }
     badges.current?.set(list)
-  }, [marks, tmp, focused])
+    // Where badges hang (buys below the bar, the rest above), so pattern labels can keep clear of them.
+    const sides: Record<number, 'above' | 'below' | 'both'> = {}
+    for (const b of list) {
+      const side = b.kind === 'buy' ? 'below' : 'above'
+      sides[b.time] = sides[b.time] && sides[b.time] !== side ? 'both' : side
+    }
+    useEventsUi.setState({ badgeSides: sides })
+  }, [marks, tmp, focused, patternsOn])
+  useEffect(() => () => useEventsUi.setState({ badgeSides: {} }), [])
 
   /** Events shown for a bar: those of its permanent marker, or the temporary one. */
   const eventsAt = (time: number): ChartEvent[] => {
@@ -265,6 +279,7 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
   // Phone: the chosen entry (tapped bar or list) shows its bar's events in a card at the bottom of the chart.
   const selectedIndex = selected ? (base.index.get(selected) ?? -1) : -1
   const cardEvents = IS_MOBILE && selectedIndex >= 0 ? eventsAt(base.times[selectedIndex]) : []
+  const cardTime = selectedIndex >= 0 ? base.times[selectedIndex] : -1
   return (
     <>
       {stripe && <div className="pointer-events-none absolute inset-y-0 bg-white/5" style={{ left: stripe.left, width: stripe.width }} />}
@@ -285,6 +300,17 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
           right={chart.priceScale('right').width() + 8}
           onAll={() => window.dispatchEvent(new Event('kandleos:events'))}
           onClose={() => useEventsUi.setState({ selected: null })}
+          also={
+            patternSpan && cardTime >= patternSpan.from && cardTime <= patternSpan.to
+              ? {
+                  label: patternNames.map((id) => PATTERN_NAME[id]).join(' · '),
+                  onOpen: () => {
+                    useEventsUi.setState({ selected: null })
+                    usePatternsUi.setState({ open: { time: patternSpan.to, pinned: true } })
+                  }
+                }
+              : undefined
+          }
         />
       )}
     </>

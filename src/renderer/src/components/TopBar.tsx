@@ -12,6 +12,8 @@ import SavedCharts from './SavedCharts'
 import SymbolSearch from './SymbolSearch'
 import UpdateBadge from './UpdateBadge'
 import { SETUPS, setupOn, setupPatch, setupsOf } from '../lib/setups'
+import { PATTERN_NAME } from '../../../shared/patterns'
+import { usePatternsUi } from '../store/patternsUi'
 
 export default function TopBar({ onOpenSettings, onOpenAbout }: { onOpenSettings: () => void; onOpenAbout: () => void }) {
   const symbol = useStore((s) => s.symbol)
@@ -252,7 +254,7 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
 }
 
 // [field, label, step]
-const ROWS: Record<keyof Indicators, { label: string; params: [string, string, number?][] }> = {
+const ROWS: Record<Exclude<keyof Indicators, 'patterns'>, { label: string; params: [string, string, number?][] }> = {
   sma: { label: 'SMA', params: [['period', msg('Periode')]] },
   ema: { label: 'EMA', params: [['period', msg('Periode')]] },
   ema3: { label: msg('3-fach EMA'), params: [['fast', msg('Kurz')], ['mid', msg('Mittel')], ['slow', msg('Lang')]] },
@@ -296,10 +298,15 @@ function NumberField(p: { label: string; title: string; min: number; max: number
   )
 }
 
+const PATTERNS_INFO = msg(
+  'Zeigt bekannte Kerzenmuster (Hammer, Engulfing, Morning Star, Harami, Doji, Three White Soldiers und ihre Gegenstücke) an den letzten 3 fertigen Kerzen. Fahr über das Schild oder tippe es an, um die Erklärung zu sehen. „Im Rückblick richtig“ zählt, wie oft der Kurs bei diesem Wert 5 Kerzen nach dem Muster in die angedeutete Richtung lief, „ohne Muster“ dasselbe nach jedem Rückgang bzw. Anstieg ohne dieses Muster. Erst der Abstand zeigt, ob das Muster etwas bringt: Kräht der Hahn, scheint in 70 % der Fälle die Sonne – im Sommer aber ohnehin an 70 % der Tage. Auch „bisher besser“ kann Zufall sein, etwa jede 20. Karte zeigt das zufällig.'
+)
+
 export function IndicatorMenu({ onClose }: { onClose: () => void }) {
   const indicators = useStore((s) => s.indicators)
   const setIndicator = useStore((s) => s.setIndicator)
   const setIndicators = useStore((s) => s.setIndicators)
+  const patterns = usePatternsUi((s) => s.current)
   // Setup whose explanation is open.
   const [info, setInfo] = useState<string | null>(null)
 
@@ -338,8 +345,41 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
             )}
           </div>
         ))}
+        <div className="px-1 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted">{t('Kerzenmuster')}</div>
+        <div className="rounded px-1 py-1.5 hover:bg-bg">
+          <div className="flex items-center gap-2">
+            <label className="flex flex-1 cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={indicators.patterns.on}
+                onChange={(e) => setIndicator('patterns', { on: e.target.checked })}
+                className="accent-accent"
+              />
+              <span className="text-white">{t('Kerzenmuster anzeigen')}</span>
+            </label>
+            <button
+              onClick={() => setInfo((o) => (o === 'patterns' ? null : 'patterns'))}
+              aria-label={t('Was bedeutet das?')}
+              aria-expanded={info === 'patterns'}
+              title={t('Was bedeutet das?')}
+              className="rounded p-0.5 text-muted hover:text-white"
+            >
+              <Info size={14} />
+            </button>
+          </div>
+          {indicators.patterns.on && (
+            <p className="mt-0.5 pl-6 text-xs text-muted">
+              {patterns.length ? t('derzeit: {names}', { names: patterns.map((id) => PATTERN_NAME[id]).join(' · ') }) : t('derzeit kein Muster')}
+            </p>
+          )}
+          {info === 'patterns' && (
+            <p className="mt-1 pl-6 text-xs leading-relaxed text-slate-300">
+              {t(PATTERNS_INFO)} <span className="text-muted">{t('Keine Anlageberatung')}.</span>
+            </p>
+          )}
+        </div>
         <div className="my-1 border-t border-line" />
-        {(Object.keys(ROWS) as (keyof Indicators)[]).map((name) => {
+        {(Object.keys(ROWS) as (keyof typeof ROWS)[]).map((name) => {
           const cfg = indicators[name] as unknown as Record<string, number | boolean>
           const of = setupsOf(name).filter((s) => setupOn(indicators, s))
           return (

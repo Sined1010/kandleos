@@ -393,6 +393,50 @@ export const EN: Record<string, string> = {
   StdAbw: 'StdDev',
   'ATR-Periode': 'ATR period',
   Stufen: 'Rows',
+  // Candlestick patterns
+  Kerzenmuster: 'Candlestick patterns',
+  'Kerzenmuster anzeigen': 'Show candlestick patterns',
+  'derzeit: {names}': 'now: {names}',
+  'derzeit kein Muster': 'no pattern right now',
+  'Zeigt bekannte Kerzenmuster (Hammer, Engulfing, Morning Star, Harami, Doji, Three White Soldiers und ihre Gegenstücke) an den letzten 3 fertigen Kerzen. Fahr über das Schild oder tippe es an, um die Erklärung zu sehen. „Im Rückblick richtig“ zählt, wie oft der Kurs bei diesem Wert 5 Kerzen nach dem Muster in die angedeutete Richtung lief, „ohne Muster“ dasselbe nach jedem Rückgang bzw. Anstieg ohne dieses Muster. Erst der Abstand zeigt, ob das Muster etwas bringt: Kräht der Hahn, scheint in 70 % der Fälle die Sonne – im Sommer aber ohnehin an 70 % der Tage. Auch „bisher besser“ kann Zufall sein, etwa jede 20. Karte zeigt das zufällig.':
+    'Shows well-known candlestick patterns (Hammer, Engulfing, Morning Star, Harami, Doji, Three White Soldiers and their counterparts) at the last 3 finished candles. Hover over or tap the label to see the explanation. “Right in the look-back” counts how often the price of this symbol moved the hinted way 5 candles after the pattern, “without pattern” the same after every fall or rise without this pattern. Only the gap between the two shows whether the pattern adds anything: when the rooster crows, the sun shines 70% of the time – but in summer it shines on 70% of days anyway. Even “better so far” can be chance; about one card in 20 shows it by chance.',
+  'Im Rückblick richtig: {x} % · ohne Muster {y} %': 'Right in the look-back: {x}% · without pattern {y}%',
+  '1 Fall': '1 case',
+  '{n} Fälle': '{n} cases',
+  'zu selten für eine Aussage': 'too rare to tell',
+  'kein klarer Vorteil': 'no clear edge',
+  'bisher besser als ohne Muster': 'better than without the pattern so far',
+  'bisher schlechter als ohne Muster': 'worse than without the pattern so far',
+  'auf kleinen Kerzen meist Zufall': 'mostly chance on small candles',
+  'letzte fertige Kerze': 'last finished candle',
+  'vorletzte fertige Kerze': 'second-to-last finished candle',
+  'drittletzte fertige Kerze': 'third-to-last finished candle',
+  'nach einem Rückgang': 'after a fall',
+  'nach einem Anstieg': 'after a rise',
+  'Auch: {name}': 'Also: {name}',
+  'Kein Kauf- oder Verkaufssignal und keine Prognose.': 'Not a buy or sell signal and not a forecast.',
+  'Kleiner Körper oben, langer Docht nach unten. Nach einem Rückgang kann das bedeuten, dass Käufer den Kurs wieder hochgezogen haben.':
+    'Small body at the top, long wick below. After a fall this can mean buyers pulled the price back up.',
+  'Kleiner Körper unten, langer Docht nach oben. Nach einem Anstieg kann das bedeuten, dass Verkäufer den Kurs wieder gedrückt haben.':
+    'Small body at the bottom, long wick above. After a rise this can mean sellers pushed the price back down.',
+  'Eine große grüne Kerze umschließt den Körper der roten Kerze davor. Nach einem Rückgang kann das bedeuten, dass Käufer wieder stärker werden.':
+    'A big green candle wraps the body of the red candle before it. After a fall this can mean buyers are getting stronger again.',
+  'Eine große rote Kerze umschließt den Körper der grünen Kerze davor. Nach einem Anstieg kann das bedeuten, dass Verkäufer wieder stärker werden.':
+    'A big red candle wraps the body of the green candle before it. After a rise this can mean sellers are getting stronger again.',
+  'Eine große rote Kerze, eine kleine Kerze, dann eine grüne bis über die Mitte der ersten. Nach einem Rückgang kann das eine Wende nach oben andeuten.':
+    'A big red candle, a small candle, then a green one closing above the middle of the first. After a fall this can hint at a turn upwards.',
+  'Eine große grüne Kerze, eine kleine Kerze, dann eine rote bis unter die Mitte der ersten. Nach einem Anstieg kann das eine Wende nach unten andeuten.':
+    'A big green candle, a small candle, then a red one closing below the middle of the first. After a rise this can hint at a turn downwards.',
+  'Eine kleine grüne Kerze liegt ganz im Körper der großen roten davor. Nach einem Rückgang kann das bedeuten, dass der Druck nachlässt.':
+    'A small green candle sits inside the body of the big red one before it. After a fall this can mean the pressure is easing.',
+  'Eine kleine rote Kerze liegt ganz im Körper der großen grünen davor. Nach einem Anstieg kann das bedeuten, dass der Schwung nachlässt.':
+    'A small red candle sits inside the body of the big green one before it. After a rise this can mean the momentum is fading.',
+  'Eröffnung und Schluss fast gleich, und die Kerze ist mindestens so lang wie die letzten: Käufer und Verkäufer haben gekämpft, keiner hat gewonnen. Nach einer klaren Bewegung kann das eine Pause oder Wende andeuten.':
+    'Open and close almost equal on a candle at least as long as the recent ones: buyers and sellers fought and neither won. After a clear move this can hint at a pause or a turn.',
+  'Drei kräftige grüne Kerzen, jede schließt höher. Nach einem Rückgang kann das bedeuten, dass Käufer übernehmen.':
+    'Three strong green candles, each closing higher. After a fall this can mean buyers are taking over.',
+  'Drei kräftige rote Kerzen, jede schließt tiefer. Nach einem Anstieg kann das bedeuten, dass Verkäufer übernehmen.':
+    'Three strong red candles, each closing lower. After a rise this can mean sellers are taking over.',
   Setups: 'Setups',
   'Volatilitäts-Ausbruch': 'Volatility breakout',
   Ausbruch: 'Breakout',

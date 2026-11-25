@@ -1,0 +1,15 @@
+import type { PrimitiveHoveredItem } from 'lightweight-charts'
+
+/**
+ * How a pattern frame or pill answers a hit test: 'top' so lines and volume bars over the candles do not swallow it,
+ * but without itemType 'marker', so an event badge ('top' marker) at the same point always wins (isBetterHit ranks
+ * point hits above range hits).
+ */
+export const PATTERN_HIT: Omit<PrimitiveHoveredItem, 'externalId'> = { zOrder: 'top', cursorStyle: 'pointer' }
+
+/** Phone: a tap within `finger` px of a bar with event badges belongs to the event, as EventLayer reads it. */
+export const eventNear = (badgeTimes: number[], toX: (time: number) => number | null, x: number, finger: number): boolean =>
+  badgeTimes.some((t) => {
+    const bx = toX(t)
+    return bx !== null && Math.abs(bx - x) <= finger
+  })

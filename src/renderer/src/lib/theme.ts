@@ -17,5 +17,7 @@ export const THEME = {
   eventSell: '#fb7185',
   eventNote: '#a5b4fc',
   /** Buys and sells on one bar. */
-  eventMixed: '#f59e0b'
+  eventMixed: '#f59e0b',
+  /** Candlestick patterns: a quiet grey that reads as information, not as a buy or sell sign. */
+  pattern: '#cbd5e1'
 } as const

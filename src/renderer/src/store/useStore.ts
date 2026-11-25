@@ -104,6 +104,8 @@ export interface Indicators {
   stoch: { on: boolean; period: number; smoothK: number; smoothD: number }
   atr: { on: boolean; period: number }
   adx: { on: boolean; period: number }
+  /** Candlestick patterns at the last finished bars (one switch for all, no parameters). */
+  patterns: { on: boolean }
 }
 
 interface State {

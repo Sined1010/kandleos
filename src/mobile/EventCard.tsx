@@ -8,7 +8,16 @@ import { useBack } from './useBack'
  * Phone: the events of a tapped bar (or of the entry chosen in the list), in a card at the bottom of the chart, where
  * the PC shows its hover box. "Alle Events" opens the sheet; back or × closes the card.
  */
-export default function EventCard(p: { events: ChartEvent[]; day: string; bottom: number; right: number; onAll(): void; onClose(): void }) {
+export default function EventCard(p: {
+  events: ChartEvent[]
+  day: string
+  bottom: number
+  right: number
+  onAll(): void
+  onClose(): void
+  /** A candlestick pattern on this bar too: one tap opens its card instead. */
+  also?: { label: string; onOpen(): void }
+}) {
   useBack('event-card', true, p.onClose)
   return (
     <div
@@ -20,6 +29,11 @@ export default function EventCard(p: { events: ChartEvent[]; day: string; bottom
         <X size={16} />
       </button>
       <EventStack events={p.events} day={p.day} />
+      {p.also && (
+        <button onClick={p.also.onOpen} className="min-h-11 w-full rounded-lg border border-line px-3 text-pattern">
+          {t('Auch: {name}', { name: p.also.label })}
+        </button>
+      )}
       <button onClick={p.onAll} className="min-h-11 w-full rounded-lg bg-line px-3 font-medium text-slate-200">
         {t('Alle Events')}
       </button>

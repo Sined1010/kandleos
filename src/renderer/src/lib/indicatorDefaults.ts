@@ -14,5 +14,6 @@ export const DEFAULT_INDICATORS: Indicators = {
   macd: { on: false, fast: 12, slow: 26, signal: 9 },
   stoch: { on: false, period: 14, smoothK: 3, smoothD: 3 },
   atr: { on: false, period: 14 },
-  adx: { on: false, period: 14 }
+  adx: { on: false, period: 14 },
+  patterns: { on: false }
 }

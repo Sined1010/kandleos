@@ -454,3 +454,8 @@ test('format 4: a line alarm survives the trip with its line', () => {
   const back = sliceOf(unitsOf({ ...s, alarms: [...s.alarms, a] }), s).alarms.find((x) => x.id === 'la')
   assert.deepEqual(back, a)
 })
+
+test('indicators from a device without patterns keep the local switch', () => {
+  const local = { ...DEFAULT_INDICATORS, patterns: { on: true } }
+  assert.equal(cleanIndicators(local, { sma: { on: false, period: 20 } }).patterns.on, true)
+})

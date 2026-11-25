@@ -27,6 +27,7 @@ import { backtest, bandScale, checkCutoffs, forecastCandles, historyNeeded, Q, s
 import type { Decision } from '../../../shared/agents'
 import { locale, msg, t } from '../../../shared/i18n'
 import { phaseAt } from '../../../shared/market'
+import { barsKey } from '../../../shared/patterns'
 import {
   FORECAST_MIN_BARS,
   forecastSteps,
@@ -62,6 +63,7 @@ import { archiveForecast, settleDue, type ArchiveContext } from '../services/arc
 import AgentsSetup from './AgentsSetup'
 import DrawingOverlay from './DrawingOverlay'
 import EventLayer from './EventLayer'
+import PatternLayer from './PatternLayer'
 import EventsButton from './EventsButton'
 import { loadEvents, useEventsData } from '../services/events'
 import ForecastLoader, { BrandLoader } from './ForecastLoader'
@@ -493,7 +495,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   const sq = indicators.squeeze
   // Changes when a bar is added or loaded, on another symbol (same bar count and start: BTC and ETH) and when the
   // last bar is final; not on a tick of the running bar.
-  const sqKey = `${data.length}|${data[0]?.time}|${data[0]?.close}|${data.at(-2)?.close}|${lastRunning ? '' : data.at(-1)?.close}`
+  const sqKey = barsKey(data, lastRunning)
   useEffect(() => {
     if (!api || !sq.on || !data.length) return
     const { on, released } = squeeze(data, sq.period, sq.mult, sq.kcMult, lastRunning)
@@ -1171,6 +1173,9 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           >
             {MINOR_UNITS[currency] ?? currency}
           </span>
+        )}
+        {api && indicators.patterns.on && (
+          <PatternLayer chart={api.chart} series={api.candles} data={data} symbol={symbol} timeframe={timeframe} timeZone={exchangeZone} extended={extended} lastRunning={lastRunning} />
         )}
         {api && eventsOn && <EventLayer chart={api.chart} series={api.candles} data={data} symbol={symbol} timeframe={timeframe} timeZone={exchangeZone} currency={currency} />}
         {api && <DrawingOverlay chart={api.chart} series={api.candles} data={data} timeZone={exchangeZone} />}
