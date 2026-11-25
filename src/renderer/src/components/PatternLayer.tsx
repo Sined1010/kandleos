@@ -161,8 +161,11 @@ export default function PatternLayer({ chart, series, data, symbol, timeframe, t
     const onTap = (p: MouseEventParams<Time>) => {
       const ts = chart.timeScale()
       const x = p.point?.x
+      // The pill counts too: at the newest bars it is pushed left of them, out of the finger's reach.
+      const pill = p.point && prim.current?.hitTest(p.point.x, p.point.y)?.externalId
       const g =
-        x === undefined
+        groupsRef.current.find((g) => pill === `pat:${g.to}`) ??
+        (x === undefined
           ? undefined
           : groupsRef.current.find((g) =>
               g.pieces.some((p) => {
@@ -170,7 +173,7 @@ export default function PatternLayer({ chart, series, data, symbol, timeframe, t
                 const b = ts.timeToCoordinate(p.to as Time)
                 return a !== null && b !== null && x >= a - FINGER && x <= b + FINGER
               })
-            )
+            ))
       // A tap near a bar with events is the event's (EventLayer uses the same finger rule); its card offers the pattern.
       const badgeTimes = Object.keys(useEventsUi.getState().badgeSides).map(Number)
       const toX = (t: number) => ts.timeToCoordinate(t as Time)
