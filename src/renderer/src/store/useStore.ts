@@ -1,17 +1,18 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
+import { fileStorage } from './fileStorage'
 import { isCrypto, type Quote, type StockSource, type Timeframe } from '../../../shared/types'
-import { drawingsKey, withoutAlarmEnds, type SavedChart } from '../lib/charts'
+import { drawingsKey, reloadDrawings, withoutAlarmEnds, type SavedChart } from '../lib/charts'
 import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo, type WatchSort } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
-import type { Lang } from '../../../shared/i18n'
+import { t, type Lang } from '../../../shared/i18n'
 import { alarmClock, checkAlarm, dropAlarmsOf, dropAlarmsOfTab, isArmed, mergeTriggered, newLineAlarm, restartLine, type Alarm, type NativeTrigger } from '../../../shared/alarms'
 import { endAhead, lineMoved, lineParts } from '../../../shared/lineAlarm'
 import { armBox, settlePairs } from '../../../shared/boxAlarm'
 import type { BoxDrawing } from '../lib/positionBox'
 import { lineNow } from '../lib/lineAlarms'
-import { cleanIndicators, emptySync, type SyncState } from '../../../shared/sync'
+import { cleanIndicators, emptySync, MAX_TABS, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
 import { DEFAULT_INDICATORS } from '../lib/indicatorDefaults'
 
@@ -90,7 +91,7 @@ export interface ChartTab {
   /** Saved chart this tab was loaded from or saved as; it counts only while the tab shows that chart's symbol. */
   chartId?: string
 }
-export const MAX_TABS = 3
+export { MAX_TABS }
 
 export interface Indicators {
   sma: { on: boolean; period: number }
@@ -291,6 +292,11 @@ const withSymbol = (f: Folder, symbol: string): Folder =>
 const withoutSymbol = (f: Folder, symbol: string): Folder => ({ ...f, symbols: f.symbols.filter((x) => x !== symbol) })
 /** A symbol that left the watchlist is no longer pinned (re-adding it later must not bring the pin back). */
 const keepPins = (pinned: string[], folders: Folder[]) => ({ folders, pinned: pinned.filter((x) => folders.some((f) => f.symbols.includes(x))) })
+
+const storage = fileStorage<unknown>(
+  () => window.api.storeGet(),
+  (text) => window.api.storeSet(text)
+)
 
 export const useStore = create<State>()(
   persist(
@@ -516,14 +522,16 @@ export const useStore = create<State>()(
           const tabs = s.tabs.map((t) =>
             t.id === s.activeTab ? { ...t, symbol: c.symbol, timeframe: c.timeframe, range: null, chartId: id } : t
           )
+          const key = drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })
+          // Drawings unchanged since saving keep their alarms (loading the chart open again); replaced ones lose theirs.
+          const loaded = reloadDrawings(c.drawings, s.drawings[key] ?? [])
           return {
             tabs,
             symbol: c.symbol,
             timeframe: c.timeframe,
             range: null,
-            drawings: { ...s.drawings, [drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })]: drawings },
-            // The replaced drawings take their line alarms with them; the copies keep the same ids.
-            alarms: dropAlarmsOf(s.alarms, drawingsKey({ activeTab: s.activeTab, symbol: c.symbol })),
+            drawings: { ...s.drawings, [key]: loaded.drawings },
+            alarms: dropAlarmsOf(s.alarms, key, loaded.replaced),
             selectedId: null,
             tool: 'cursor' as const
           }
@@ -610,7 +618,8 @@ export const useStore = create<State>()(
       // Synchronous read lets the store hydrate before the first render (no flash of defaults).
       // Indicators added in later versions are missing from older files; fill them with their defaults.
       merge: (persisted, current) => {
-        const p = persisted as Partial<State>
+        // A first start has no file.
+        const p = (persisted ?? {}) as Partial<State>
         const { backtest, ...view } = (p.forecastView ?? {}) as Partial<ForecastView> & { backtest?: boolean }
         const s = {
           ...current,
@@ -633,11 +642,14 @@ export const useStore = create<State>()(
           : [{ ...firstTab, symbol: s.symbol, timeframe: s.timeframe, range: s.range }]
         return { ...s, tabs, ...showTab(tabs.find((t) => t.id === p.activeTab) ?? tabs[0]) }
       },
-      storage: createJSONStorage(() => ({
-        getItem: () => window.api.storeGet(),
-        setItem: (_name, value) => void window.api.storeSet(value),
-        removeItem: () => {}
-      })),
+      storage,
+      // A file the app cannot take in (merge or migration threw): keep it as it is instead of saving defaults over it.
+      onRehydrateStorage: () => (_state, err) => {
+        if (!err) return
+        storage.stop()
+        console.error('Store nicht lesbar:', err)
+        window.api.notify(t('Gespeicherte Daten waren beschädigt'), t('Änderungen werden in dieser Sitzung nicht gespeichert.'))
+      },
       partialize: ({
         symbol,
         timeframe,

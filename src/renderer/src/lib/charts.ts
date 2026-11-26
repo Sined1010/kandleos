@@ -1,4 +1,5 @@
 import type { Timeframe } from '../../../shared/types'
+import { norm } from '../../../shared/sync.ts'
 import type { ChartTab, Drawing, Indicators } from '../store/useStore'
 
 /** A named chart the user saved: symbol, candle size and drawings (indicators are kept but not applied on load). */
@@ -19,6 +20,16 @@ export const drawingsKey = (s: { activeTab: string; symbol: string }): string =>
 export const withoutAlarmEnds = (drawings: Drawing[]): Drawing[] => drawings.map(({ alarmUntil: _, ...d }) => d as Drawing)
 const sameDrawings = (a: Drawing[], b: Drawing[]) => JSON.stringify(withoutAlarmEnds(a)) === JSON.stringify(withoutAlarmEnds(b))
 
+/**
+ * A saved chart loaded over drawings shown now: one that did not change since saving stays as it is, with its alarm
+ * end, so its alarms can stay too; `replaced` = the drawings shown now that are changed or gone (their alarms go).
+ */
+export function reloadDrawings(saved: Drawing[], current: Drawing[]): { drawings: Drawing[]; replaced: string[] } {
+  const same = (d: Drawing) => current.find((c) => c.id === d.id && sameDrawings([c], [d]))
+  const drawings = saved.map((d) => same(d) ?? withoutAlarmEnds([structuredClone(d)])[0])
+  return { drawings, replaced: current.filter((c) => !drawings.includes(c)).map((c) => c.id) }
+}
+
 /** Whether the chart shown differs from what was saved (contents, so undoing a change makes it clean again). */
 export function isDirty(saved: SavedChart, timeframe: Timeframe, drawings: Drawing[]): boolean {
   return saved.timeframe !== timeframe || !sameDrawings(saved.drawings, drawings)
@@ -30,7 +41,6 @@ export function toolCounts(drawings: Drawing[]): Partial<Record<Drawing['type'],
   return out
 }
 
-const norm = (s: string) => s.trim().toLocaleLowerCase()
 
 export function findByName(charts: SavedChart[], symbol: string, name: string): SavedChart | undefined {
   return charts.find((c) => c.symbol === symbol && norm(c.name) === norm(name))

@@ -3,15 +3,14 @@
 import type { SavedAnalysis } from '../main/agents'
 import { parseStructured, PROVIDERS, type ProviderId } from './agents.ts'
 import { parseChronos } from './chronosLink.ts'
-import { SYMBOL_RE } from './types.ts'
+import { isObj, SYMBOL_RE } from './types.ts'
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 /** A saved analysis rebuilt from known fields only; null if it does not look like one. */
 export function checkAnalysis(v: unknown): SavedAnalysis | null {
-  if (!isObject(v)) return null
+  if (!isObj(v)) return null
   const { id, symbol, ticker, date, createdAt, durationSec, provider, deepModel, quickModel, analysts, rating, reports, stats } = v
   const ok =
     typeof id === 'string' &&
@@ -31,9 +30,9 @@ export function checkAnalysis(v: unknown): SavedAnalysis | null {
     analysts.length <= 20 &&
     analysts.every((a) => str(a, 40)) &&
     str(rating, 40) &&
-    isObject(reports) &&
+    isObj(reports) &&
     Object.entries(reports).every(([k, r]) => k.length <= 40 && str(r, 500_000)) &&
-    isObject(stats) &&
+    isObj(stats) &&
     num(stats.calls) &&
     num(stats.tokensIn) &&
     num(stats.tokensOut)

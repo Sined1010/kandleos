@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChartTab, Drawing, Indicators } from '../store/useStore'
-import { findByName, groupCharts, isDirty, linkedChart, loadTarget, toolCounts, withoutAlarmEnds, type SavedChart } from './charts.ts'
+import { findByName, groupCharts, isDirty, linkedChart, loadTarget, reloadDrawings, toolCounts, withoutAlarmEnds, type SavedChart } from './charts.ts'
 
 const trend: Drawing = { id: 't1', type: 'trend', p1: { time: 1, price: 10 }, p2: { time: 2, price: 20 } }
 const hline: Drawing = { id: 'h1', type: 'hline', price: 15 }
@@ -104,4 +104,13 @@ test('alarm ends are not part of a saved chart: no false "changed" from them', (
   assert.equal(isDirty({ ...saved, drawings: [withEnd] }, '1D', [line]), false)
   const tab = { id: 't', symbol: 'AAPL', timeframe: '1D', range: null, chartId: 'c' } as ChartTab
   assert.deepEqual(loadTarget(saved, { tabs: [tab], activeTab: 't', drawings: { 't:AAPL': [withEnd] } }, 3), { kind: 'here' })
+})
+
+test('reloading a saved chart keeps an unchanged drawing as it is (with its alarm end) and names the replaced ones', () => {
+  const kept = { id: 'a', type: 'hline', price: 100 } as Drawing
+  const moved = { id: 'b', type: 'hline', price: 120 } as Drawing
+  const current = [{ ...kept, alarmUntil: 500 }, { ...moved, price: 125 }, { id: 'c', type: 'hline', price: 90 } as Drawing]
+  const out = reloadDrawings([kept, moved], current)
+  assert.deepEqual(out.drawings, [{ ...kept, alarmUntil: 500 }, moved])
+  assert.deepEqual(out.replaced, ['b', 'c'])
 })

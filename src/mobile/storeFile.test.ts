@@ -89,3 +89,17 @@ test('an empty or broken store file falls back to a valid temp file', async () =
   f.disk.set('store.json.tmp', '{"v":4}')
   assert.equal(await readStore(f), '{"v":4}')
 })
+
+test('an unreadable store is set aside before the app starts with defaults, so nothing overwrites it', async () => {
+  const f = memFiles()
+  f.disk.set('store.json', '{"state":{"drawi')
+  assert.equal(await readStore(f, 1700000000000), null)
+  assert.equal(f.disk.get('store.json'), undefined)
+  assert.equal(f.disk.get('store.broken-1700000000000.json'), '{"state":{"drawi')
+})
+
+test('no store file yet: nothing to set aside', async () => {
+  const f = memFiles()
+  assert.equal(await readStore(f, 1), null)
+  assert.equal(f.disk.size, 0)
+})

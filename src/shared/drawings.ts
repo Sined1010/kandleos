@@ -1,6 +1,7 @@
 // Drawings as the store keeps them, checked for anything that comes from the other device (sync.ts): one broken
 // drawing would otherwise crash the chart every time it is shown.
 import type { Drawing, Tool } from '../renderer/src/store/useStore.ts'
+import { isObj } from './types.ts'
 
 /** Clicks each tool needs; the drawing is created on the last one. */
 export const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
@@ -36,7 +37,6 @@ function boxOk(type: 'long' | 'short', pts: unknown): boolean {
 }
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const point = (p: unknown) => isObj(p) && finite(p.time) && finite(p.price)
 
 /** The drawing if it has every field its type draws with, else null. */

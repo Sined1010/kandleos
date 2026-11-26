@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -19,7 +19,7 @@ import { setLang, t } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
-import { writeFileAtomic } from './atomicFile'
+import { readOrSetAside, writeFileAtomic } from './atomicFile'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, loadModel, modelReady } from './forecast'
 import { createRemoteOps } from './remoteOps'
@@ -144,16 +144,39 @@ ipcMain.on('app:notify', (_e, title, body) => notify(title, body))
 // Alpaca keys only go in; the window learns whether they are set.
 ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
 ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))
-ipcMain.on('store:get', (e) => (e.returnValue = readStore()))
-// After an import the old page would save its state back over the imported store; ignore it until the reload.
+// After an import the old page would save its state back over the imported store; ignore it until the reload. Also
+// set when the store could not be read: the window's defaults must not replace it.
 let storeLocked = false
+ipcMain.on('store:get', (e) => {
+  const had = existsSync(storeFile())
+  try {
+    const text = readOrSetAside(storeFile())
+    // Set aside unreadable: the window starts empty, the old file stays next to it for the user.
+    if (text === null && had) notify(t('Gespeicherte Daten waren beschädigt'), t('Die alte Datei liegt als Kopie im Datenordner; KandleOS startet leer.'))
+    e.returnValue = text
+  } catch (err) {
+    console.error('Store nicht lesbar:', err)
+    storeLocked = true
+    notify(t('Gespeicherte Daten waren beschädigt'), t('Änderungen werden in dieser Sitzung nicht gespeichert.'))
+    e.returnValue = null
+  }
+})
+let saveWarned = false
 ipcMain.handle('store:set', (_e, data: unknown) => {
-  if (typeof data !== 'string' || storeLocked) return
+  if (typeof data !== 'string' || storeLocked) return false
   // Serialize writes and swap atomically so a crash mid-write never truncates the store.
-  writeQueue = writeQueue
-    .then(() => writeFileAtomic(storeFile(), data))
-    .catch((err) => console.error('Speichern fehlgeschlagen:', err))
-  return writeQueue
+  const run = writeQueue.then(() => writeFileAtomic(storeFile(), data))
+  writeQueue = run.catch((err) => {
+    console.error('Speichern fehlgeschlagen:', err)
+    // Once per run: a full disk would otherwise raise a notice on every click.
+    if (!saveWarned) notify(t('Speichern fehlgeschlagen'), (err as Error).message)
+    saveWarned = true
+  })
+  // false: the window saves the same state again next time (fileStorage.ts).
+  return run.then(
+    () => true,
+    () => false
+  )
 })
 // The Finnhub key is stored apart from the store file (stocks.ts); the window needs it for the live stream.
 ipcMain.on('key:get', (e) => (e.returnValue = finnhubKey()))
@@ -191,7 +214,7 @@ ipcMain.handle('backup:apply', async (e, password) => {
   e.sender.reload()
 })
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended, older) => stockCandles(symbol, tf, key, extended, older))
-ipcMain.handle('stocks:quotes', (_e, symbols, key) => stockQuotes(symbols, key))
+ipcMain.handle('stocks:quotes', (_e, symbols) => stockQuotes(symbols))
 ipcMain.handle('symbols:search', (_e, query) => searchSymbols(query))
 ipcMain.on('symbols:warm', (_e, wkn) => warmSearch(wkn === true))
 ipcMain.handle('finnhub:check', (_e, key) => finnhubCheck(key))

@@ -173,7 +173,8 @@ const FEED: Record<Exclude<FeedStatus['state'], 'off'>, [dot: string, label: str
 function FeedBadge({ onClick }: { onClick: () => void }) {
   const feed = useQuotes((s) => s.feed)
   const source = useStore((s) => s.stockSource) ?? 'none'
-  const stockError = useQuotes((s) => (source === 'alpaca' ? s.stockError : null))
+  // Alpaca rejecting the key, or Yahoo refusing every symbol (stocks.ts stockQuotes).
+  const stockError = useQuotes((s) => (source === 'none' ? null : s.stockError))
   const yahooExtra = useStore((s) => s.yahooExtra)
   const [okDot, label, hint] = SOURCE[source]
   const dot = stockError ? 'bg-down' : okDot

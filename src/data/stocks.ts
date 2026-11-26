@@ -1,13 +1,13 @@
-import { http, type HttpRes } from './http'
-import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch, warmAlpaca } from './alpaca'
-import { isinFromCusip, looksLikeWkn, warmXetra, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin'
-import { matchCoins, mergeHits, withPrices } from '../shared/search'
-import { periodIndex, timeZoneForSymbol } from '../shared/calendar'
-import { t } from '../shared/i18n'
-import { marketStatus, phaseAt, sessionOpen } from '../shared/market'
-import { aggregate, aggregateMonths, snapLast } from '../shared/candles'
-import { firstWhole, sectionWindow } from '../shared/history'
-import { aliasName, cleanName, COINS, findAliases } from '../shared/names'
+import { http, type HttpRes } from './http.ts'
+import { alpacaAsset, alpacaCandles, alpacaHasKeys, alpacaQuotes, alpacaSearch, warmAlpaca } from './alpaca.ts'
+import { isinFromCusip, looksLikeWkn, warmXetra, xetraOfWkn, wikidataIsin, wknOf, xetraIds } from './isin.ts'
+import { matchCoins, mergeHits, withPrices } from '../shared/search.ts'
+import { periodIndex, timeZoneForSymbol } from '../shared/calendar.ts'
+import { t } from '../shared/i18n.ts'
+import { phaseAt, sessionOpen } from '../shared/market.ts'
+import { aggregate, aggregateMonths, snapLast } from '../shared/candles.ts'
+import { firstWhole, sectionWindow } from '../shared/history.ts'
+import { aliasName, cleanName, COINS, findAliases } from '../shared/names.ts'
 import {
   alpacaKnows,
   cryptoQuoteAsset,
@@ -26,7 +26,7 @@ import {
   type SearchResult,
   type StockSource,
   type Timeframe
-} from '../shared/types'
+} from '../shared/types.ts'
 
 // Chosen by the user on first start or in the settings; the window tells main (see index.ts).
 let source: StockSource | null = null
@@ -375,17 +375,11 @@ export async function finnhubCheck(keyArg: unknown): Promise<string | null> {
   try {
     const res = await http('https://finnhub.io/api/v1/quote?symbol=AAPL', { headers: finnhubAuth(key), redirect: 'manual', timeoutMs: 10_000 })
     if (res.status === 401 || res.status === 403) return t('API-Key ungültig')
-    if (res.status === 429) return 'Rate-Limit erreicht (max. 60 Anfragen/Minute)'
-    return res.ok ? null : `Finnhub HTTP ${res.status}`
+    // Rate-limited is not rejected: the key is fine, and the live stream does not count against the limit.
+    return res.ok || res.status === 429 ? null : `Finnhub HTTP ${res.status}`
   } catch {
     return t('Finnhub nicht erreichbar')
   }
-}
-
-async function finnhubQuote(symbol: string, key: string): Promise<Quote> {
-  const d = await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}`, finnhubAuth(key))
-  if (!d.c) throw new Error(t('Finnhub: kein Kurs für {symbol}', { symbol }))
-  return { price: d.c, changePct: d.dp ?? 0, time: d.t, prevClose: d.pc }
 }
 
 async function yahooMeta(symbol: string): Promise<any> {
@@ -442,14 +436,18 @@ async function yahooQuote(symbol: string): Promise<Quote> {
   return quote
 }
 
-/** Latest prices; `error` says why Alpaca sent none (key rejected, offline), for the source badge. */
-export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<{ quotes: Record<string, Quote>; error: string | null }> {
+/**
+ * Latest prices; `error` says why the source sent none (Alpaca key rejected, offline, Yahoo refusing), for the source
+ * badge. Never from Finnhub: its free plan has 60 calls a minute, which its live stream and the events need.
+ */
+export async function stockQuotes(symbols: unknown): Promise<{ quotes: Record<string, Quote>; error: string | null }> {
   const out: Record<string, Quote> = {}
   let error: string | null = null
   if (!Array.isArray(symbols)) return { quotes: out, error }
   const alpaca = symbols.filter((s) => typeof s === 'string' && SYMBOL_RE.test(s) && viaAlpaca(s))
   // shortcut: with the Yahoo extra its symbols are polled at Alpaca's 5 s pace; throttle here if Yahoo starts refusing.
   const yahoo = yahooOn() ? symbols.filter((s) => !alpaca.includes(s)) : []
+  let yahooError: string | undefined
   await Promise.all([
     // One failing source must not drop the other's prices.
     alpaca.length &&
@@ -459,18 +457,18 @@ export async function stockQuotes(symbols: unknown, keyArg: unknown): Promise<{ 
       ),
     ...yahoo.map(async (s) => {
       try {
-        const [symbol, key] = checkArgs(s, keyArg)
-        // Outside the regular session Yahoo also has the pre-market and after-hours price; Finnhub's quote does not.
-        const regular = marketStatus(symbol, timeZoneForSymbol(symbol))?.phase === 'open'
-        // Finnhub's free plan quotes US listings only; asking it for SAP.DE every few seconds only used up its
-        // 60 calls a minute, which the events and the live stream need.
-        out[symbol] =
-          key && regular && alpacaKnows(symbol) ? await finnhubQuote(symbol, key).catch(() => yahooQuote(symbol)) : await yahooQuote(symbol)
+        const [symbol] = checkArgs(s, '')
+        out[symbol] = await yahooQuote(symbol)
       } catch (e) {
-        console.warn((e as Error).message)
+        const err = e as Error
+        console.warn(err.message)
+        // Yahoo itself failing (rate limit, down, no answer), not one symbol it does not know.
+        if (/HTTP (429|5\d\d)$/.test(err.message) || ['TimeoutError', 'TypeError', 'AbortError'].includes(err.name)) yahooError = err.message
       }
     })
   ])
+  // Yahoo refusing every symbol (rate limit, down): say so, or the watchlist and alarms would freeze unnoticed.
+  if (yahooError && yahoo.every((s) => !out[s as string])) error ??= yahooError
   return { quotes: out, error }
 }
 

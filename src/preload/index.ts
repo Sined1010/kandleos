@@ -25,7 +25,7 @@ const api = {
   alpacaHasKeys: (): Promise<boolean> => ipcRenderer.invoke('alpaca:has-keys'),
   /** Checks the key pair with Alpaca and stores it encrypted; resolves to an error message or null. Empty removes it. */
   alpacaSetKeys: (id: string, secret: string): Promise<string | null> => ipcRenderer.invoke('alpaca:set-keys', id, secret),
-  storeSet: (data: string): Promise<void> => ipcRenderer.invoke('store:set', data),
+  storeSet: (data: string): Promise<boolean> => ipcRenderer.invoke('store:set', data),
   keyGet: (): string => ipcRenderer.sendSync('key:get'),
   keySet: (key: string): Promise<void> => ipcRenderer.invoke('key:set', key),
   /**
@@ -34,8 +34,8 @@ const api = {
    */
   stockCandles: (symbol: string, tf: Timeframe, key: string, extended = false, older?: OlderRequest): Promise<CandleData> =>
     ipcRenderer.invoke('stocks:candles', symbol, tf, key, extended, older),
-  stockQuotes: (symbols: string[], key: string): Promise<{ quotes: Record<string, Quote>; error: string | null }> =>
-    ipcRenderer.invoke('stocks:quotes', symbols, key),
+  stockQuotes: (symbols: string[]): Promise<{ quotes: Record<string, Quote>; error: string | null }> =>
+    ipcRenderer.invoke('stocks:quotes', symbols),
   searchSymbols: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('symbols:search', query),
   /** The search got the focus (or, with `wkn`, a digit): loads the lists it matches against ahead of it. */
   warmSearch: (wkn?: boolean): void => ipcRenderer.send('symbols:warm', wkn === true),

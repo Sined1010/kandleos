@@ -15,6 +15,7 @@ import {
   type Timeframe
 } from '../../../shared/types'
 import { ipcError } from '../lib/format'
+import { socket } from './socket'
 
 const BINANCE = 'https://api.binance.com/api/v3'
 const BINANCE_WS = 'wss://stream.binance.com:9443'
@@ -50,40 +51,13 @@ const kline = (k: (string | number)[]): Candle => ({
   volume: +k[5]
 })
 
-/** `endTime` is matched against a bar's close (ms), so `open - 1` ends just before that bar. */
-async function klines(symbol: string, interval: string, limit: number, endTime?: number): Promise<Candle[]> {
-  const end = endTime === undefined ? '' : `&endTime=${endTime}`
-  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`)
+/** `endTime` is matched against a bar's close (ms), so `open - 1` ends just before that bar; `startTime` against its open. */
+async function klines(symbol: string, interval: string, limit: number, endTime?: number, startTime?: number): Promise<Candle[]> {
+  const end = (endTime === undefined ? '' : `&endTime=${endTime}`) + (startTime === undefined ? '' : `&startTime=${startTime}`)
+  // A reply that stalls (half-open connection after a network change) must not keep the chart loading for good.
+  const res = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`, { signal: AbortSignal.timeout(15_000) })
   if (!res.ok) throw new Error(t('Binance: {symbol} nicht gefunden (HTTP {status})', { symbol, status: res.status }))
   return ((await res.json()) as (string | number)[][]).map(kline)
-}
-
-/** WebSocket that reconnects after drops (Binance closes streams every 24h). Returns a close function. */
-function socket(
-  url: string,
-  onMessage: (msg: any) => void,
-  onOpen?: (ws: WebSocket) => void,
-  onDrop?: () => void
-): () => void {
-  let ws: WebSocket
-  let closed = false
-  let timer: ReturnType<typeof setTimeout>
-  const connect = () => {
-    ws = new WebSocket(url)
-    ws.onopen = () => onOpen?.(ws)
-    ws.onmessage = (e) => onMessage(JSON.parse(e.data))
-    ws.onclose = () => {
-      if (closed) return
-      onDrop?.()
-      timer = setTimeout(connect, 3000)
-    }
-  }
-  connect()
-  return () => {
-    closed = true
-    clearTimeout(timer)
-    ws.close()
-  }
 }
 
 /** Keeps the last charts (src/mobile/candleCache.ts): on the phone in files, on the PC in memory only. */
@@ -124,11 +98,13 @@ export async function fetchCandles(
   tf: Timeframe,
   finnhubKey: string,
   extended = false,
-  older?: OlderRequest
+  older?: OlderRequest,
+  from?: number
 ): Promise<CandleData> {
   if (!isCrypto(symbol)) return window.api.stockCandles(symbol, tf, finnhubKey, extended, older)
-  // Sections before a time come from the bar size itself; month-based charts load all history at once.
-  const candles = await klines(symbol, BINANCE_TF[tf], 1000, older && older.before * 1000 - 1)
+  // Sections before a time come from the bar size itself; month-based charts load all history at once. The alarm
+  // catch-up reads on from its last check (`from`): the newest 1000 bars alone leave a gap after a few days away.
+  const candles = await klines(symbol, BINANCE_TF[tf], 1000, older && older.before * 1000 - 1, from && from * 1000)
   const months = combined(tf)
   return {
     candles: months ? aggregateMonths(candles, months) : candles,
@@ -137,12 +113,12 @@ export async function fetchCandles(
   }
 }
 
-/** Live bars for a crypto chart. */
-export function watchCandles(symbol: string, tf: Timeframe, onBar: (c: Candle) => void): () => void {
+/** Live bars for a crypto chart; `onReconnect` after a drop, when the stream may have missed bars. */
+export function watchCandles(symbol: string, tf: Timeframe, onBar: (c: Candle) => void, onReconnect?: () => void): () => void {
   const url = `${BINANCE_WS}/ws/${symbol.toLowerCase()}@kline_${BINANCE_TF[tf]}`
   const toBar = (k: any): Candle => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v })
   const months = combined(tf)
-  if (!months) return socket(url, ({ k }) => onBar(toBar(k)))
+  if (!months) return socket(url, ({ k }) => onBar(toBar(k)), (_ws, again) => again && onReconnect?.())
   // The stream only updates the running month; the period's earlier months come from one REST call.
   // Until they are in, nothing is sent: a period built from the current month alone would be wrong.
   const bars = new Map<number, Candle>()
@@ -152,19 +128,29 @@ export function watchCandles(symbol: string, tf: Timeframe, onBar: (c: Candle) =
     const period = aggregateMonths([...bars.values()].sort((a, b) => a.time - b.time), months)
     onBar(period[period.length - 1])
   }
-  klines(symbol, '1M', 12)
-    .then((list) => {
-      // A month the stream already delivered is newer than the REST copy.
-      for (const c of list) if (!bars.has(c.time)) bars.set(c.time, c)
-      seeded = true
+  const seed = () =>
+    klines(symbol, '1M', 12)
+      .then((list) => {
+        // A month the stream already delivered is newer than the REST copy.
+        for (const c of list) if (!bars.has(c.time)) bars.set(c.time, c)
+        seeded = true
+        send()
+      })
+      // Tried again when the stream opens again; until then the period gets no live bar.
+      .catch(() => {})
+  void seed()
+  return socket(
+    url,
+    ({ k }) => {
+      const bar = toBar(k)
+      bars.set(bar.time, bar)
       send()
-    })
-    .catch(() => {})
-  return socket(url, ({ k }) => {
-    const bar = toBar(k)
-    bars.set(bar.time, bar)
-    send()
-  })
+    },
+    (_ws, again) => {
+      if (!seeded) void seed()
+      if (again) onReconnect?.()
+    }
+  )
 }
 
 export interface FeedStatus {
@@ -223,8 +209,7 @@ export function watchQuotes(
   const traded: Record<string, number> = {}
   const poll = (list = stocks) =>
     window.api
-      // A rejected key is not sent again, so quotes come straight from the chosen source.
-      .stockQuotes(list, error ? '' : finnhubKey)
+      .stockQuotes(list)
       .then(({ quotes, error: sourceError }) => {
         if (!active) return
         onStockError(sourceError)

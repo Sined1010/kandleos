@@ -2,7 +2,7 @@
 // progress maps to stages, and how its final texts are read. The Python side is resources/agents/kandleos_agents.py.
 import type { AgentsConfig } from '../renderer/src/store/useStore.ts'
 import { msg } from './i18n.ts'
-import { cryptoQuoteAsset, isCrypto } from './types.ts'
+import { cryptoQuoteAsset, isCrypto, isObj } from './types.ts'
 
 export type ProviderId = 'anthropic' | 'openai' | 'google' | 'deepseek' | 'qwen' | 'ollama'
 
@@ -101,7 +101,6 @@ export function modelsFor(provider: ProviderId, chosen?: { deep: string; quick: 
 
 /** Keys KandleOS can store besides the providers' own: FRED (free macro data). */
 export const EXTRA_KEYS = { fred: 'FRED_API_KEY' } as const
-export type KeyName = ProviderId | keyof typeof EXTRA_KEYS
 
 /** Environment variable for a stored key name, or null when there is none (e.g. local models). */
 export function keyEnvFor(name: string): string | null {
@@ -188,7 +187,6 @@ export interface Structured {
 }
 
 const positive = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const short = (v: unknown): string | null => (typeof v === 'string' && v.length <= 200 ? v : null)
 const ACTIONS = ['Buy', 'Hold', 'Sell'] as const
 
@@ -232,9 +230,14 @@ export function doneFromBridge(v: unknown): {
   const d = isObj(v) ? v : {}
   const reports = isObj(d.reports) ? d.reports : {}
   const stats = isObj(d.stats) ? d.stats : {}
+  // Cut to the limits of shared/savedAnalysis.ts: longer, a backup or the phone would drop the whole analysis.
   return {
-    rating: typeof d.rating === 'string' ? d.rating : '',
-    reports: Object.fromEntries(Object.entries(reports).filter((e): e is [string, string] => /^\w{1,40}$/.test(e[0]) && typeof e[1] === 'string')),
+    rating: typeof d.rating === 'string' ? d.rating.trim().slice(0, 40) : '',
+    reports: Object.fromEntries(
+      Object.entries(reports)
+        .filter((e): e is [string, string] => /^\w{1,40}$/.test(e[0]) && typeof e[1] === 'string')
+        .map(([k, r]) => [k, r.slice(0, 500_000)])
+    ),
     stats: { calls: count(stats.calls), tokensIn: count(stats.tokensIn), tokensOut: count(stats.tokensOut) },
     structured: d.structured
   }

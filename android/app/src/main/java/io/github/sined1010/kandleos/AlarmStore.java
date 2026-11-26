@@ -273,6 +273,10 @@ public final class AlarmStore {
         for (Side s : sides) if (s.scan[1] >= 0) seen = seen < 0 ? s.scan[1] : Math.min(seen, s.scan[1]);
         if (won > 0) {
             String part = won == 1 ? "target" : "stop";
+            // An entry touched after the deciding hit's 5-minute bar is too late for this trade (alarmCore.ts catchUpBox).
+            long[] entries = new long[sides.size()];
+            for (int i = 0; i < entries.length; i++) entries[i] = sides.get(i).scan[1];
+            seen = AlarmCheck.entryUntil(entries, (won == 1 ? target : stop) + 299);
             for (Side s : sides) {
                 if (!part.equals(s.a.optString("part"))) continue;
                 double price = AlarmCheck.linePrice(s.kt, s.kp, s.scan[0]);

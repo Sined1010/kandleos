@@ -49,4 +49,3 @@ export function createCandleCache(f: Files) {
     }
   }
 }
-export type CandleCache = ReturnType<typeof createCandleCache>

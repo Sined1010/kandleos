@@ -1,7 +1,7 @@
 // Insider dealings, filings and news of one symbol: from cleaned source rows to the events the list and the chart
 // show. Pure functions; the fetching lives in src/data/events/, the screens in the renderer.
 import { wall } from './calendar.ts'
-import { unusualDays, type FlowAsset, type FlowSeries } from './chain.ts'
+import { DAY_RE, unusualDays, type FlowAsset, type FlowSeries } from './chain.ts'
 import { alpacaKnows, isCrypto } from './types.ts'
 
 export type Role = 'vorstand' | 'aufsichtsrat' | 'fuehrung' | 'nahestehend'
@@ -118,7 +118,6 @@ export function eventRoute(symbol: string, isin: string | undefined): 'bafin' | 
   return symbol.includes('.') && FINNHUB_INSIDER_SUFFIXES.includes(suffix!) ? 'finnhub' : 'none'
 }
 
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 const ROLES: Role[] = ['vorstand', 'aufsichtsrat', 'fuehrung', 'nahestehend']
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length <= max ? v : undefined)

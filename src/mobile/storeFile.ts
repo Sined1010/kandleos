@@ -21,11 +21,14 @@ const isJson = (s: string | null): s is string => {
   }
 }
 
-export async function readStore(f: Files): Promise<string | null> {
+export async function readStore(f: Files, now = Date.now()): Promise<string | null> {
   const main = await f.read(FILE)
   if (isJson(main)) return main
   const tmp = await f.read(TMP)
-  return isJson(tmp) ? tmp : null
+  if (isJson(tmp)) return tmp
+  // The app starts with its defaults and saves them: keep the unreadable file for the user instead of overwriting it.
+  if (main !== null) await f.rename(FILE, `store.broken-${now}.json`)
+  return null
 }
 
 let queue: Promise<unknown> = Promise.resolve()

@@ -161,10 +161,6 @@ export function endAhead(d: Drawing, now: number): Drawing {
   return rest as Drawing
 }
 
-/** Where a line lies at `t`. */
-export const lineAt = (g: LineGeom, symbol: string, t: number, tf?: Timeframe): number =>
-  'flat' in g ? g.flat : (barLine(g, symbol, tf, t, t)?.price(t) ?? priceOn(symbol, g, t))
-
 /**
  * Table of points from `from` to `to`: start, every bend in between, end. A bend is a session edge, or on a bar grid
  * (`tf`) a bar whose gap to the next one differs from the gap before it (the last bar of a day, the first after a night).

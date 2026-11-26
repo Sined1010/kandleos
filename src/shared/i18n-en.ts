@@ -32,7 +32,6 @@ export const EN: Record<string, string> = {
   'Ungültiger Timeframe: {tf}': 'Invalid timeframe: {tf}',
   'Ungültiges Key-Format': 'Invalid key format',
   'API-Key ungültig': 'Invalid API key',
-  'Finnhub: kein Kurs für {symbol}': 'Finnhub: no price for {symbol}',
   'Yahoo: kein Kurs für {symbol}': 'Yahoo: no price for {symbol}',
   'Finnhub nicht erreichbar': 'Finnhub unreachable',
   'Finnhub-Fehler': 'Finnhub error',
@@ -1075,13 +1074,6 @@ export const EN: Record<string, string> = {
   'Entkoppeln': 'Unpair',
   'Vom PC übernommen – Kursquelle und Keys am PC ändern.': 'Taken over from the PC – change the stock source and keys there.',
   'Tab vom Handy': 'Tab from phone',
-  'Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.':
-    'Pair with the PC “{name}”? The watchlist, drawings and alarms will then sync with it.',
-  'Mit „{name}“ gekoppelt.': 'Paired with “{name}”.',
-  'Adressen im Code: {addrs}': 'Addresses in the code: {addrs}',
-  'Neue Adressen für den PC „{name}“ übernehmen?': 'Take over new addresses for the PC “{name}”?',
-  'Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.':
-    'The phone is paired with “{current}”. Pair with “{name}” instead? The watchlist, drawings and alarms then go to that PC. Only pair with codes your own PC is showing right now.',
   'Geprüft wird, solange KandleOS läuft – mit Handy-Kopplung auch im Infobereich. Ein gekoppeltes Handy prüft zusätzlich selbst.':
     'Checked while KandleOS runs – with phone pairing also from the notification area. A paired phone checks on its own as well.',
   '(Handy)': '(phone)',
@@ -1105,7 +1097,7 @@ export const EN: Record<string, string> = {
   'Trotzdem weiter': 'Continue anyway',
   'Nochmal versuchen': 'Try again',
   'Weiter': 'Continue',
-  'Scanne den Code mit der Kamera deines Handys – oder in der KandleOS-App: Menü ⋮ → Mit PC koppeln.': 'Scan the code with your phone\'s camera – or in the KandleOS app: menu ⋮ → Pair with PC.',
+  'Scanne den Code in der KandleOS-App am Handy: Menü ⋮ → Mit PC koppeln.': 'Scan the code in the KandleOS app on your phone: menu ⋮ → Pair with PC.',
   'Gültig noch {s} s.': 'Valid for {s} s.',
   'Neuen Code anzeigen': 'Show a new code',
   'Klappt nicht?': 'Not working?',
@@ -1134,7 +1126,6 @@ export const EN: Record<string, string> = {
   'PC nicht erreichbar. Die KI-Prognose rechnet dein PC – ist er an und im selben WLAN oder VPN?': 'PC not reachable. Your PC computes the AI forecast – is it on and in the same Wi-Fi or VPN?',
   'Das Prognosemodell fehlt am PC. Jetzt am PC laden (ca. 480 MB)?': 'The forecast model is missing on the PC. Download it on the PC now (about 480 MB)?',
   Laden: 'Download',
-  Koppeln: 'Pair',
   Verwerfen: 'Discard',
   'Neu laden': 'Reload',
   Ersetzen: 'Replace',
@@ -1269,5 +1260,10 @@ export const EN: Record<string, string> = {
   'Daten: Coin Metrics Community ·': 'Data: Coin Metrics Community ·',
   'nur für nicht kommerzielle Nutzung': 'non-commercial use only',
   'Coin Metrics – tägliche Zu- und Abflüsse von BTC und ETH auf Börsen (Schätzung), nur bei eingeschalteten Events und geöffnetem BTC- oder ETH-Chart, höchstens einmal am Tag; gesendet werden nur Coin, Kennzahlen und Zeitraum. Daten unter CC BY-NC 4.0 (nur nicht kommerzielle Nutzung)':
-    'Coin Metrics – daily BTC and ETH inflows and outflows on exchanges (estimates), only with events switched on and a BTC or ETH chart open, at most once a day; only the coin, the figures and the date range are sent. Data under CC BY-NC 4.0 (non-commercial use only)'
+    'Coin Metrics – daily BTC and ETH inflows and outflows on exchanges (estimates), only with events switched on and a BTC or ETH chart open, at most once a day; only the coin, the figures and the date range are sent. Data under CC BY-NC 4.0 (non-commercial use only)',
+  'Gespeicherte Daten waren beschädigt': 'Saved data was damaged',
+  'Die alte Datei liegt als Kopie im Datenordner; KandleOS startet leer.':
+    'The old file is kept as a copy in the data folder; KandleOS starts empty.',
+  'Speichern fehlgeschlagen': 'Saving failed',
+  'Änderungen werden in dieser Sitzung nicht gespeichert.': 'Changes are not saved in this session.'
 }

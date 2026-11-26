@@ -124,4 +124,12 @@ public class AlarmCheckTest {
         assertEquals(2, AlarmCheck.pairWinner(7, 7));
         assertEquals(2, AlarmCheck.pairWinner(-1, 3));
     }
+    @Test
+    public void entryTouchedAfterTheDecidingHitDoesNotCount() {
+        // alarmCore.ts catchUpBox: the earliest entry of both sides, but only up to the winner's hit.
+        assertEquals(-1, AlarmCheck.entryUntil(new long[] {-1, 30}, 20));
+        assertEquals(15, AlarmCheck.entryUntil(new long[] {30, 15}, 20));
+        assertEquals(20, AlarmCheck.entryUntil(new long[] {20, -1}, 20));
+        assertEquals(-1, AlarmCheck.entryUntil(new long[] {-1, -1}, 20));
+    }
 }

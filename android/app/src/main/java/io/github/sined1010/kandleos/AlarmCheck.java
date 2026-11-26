@@ -88,6 +88,13 @@ public final class AlarmCheck {
         return Math.min(a, b);
     }
 
+    /** The earliest entry touch of the box's sides up to `until` (the deciding hit), -1 for none (alarmCore.ts catchUpBox). */
+    public static long entryUntil(long[] entries, long until) {
+        long seen = -1;
+        for (long e : entries) if (e >= 0 && e <= until) seen = seen < 0 ? e : Math.min(seen, e);
+        return seen;
+    }
+
     /** Which side of a box decided (boxAlarm.ts pairWinner): 0 none, 1 target, 2 stop; the stop on a tie. */
     public static int pairWinner(long target, long stop) {
         if (target < 0) return stop < 0 ? 0 : 2;

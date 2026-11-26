@@ -1,8 +1,12 @@
 package io.github.sined1010.kandleos;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.time.Instant;
 
 import org.junit.Test;
@@ -24,5 +28,23 @@ public class AlarmFetchTest {
         assertTrue(AlarmFetch.regularUs(at("2026-07-09T13:30:00Z")));
         // Saturday.
         assertFalse(AlarmFetch.regularUs(at("2026-11-14T15:00:00Z")));
+    }
+
+    @Test
+    public void aReplyIsReadUpToItsLimit() throws Exception {
+        assertEquals("hello", AlarmFetch.readAll(new ByteArrayInputStream("hello".getBytes("UTF-8")), 5));
+        // A device that streams without end (another one on the Wi-Fi under the PC's address) must not fill the memory.
+        InputStream endless = new InputStream() {
+            @Override
+            public int read() {
+                return 'x';
+            }
+        };
+        try {
+            AlarmFetch.readAll(endless, 1 << 20);
+            fail("read past the limit");
+        } catch (java.io.IOException expected) {
+            // stopped at the limit
+        }
     }
 }

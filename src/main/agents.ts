@@ -144,6 +144,8 @@ let installing: Promise<AgentsStatus> | null = null
 /** Sets up Python and TradingAgents (a few hundred MB, several minutes on first use). */
 export function installAgents(onProgress: (p: SetupProgress) => void): Promise<AgentsStatus> {
   if (!build()) return Promise.reject(new Error(t('Die umfassende Analyse gibt es nur für Windows und Linux (x64).')))
+  // A running python.exe cannot be replaced on Windows: the half-rebuilt venv would break every later run.
+  if (current || job) return Promise.reject(new Error(t('Es läuft bereits eine Analyse')))
   installing ??= (async () => {
     await rm(markerFile(), { force: true })
     if (!existsSync(uvExe())) await downloadUv(onProgress)
@@ -171,8 +173,11 @@ export function installAgents(onProgress: (p: SetupProgress) => void): Promise<A
 
 /** Removes Python, packages and caches; stored keys and saved analyses stay. */
 export async function removeAgents(): Promise<AgentsStatus> {
-  for (const d of ['venv', 'python', 'cache', 'uv', 'work']) await rm(join(base(), d), { recursive: true, force: true })
+  // A running python.exe cannot be deleted on Windows: the venv would be left half gone but still count as installed.
+  if (current || job || installing) throw new Error(t('Es läuft bereits eine Analyse'))
+  // The marker first: if a delete fails halfway, the setup is offered again instead of a broken install.
   await rm(markerFile(), { force: true })
+  for (const d of ['venv', 'python', 'cache', 'uv', 'work']) await rm(join(base(), d), { recursive: true, force: true })
   return agentsStatus()
 }
 

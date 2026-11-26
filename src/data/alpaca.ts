@@ -1,9 +1,9 @@
-import { http } from './http'
-import { aggregate } from '../shared/candles'
-import { firstWhole, sectionWindow } from '../shared/history'
-import { t } from '../shared/i18n'
-import { phaseAt, sessionOpen } from '../shared/market'
-import { cleanName } from '../shared/names'
+import { http } from './http.ts'
+import { aggregate } from '../shared/candles.ts'
+import { firstWhole, sectionWindow } from '../shared/history.ts'
+import { t } from '../shared/i18n.ts'
+import { phaseAt, sessionOpen } from '../shared/market.ts'
+import { cleanName } from '../shared/names.ts'
 import {
   ALPACA_KEY_RE,
   alpacaKnows,
@@ -13,7 +13,7 @@ import {
   type Quote,
   type SearchResult,
   type Timeframe
-} from '../shared/types'
+} from '../shared/types.ts'
 
 // Alpaca's market data API with the user's own free key: US stocks and ETFs. The free plan serves all US
 // exchanges (SIP) up to 15 minutes ago and real-time data from the IEX exchange only.

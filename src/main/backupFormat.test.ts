@@ -87,3 +87,12 @@ test('analyses that would write outside their folder are dropped, extra fields a
   assert.ok(clean && !('extra' in clean))
   assert.equal(parseBackup(backup({ analyses: [analysis, { ...analysis, id: '../x' }] })).analyses.length, 1)
 })
+
+test('a backup cannot point the analysis at a foreign Ollama server; the local default comes along', () => {
+  const store = (ollamaUrl: string) => ({ state: { agentsConfig: { provider: 'ollama', ollamaUrl } }, version: 8 })
+  const url = (v: string) => (parseBackup(backup({ store: store(v) }))?.store?.state.agentsConfig as { ollamaUrl?: string } | undefined)?.ollamaUrl
+  assert.equal(url('http://attacker.example:11434'), undefined)
+  assert.equal(url('http://192.168.1.20:11434'), undefined)
+  assert.equal(url('http://localhost:11434'), 'http://localhost:11434')
+  assert.equal(url('http://127.0.0.1:11434'), 'http://127.0.0.1:11434')
+})

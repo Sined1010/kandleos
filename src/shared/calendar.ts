@@ -256,7 +256,7 @@ export const nextDate = (date: string): string => iso(new Date((dateSeconds(date
 /**
  * Timestamps of the next `count` bars on the exchange's trading calendar: trading weekdays and session times
  * as seen in the history (in the exchange's own time zone, so DST is handled), minus exchange holidays.
- * Markets without gaps (crypto) and weekly bars are evenly spaced; month-based bars (`months` > 0) start on
+ * Markets without gaps (crypto) are evenly spaced, weekly bars a week apart on the exchange's clock; month-based bars (`months` > 0) start on
  * the first of each following calendar period.
  */
 export function futureTimes(times: number[], seconds: number, count: number, timeZone = 'UTC', months = 0): number[] {
@@ -270,7 +270,14 @@ export function futureTimes(times: number[], seconds: number, count: number, tim
   // The calendar comes from the bars before the last one: Yahoo stamps the live bar with the current time.
   const history = times.slice(0, -1)
   const gappy = history.some((t, i) => i > 0 && t - history[i - 1] > seconds)
-  if (seconds >= 604800 || !gappy) return even()
+  if (seconds >= 604800) {
+    // Weekly bars keep the last bar's wall-clock time: plain 7 × 24 h would land on Sunday 23:00 after the autumn
+    // clock change. Bars dated as plain UTC dates (Finnhub) stay in UTC.
+    const zone = times.every((t) => t % 86400 === 0) ? 'UTC' : timeZone
+    const end = wall(last, zone)
+    return Array.from({ length: count }, (_, i) => fromWall(iso(new Date((dateSeconds(end.date) + 7 * 86400 * (i + 1)) * 1000)), end.sec, zone))
+  }
+  if (!gappy) return even()
   // Finnhub stamps daily bars at 00:00 UTC as a plain date label; read in New York time that would be 20:00
   // of the previous day. Such bars are dated in UTC, Yahoo's session-time stamps in the exchange zone.
   const dateLabels = seconds >= 86400 && times.every((t) => t % 86400 === 0)

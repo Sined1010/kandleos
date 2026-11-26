@@ -64,7 +64,6 @@ export interface Quote {
 
 /** Where stock prices come from: Alpaca (own key), Yahoo Finance (unofficial, opt-in) or none (crypto only). */
 export type StockSource = 'alpaca' | 'yahoo' | 'none'
-export const STOCK_SOURCES: StockSource[] = ['alpaca', 'yahoo', 'none']
 
 /**
  * Indices, futures, currencies and foreign listings (^GSPC, GC=F, EURUSD=X, SAP.DE) are not on Alpaca. One-letter
@@ -150,3 +149,9 @@ const CRYPTO_RE = /^[A-Z0-9]{2,}(USDT|USDC|FDUSD|BTC|ETH|BNB)$/
 export const isCrypto = (symbol: string): boolean => CRYPTO_RE.test(symbol)
 /** BTCUSDT → USDT */
 export const cryptoQuoteAsset = (symbol: string): string => CRYPTO_RE.exec(symbol)?.[1] ?? ''
+
+/** A plain object (not null, not an array): the first check on anything read from a file or another device. */
+export const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+/** Shortest password for the keys in a backup file (main/backup.ts, and the window's form). */
+export const MIN_PASSWORD = 8

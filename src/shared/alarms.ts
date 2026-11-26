@@ -2,7 +2,7 @@
 // in the app and in the Android background check (android/.../AlarmCheck.java), so keep both in step. Times are in
 // seconds.
 import { linePrice, type Knot } from './lineAlarm.ts'
-import { TIMEFRAMES, type Timeframe } from './types.ts'
+import { isObj, TIMEFRAMES, type Timeframe } from './types.ts'
 
 export interface Alarm {
   id: string
@@ -88,7 +88,6 @@ export function hit(a: Alarm, bars: { time: number; high: number; low: number }[
   return null
 }
 
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0
 const optTime = (v: unknown) => v === undefined || (typeof v === 'number' && Number.isFinite(v))
 

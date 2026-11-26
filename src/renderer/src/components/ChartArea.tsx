@@ -46,7 +46,7 @@ import { THEME } from '../lib/theme'
 import { adx, atr, bollinger, ema, lastBarRunning, macd, rsi, sma, squeeze, stochastic, supertrend, vwap } from '../lib/indicators'
 import { RANGES, rangeStartIndex, type RangeId } from '../lib/ranges'
 import { sessionLine } from '../lib/sessionLine'
-import { cachedCandles, loadCandles, watchCandles } from '../services/marketData'
+import { cachedCandles, fetchCandles, loadCandles, watchCandles } from '../services/marketData'
 import { IS_MOBILE } from '../lib/platform'
 import { usePcStatus } from '../lib/pcStatus'
 import { ask, tell } from '../../../mobile/MessageBox'
@@ -383,6 +383,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     if (kept?.candles.length) show(kept, false)
     // Without fresh candles the stored ones come back (stale); it keeps asking until fresh ones arrive.
     let retry: ReturnType<typeof setTimeout> | undefined
+    // After an error: 15 s, doubling up to 5 minutes (an unknown symbol keeps failing).
+    let wait = 15_000
     const load = (first: boolean) =>
       loadCandles(symbol, timeframe, finnhubKey, extended)
         .then((d) => {
@@ -393,11 +395,33 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
           retry = setTimeout(() => load(false), 15_000)
         })
-        .catch((e: Error) => active && setStatus(ipcError(e)))
+        .catch((e: Error) => {
+          if (!active) return
+          setStatus(ipcError(e))
+          // The network may still be coming up (start, wake from sleep): ask again.
+          retry = setTimeout(() => load(first), wait)
+          wait = Math.min(wait * 2, 300_000)
+        })
     load(true)
+    // After a dropped stream or a sleep the bars in between are missing: the newest page fills them in. Not for stock
+    // bars of a day or longer: Yahoo stamps today's bar with the quote time, which would add a second bar for today.
+    const refill = () =>
+      (isCrypto(symbol) || (seconds < 86400 && !months)) &&
+      fetchCandles(symbol, timeframe, finnhubKey, extended)
+        .then(({ candles }) => {
+          const last = dataRef.current[dataRef.current.length - 1]?.time
+          if (last !== undefined) for (const b of candles) if (b.time >= last) push(b)
+        })
+        .catch(() => {})
+    // A sleeping PC runs no timers: a tick far later than planned means it woke up.
+    let tickAt = Date.now()
+    const wake = setInterval(() => {
+      if (Date.now() - tickAt > 90_000) void refill()
+      tickAt = Date.now()
+    }, 30_000)
 
     const stop = isCrypto(symbol)
-      ? watchCandles(symbol, timeframe, push)
+      ? watchCandles(symbol, timeframe, push, refill)
       : useQuotes.subscribe((s, prev) => {
           const q = s.quotes[symbol]
           const arr = dataRef.current
@@ -415,6 +439,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       fcRun.current++
       clearTimeout(retry)
       clearTimeout(soon)
+      clearInterval(wake)
       stop()
     }
   }, [api, symbol, timeframe, finnhubKey, extended, stockSource, yahooExtra])

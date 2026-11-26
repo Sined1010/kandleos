@@ -91,7 +91,9 @@ async function results(symbol: string): Promise<SavedAnalysis[]> {
 export async function createMobileApi(): Promise<Api> {
   setHttp(capHttp)
   // storeGet and keyGet are synchronous on the desktop (sendSync); here their values are read up front.
-  let store = await readStore(appFiles)
+  // An unreadable store that could not be set aside: start empty, and save nothing over it this session.
+  let locked = false
+  let store = await readStore(appFiles).catch(() => ((locked = true), null))
   let storeWarned = false
   let finnhub = (await secret('finnhub')) ?? ''
   let alpaca: AlpacaKeys | null = null
@@ -112,15 +114,17 @@ export async function createMobileApi(): Promise<Api> {
   return {
     storeGet: () => store,
     storeSet: async (data) => {
+      if (locked) return false
       store = data
       // Every write holds the whole store, so the next one that works repairs the file; tell the user once meanwhile.
       try {
         await writeAtomic(appFiles, data)
         storeWarned = false
+        return true
       } catch (e) {
-        if (storeWarned) return
+        if (!storeWarned) tell(t('Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?', { error: (e as Error).message }))
         storeWarned = true
-        tell(t('Änderungen konnten nicht gespeichert werden ({error}). Ist der Speicher des Handys voll?', { error: (e as Error).message }))
+        return false
       }
     },
     setLanguage: () => {},
@@ -135,7 +139,7 @@ export async function createMobileApi(): Promise<Api> {
       else await KandleNative.secureRemove({ name: 'finnhub' })
     },
     stockCandles: (symbol, tf, key, extended = false, older) => stockCandles(symbol, tf, key, extended, older),
-    stockQuotes: (symbols, key) => stockQuotes(symbols, key),
+    stockQuotes: (symbols) => stockQuotes(symbols),
     searchSymbols: (query) => searchSymbols(query),
     warmSearch,
     finnhubCheck: (key) => finnhubCheck(key),

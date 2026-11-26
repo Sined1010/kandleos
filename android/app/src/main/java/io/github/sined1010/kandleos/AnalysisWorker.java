@@ -15,7 +15,6 @@ import androidx.work.WorkerParameters;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -162,10 +161,7 @@ public class AnalysisWorker extends Worker {
             }
             if (con.getResponseCode() != 200) return null;
             try (InputStream in = con.getInputStream()) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
-                return out.toString("UTF-8");
+                return AlarmFetch.readAll(in, AlarmFetch.MAX_REPLY);
             }
         } catch (Exception e) {
             return null;

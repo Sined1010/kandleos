@@ -27,7 +27,7 @@ export function flowAsset(symbol: string): FlowAsset | undefined {
   return base === 'BTC' || base === 'ETH' ? base : undefined
 }
 
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 const amount = (v: unknown): number | undefined => {
   const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : typeof v === 'number' ? v : NaN
   return Number.isFinite(n) && n >= 0 ? n : undefined

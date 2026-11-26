@@ -30,7 +30,7 @@ const watch = createAlarmWatch({
     const s = useStore.getState()
     return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
   },
-  loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
+  loadBars: (symbol, from) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey, false, undefined, from),
   notify: notifyAlarm,
   collect: collectNative,
   knotsFor: (a, now) => knotsFor(a, useStore.getState().drawings, now)

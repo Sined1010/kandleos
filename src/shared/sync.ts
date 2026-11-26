@@ -5,7 +5,7 @@
 import { checkAlarm, type Alarm } from './alarms.ts'
 import { settlePairs } from './boxAlarm.ts'
 import { checkDrawing } from './drawings.ts'
-import { TIMEFRAMES, type Timeframe } from './types.ts'
+import { isObj, TIMEFRAMES, type Timeframe } from './types.ts'
 import type { ChartTab, Drawing, Folder, Indicators } from '../renderer/src/store/useStore.ts'
 import type { SavedChart } from '../renderer/src/lib/charts.ts'
 import { RANGES } from '../renderer/src/lib/ranges.ts'
@@ -142,12 +142,14 @@ export function mergeUnits(base: Units, mine: Units, theirs: Units, stampsMine: 
 /**
  * An alarm changed on both sides within the same round (same `createdAt`): the times each side saw are kept, the
  * earliest of each (reached, switched off, entry touched), so a box pair can be decided by its earlier hit afterwards
- * (settlePairs in sliceOf). A reached alarm is never switched off. Otherwise the picked side stays as it is.
+ * (settlePairs in sliceOf). A reached alarm is never switched off. Different rounds: the later arming wins (a moved
+ * box or line was armed again; what the other device saw belongs to the old round, like mergeTriggered).
  */
 function mergeAlarm(picked: string, m: string, t: string): string {
   const a = parse<Partial<Alarm> | null>(m, null)
   const b = parse<Partial<Alarm> | null>(t, null)
-  if (!isObj(a) || !isObj(b) || a.createdAt !== b.createdAt) return picked
+  if (!isObj(a) || !isObj(b)) return picked
+  if (a.createdAt !== b.createdAt) return (b.createdAt ?? 0) > (a.createdAt ?? 0) ? t : m
   const min = (x?: number, y?: number) => (x === undefined ? y : y === undefined ? x : Math.min(x, y))
   const first = [a, b].filter((x) => x.triggeredAt !== undefined).sort((x, y) => x.triggeredAt! - y.triggeredAt!)[0]
   const out = { ...parse<Record<string, unknown>>(picked, {}) }
@@ -162,7 +164,11 @@ function mergeAlarm(picked: string, m: string, t: string): string {
   return stable(out)
 }
 
-/** A surviving child brings back its deleted parent (taken from `sources`); order lists are made whole. */
+/**
+ * A surviving child brings back its deleted parent (taken from `sources`); order lists are made whole. A line alarm
+ * whose drawing is gone (deleted on one side while the other noted a touch, a tab closed by capTabs) goes too: it would
+ * show as armed and never be checked.
+ */
 function normalize(out: Units, sources: Units[]): Units {
   const restore = (key: string) => {
     if (!out[key]) {
@@ -171,7 +177,10 @@ function normalize(out: Units, sources: Units[]): Units {
     }
   }
   for (const k of Object.keys(out)) {
-    if (k.startsWith('entry:')) restore(`folder:${k.split(':')[1]}`)
+    if (k.startsWith('alarm:')) {
+      const line = parse<Partial<Alarm> | null>(out[k], null)?.line
+      if (isObj(line) && out[`drawing:${line.key}:${line.drawing}`] === undefined) delete out[k]
+    } else if (k.startsWith('entry:')) restore(`folder:${k.split(':')[1]}`)
     else if (k.startsWith('drawing:')) restore(`tab:${k.split(':')[1]}`)
   }
   const folders = Object.keys(out).filter((k) => k.startsWith('folder:')).map((k) => k.slice(7))
@@ -191,7 +200,8 @@ function normalize(out: Units, sources: Units[]): Units {
   return out
 }
 
-const norm = (s: string) => s.trim().toLocaleLowerCase()
+/** Names compared without case and outer spaces (folders here, saved charts in lib/charts.ts). */
+export const norm = (s: string): string => s.trim().toLocaleLowerCase()
 // The start folders carry the language of the install (an older PC has "Krypto", a new phone "Crypto"): one folder.
 const SAME_FOLDER: Record<string, string> = { krypto: 'crypto', aktien: 'stocks' }
 const folderName = (s: string) => SAME_FOLDER[norm(s)] ?? norm(s)
@@ -213,7 +223,8 @@ const drawingsOf = (s: SyncSlice, tabId: string) => Object.entries(s.drawings).f
 /**
  * The very first sync after pairing, when there is no common base yet: folders meet by id or name and symbols by
  * ticker, names/indicators/tabs come from the PC, the phone's tabs with drawings are kept as saved charts,
- * saved charts and alarms of both are kept (a clashing chart name per symbol gets `clash` appended).
+ * saved charts and alarms of both are kept (a clashing chart name per symbol gets `clash` appended). The phone's line
+ * alarms go with its tabs: their drawings live on in saved charts, which carry no alarms (normalize drops them).
  */
 export function firstMerge(pc: SyncSlice, phone: SyncSlice, tabLabel: string, clash: string): { slice: SyncSlice; savedTabs: number } {
   const folders = pc.folders.map((f) => ({ ...f, symbols: [...f.symbols] }))
@@ -271,7 +282,6 @@ export function capTabs(s: SyncSlice, max: number, label: string): SyncSlice {
 }
 
 const str = (v: unknown): v is string => typeof v === 'string'
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 /** Keeps `current`'s order for what is still there and appends the rest. */
 const inOrder = <T extends { id: string }>(items: T[], current: T[]) =>
   [...items].sort((x, y) => {
@@ -378,8 +388,8 @@ export const emptySync = (): SyncState => ({ stamps: {}, seen: {}, bases: {} })
 const stampsOf = (stamps: Stamps, units: Units): Stamps => Object.fromEntries(Object.entries(stamps).filter(([k]) => Object.hasOwn(units, k)))
 const KEEP_BASES = 3
 
-// Same as MAX_TABS in the store (not imported: this file must run without the window).
-const MAX_TABS = 3
+/** Chart tabs at most (the store and the sync use the same). */
+export const MAX_TABS = 3
 const UNIT_KEY =
   /^(indicators|order:folders|order:tabs|(folder|order|name|tab|chart|alarm|pin):[^:\s]{1,200}|entry:[^:\s]{1,200}:[^:\s]{1,40}|drawing:[^:\s]{1,200}:[^:\s]{1,40}:[^:\s]{1,200})$/
 const MAX_UNITS = 100_000

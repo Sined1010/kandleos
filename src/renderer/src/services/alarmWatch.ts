@@ -40,7 +40,7 @@ export function startPcAlarmWatch(): () => void {
       const s = useStore.getState()
       return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
     },
-    loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
+    loadBars: (symbol, from) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey, false, undefined, from),
     notify: async (a, note) => window.api.notify(alarmTitle(a), alarmBody(a, undefined, note)),
     collect: async () => {},
     knotsFor: (a, now) => knotsFor(a, useStore.getState().drawings, now)

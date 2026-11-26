@@ -5,7 +5,7 @@ import type { SavedAnalysis } from './agents'
 import { keyEnvFor } from '../shared/agents.ts'
 import { t } from '../shared/i18n.ts'
 import { checkAnalyses } from '../shared/savedAnalysis.ts'
-import { ALPACA_KEY_RE, FINNHUB_KEY_RE } from '../shared/types.ts'
+import { ALPACA_KEY_RE, FINNHUB_KEY_RE, isObj, MIN_PASSWORD } from '../shared/types.ts'
 
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 
@@ -51,7 +51,7 @@ const P = 1
 const derive = (password: string, salt: Buffer): Buffer =>
   scryptSync(password.normalize('NFC'), salt, 32, { N, r: R, p: P, maxmem: 64 * 1024 * 1024 })
 
-export const MIN_PASSWORD = 8
+export { MIN_PASSWORD }
 
 export function sealKeys(keys: BackupKeys, password: string): SealedKeys {
   if (password.length < MIN_PASSWORD) throw new Error(t('Das Passwort muss mindestens {n} Zeichen haben.', { n: String(MIN_PASSWORD) }))
@@ -76,7 +76,7 @@ export function openKeys(sealed: SealedKeys, password: string): BackupKeys {
   return checkKeys(JSON.parse(plain))
 }
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const LOCAL_URL = /^https?:\/\/(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[::1\])(:\d{1,5})?(\/|$)/i
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max
 const fail = (): never => {
   throw new Error(t('Keine gültige KandleOS-Sicherung'))
@@ -84,7 +84,7 @@ const fail = (): never => {
 
 /** Same rules as entering the keys by hand (index.ts, alpaca.ts, agents.ts). */
 export function checkKeys(v: unknown): BackupKeys {
-  if (!isObject(v)) return fail()
+  if (!isObj(v)) return fail()
   const out: BackupKeys = {}
   if (v.finnhub !== undefined) {
     if (typeof v.finnhub !== 'string' || !v.finnhub || !FINNHUB_KEY_RE.test(v.finnhub)) return fail()
@@ -92,12 +92,12 @@ export function checkKeys(v: unknown): BackupKeys {
   }
   if (v.alpaca !== undefined) {
     const a = v.alpaca
-    if (!isObject(a) || typeof a.id !== 'string' || typeof a.secret !== 'string') return fail()
+    if (!isObj(a) || typeof a.id !== 'string' || typeof a.secret !== 'string') return fail()
     if (!ALPACA_KEY_RE.test(a.id) || !ALPACA_KEY_RE.test(a.secret)) return fail()
     out.alpaca = { id: a.id, secret: a.secret }
   }
   if (v.agents !== undefined) {
-    if (!isObject(v.agents)) return fail()
+    if (!isObj(v.agents)) return fail()
     out.agents = {}
     for (const [name, value] of Object.entries(v.agents)) {
       if (!keyEnvFor(name) || typeof value !== 'string' || !/^[\x21-\x7e]{1,300}$/.test(value)) return fail()
@@ -117,13 +117,13 @@ export function parseBackup(text: string): Backup {
   } catch {
     return fail()
   }
-  if (!isObject(v) || v.app !== 'KandleOS' || v.format !== 1) return fail()
+  if (!isObj(v) || v.app !== 'KandleOS' || v.format !== 1) return fail()
   const store = v.store
-  if (store !== null && !(isObject(store) && isObject(store.state) && Number.isInteger(store.version))) return fail()
+  if (store !== null && !(isObj(store) && isObj(store.state) && Number.isInteger(store.version))) return fail()
   if (!Array.isArray(v.analyses) || v.analyses.length > 10_000) return fail()
   const keys = v.keys
   if (keys !== null) {
-    if (!isObject(keys) || keys.kdf !== 'scrypt' || keys.n !== N || keys.r !== R || keys.p !== P) return fail()
+    if (!isObj(keys) || keys.kdf !== 'scrypt' || keys.n !== N || keys.r !== R || keys.p !== P) return fail()
     if (!SEALED_FIELDS.every((f) => typeof keys[f] === 'string' && /^[A-Za-z0-9+/=]{1,200000}$/.test(keys[f] as string))) return fail()
   }
   // An old store (version < 3) still carried the Finnhub key; its migration would write it into the key file
@@ -131,6 +131,13 @@ export function parseBackup(text: string): Backup {
   let cleanStore = store as Backup['store']
   if (cleanStore) {
     const { finnhubKey: _, ...state } = cleanStore.state
+    // A foreign backup could send the next analysis (also one started from the phone) to its own server: only an
+    // Ollama on this computer comes along, any other address is entered again by hand.
+    const agents = state.agentsConfig
+    if (isObj(agents) && typeof agents.ollamaUrl === 'string' && !LOCAL_URL.test(agents.ollamaUrl)) {
+      const { ollamaUrl: _u, ...rest } = agents
+      state.agentsConfig = rest
+    }
     cleanStore = { state, version: cleanStore.version }
   }
   return {
@@ -141,6 +148,6 @@ export function parseBackup(text: string): Backup {
     store: cleanStore,
     analyses: checkAnalyses(v.analyses),
     keys: keys as SealedKeys | null,
-    ...(isObject(v.archive) && typeof v.archive.archive === 'string' && { archive: { archive: v.archive.archive, summary: v.archive.summary } })
+    ...(isObj(v.archive) && typeof v.archive.archive === 'string' && { archive: { archive: v.archive.archive, summary: v.archive.summary } })
   }
 }

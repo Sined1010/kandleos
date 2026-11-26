@@ -3,6 +3,7 @@
 // and there is no 100-row cap per call (TEAM: 842 rows for a year).
 import type { Filing, InsiderDeal, NewsItem } from '../../shared/events.ts'
 import { alpacaKnows } from '../../shared/types.ts'
+import { DAY_RE } from '../../shared/chain.ts'
 import { http } from '../http.ts'
 
 const API = 'https://finnhub.io/api/v1'
@@ -22,7 +23,6 @@ const pos = (v: unknown): number | undefined => (typeof v === 'number' && Number
 const text = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 // The window opens https links only.
 const https = (v: unknown): string | undefined => text(v)?.replace(/^http:\/\//, 'https://').match(/^https:\/\/\S+$/)?.[0]
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Buys (P) and sells (S) only; `usd`: a row without a currency is in US dollars (US listings). */
 export function finnhubDeals(rows: unknown, usd: boolean): InsiderDeal[] {

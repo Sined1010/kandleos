@@ -250,3 +250,72 @@ test('box: without a price source the gap rule does not lock live prices out', a
   await w.onPrice('ETHUSDT', 112, 10 + 3600)
   assert.deepEqual(told, ['target'])
 })
+
+test('box: a price from before the box was armed does not count as crossing its entry', async () => {
+  // ETH was at 120 (an earlier alarm), then the box was drawn at 85, waiting for its entry at 100.
+  const { w, told, alarms, set } = boxSetup([], undefined, true)
+  set((list) => list.map((a) => ({ ...a, createdAt: 100 })))
+  await w.onPrice('ETHUSDT', 120, 50)
+  await w.onPrice('ETHUSDT', 85, 110)
+  assert.equal(byId(alarms(), 'stop').box?.entryAt, undefined)
+  assert.deepEqual(told, [])
+})
+
+test('box: an entry first touched after the deciding hit keeps the no-entry note', async () => {
+  // The bar at 300 reaches the target; the entry 100 is touched only in the next 5-minute bar, after the trade was decided.
+  const { w, told, alarms } = boxSetup([{ time: 300, high: 111, low: 104 }, { time: 600, high: 104, low: 99 }])
+  await w.catchUp()
+  assert.deepEqual(told.map((x) => [x.id, x.note, x.entryAt]), [['target', 'no-entry', undefined]])
+  assert.equal(byId(alarms(), 'target').box?.entryAt, undefined)
+})
+
+test('catch-up asks for the bars from where the last check stopped, so a long pause leaves no gap', async () => {
+  let asked: number | undefined
+  let alarms: Alarm[] = [{ id: 'a', symbol: 'ETHUSDT', op: 'above', price: 100, createdAt: 10, checkedUntil: 5000 }]
+  const w = createAlarmWatch({
+    alarms: () => alarms,
+    update: (fn) => void (alarms = fn(alarms)),
+    checkable: () => true,
+    loadBars: async (_s, from) => {
+      asked = from
+      return { candles: [], stale: false }
+    },
+    notify: async () => {},
+    collect: async () => {}
+  })
+  await w.catchUp()
+  assert.equal(asked, 5000)
+})
+
+test('box catch-up starts at the side checked least far', async () => {
+  const b = boxSetup([])
+  let asked: number | undefined
+  b.set((list) => list.map((a) => ({ ...a, checkedUntil: a.id === 'stop' ? 300 : 700 })))
+  const w = createAlarmWatch({
+    alarms: b.alarms,
+    update: (fn) => b.set(fn),
+    checkable: () => true,
+    loadBars: async (_s, from) => {
+      asked = from
+      return { candles: [], stale: false }
+    },
+    notify: async () => {},
+    collect: async () => {},
+    knotsFor: (a) => ({ knots: [[0, a.price], [100_000, a.price]] })
+  })
+  await w.catchUp()
+  assert.equal(asked, 300)
+})
+
+test('box: an entry a live price saw inside the hit bar counts (bar 300 holds 305)', async () => {
+  const { w, told } = boxSetup([{ time: 300, high: 111, low: 104 }], 305)
+  await w.catchUp()
+  assert.deepEqual(told.map((x) => [x.id, x.note]), [['target', undefined]])
+})
+
+test('box: without a hit both sides keep the earlier entry either of them saw, as the Android check does', async () => {
+  const { w, alarms, set } = boxSetup([{ time: 30, high: 101, low: 99 }])
+  set((list) => list.map((a) => (a.id === 'stop' ? { ...a, box: { ...a.box!, entryAt: 15 } } : a)))
+  await w.catchUp()
+  assert.equal(byId(alarms(), 'target').box?.entryAt, 15)
+})

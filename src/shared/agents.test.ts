@@ -130,3 +130,9 @@ test('checkAgentsConfig takes over only known settings of the right kind', () =>
   assert.deepEqual(checkAgentsConfig(null), {})
   assert.deepEqual(checkAgentsConfig([]), {})
 })
+
+test('doneFromBridge cuts a long rating and huge reports to what a backup and the phone take back', () => {
+  const d = doneFromBridge({ rating: '<think>' + 'x'.repeat(100) + '</think> BUY', reports: { market: 'y'.repeat(600_000) } })
+  assert.equal(d.rating.length, 40)
+  assert.equal(d.reports.market.length, 500_000)
+})

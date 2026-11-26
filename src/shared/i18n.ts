@@ -4,7 +4,6 @@
 import { EN } from './i18n-en.ts'
 
 export type Lang = 'en' | 'de'
-export const LANGS: Lang[] = ['en', 'de']
 
 let current: Lang = 'en'
 

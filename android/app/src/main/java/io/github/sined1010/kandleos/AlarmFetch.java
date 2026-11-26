@@ -25,7 +25,7 @@ public final class AlarmFetch {
 
     static List<AlarmCheck.Bar> bars(Context c, String source, String symbol, long fromSec) throws Exception {
         String sym = URLEncoder.encode(symbol, "UTF-8");
-        // Yahoo: only the bars since the last check (at most 5 days), not 5 days every 15 s.
+        // Yahoo: only the bars since the last check, not days of them every 15 s; at most 59 days (its 5-minute limit is 60).
         long now = System.currentTimeMillis() / 1000;
         switch (source) {
             case "binance": {
@@ -42,7 +42,7 @@ public final class AlarmFetch {
                 // Yahoo rejects requests without a browser-like user agent (as in src/data/stocks.ts). Regular session
                 // only, like the app's catch-up and its live check against the regular price.
                 JSONObject r = new JSONObject(get("https://query1.finance.yahoo.com/v8/finance/chart/" + sym
-                        + "?interval=5m&period1=" + Math.max(fromSec, now - 5 * 86400) + "&period2=" + now, headers("User-Agent", "Mozilla/5.0")))
+                        + "?interval=5m&period1=" + Math.max(fromSec, now - 59 * 86400) + "&period2=" + now, headers("User-Agent", "Mozilla/5.0")))
                         .getJSONObject("chart").getJSONArray("result").getJSONObject(0);
                 JSONArray ts = r.optJSONArray("timestamp");
                 JSONObject q = r.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0);
@@ -94,6 +94,20 @@ public final class AlarmFetch {
         return m;
     }
 
+    /** Largest reply read (16 MB): past it the sender is broken or hostile, and the memory would run out. */
+    static final int MAX_REPLY = 16 << 20;
+
+    /** The whole stream as UTF-8 text, at most `max` bytes; more is an IOException. */
+    static String readAll(InputStream in, int max) throws java.io.IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        for (int n; (n = in.read(buf)) > 0; ) {
+            if (out.size() + n > max) throw new java.io.IOException("reply too large");
+            out.write(buf, 0, n);
+        }
+        return out.toString("UTF-8");
+    }
+
     private static String get(String url, Map<String, String> headers) throws Exception {
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setConnectTimeout(15000);
@@ -105,10 +119,7 @@ public final class AlarmFetch {
             int code = con.getResponseCode();
             if (code != 200) throw new Exception("HTTP " + code);
             try (InputStream in = con.getInputStream()) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
-                return out.toString("UTF-8");
+                return readAll(in, MAX_REPLY);
             }
         } finally {
             con.disconnect();

@@ -512,3 +512,40 @@ test('a box decided on both devices merges to the earlier hit, whichever device 
     assert.equal(s.box?.entryAt, 50)
   }
 })
+
+test('a box moved on the PC (armed again) beats an entry the phone noted on the old round, whatever the stamps', () => {
+  const line = { key: 't1:BTCUSDT', drawing: 'bx', part: 'target' }
+  const pts = [{ time: 1, price: 100 }, { time: 1, price: 112 }, { time: 1, price: 95 }, { time: 9, price: 100 }]
+  const drawings = { 't1:BTCUSDT': [{ id: 'bx', type: 'long' as const, points: pts }] }
+  const old = { id: 'bt', symbol: 'BTCUSDT', op: 'above' as const, price: 110, createdAt: 10, line, box: { entry: 100, wait: false } }
+  const base = slice({ drawings, alarms: [old] })
+  const pc = slice({ drawings, alarms: [{ ...old, price: 112, createdAt: 100 }] })
+  const phone = slice({ drawings, alarms: [{ ...old, box: { ...old.box, entryAt: 55 } }] })
+  const merged = mergeUnits(unitsOf(base), unitsOf(pc), unitsOf(phone), { 'alarm:bt': 100 }, { 'alarm:bt': 200 }, 0)
+  const a = sliceOf(merged, pc).alarms.find((x) => x.id === 'bt')!
+  assert.equal(a.price, 112)
+  assert.equal(a.createdAt, 100)
+})
+
+test('a line alarm whose drawing is gone after the merge goes too (PC deleted the box, phone noted its entry)', () => {
+  const line = { key: 't1:BTCUSDT', drawing: 'bx', part: 'target' }
+  const pts = [{ time: 1, price: 100 }, { time: 1, price: 110 }, { time: 1, price: 95 }, { time: 9, price: 100 }]
+  const withBox = { 't1:BTCUSDT': [{ id: 'bx', type: 'long' as const, points: pts }] }
+  const a = { id: 'bt', symbol: 'BTCUSDT', op: 'above' as const, price: 110, createdAt: 10, line, box: { entry: 100, wait: false } }
+  const base = slice({ drawings: withBox, alarms: [a] })
+  const pc = slice({ drawings: { 't1:BTCUSDT': [] }, alarms: [] })
+  const phone = slice({ drawings: withBox, alarms: [{ ...a, box: { ...a.box, entryAt: 55 } }] })
+  const merged = mergeUnits(unitsOf(base), unitsOf(pc), unitsOf(phone), {}, { 'alarm:bt': 200 }, 0)
+  assert.equal(merged['alarm:bt'], undefined)
+})
+
+test('capTabs takes the line alarms of a closed tab with it', () => {
+  const tabs = [1, 2, 3, 4].map((n) => ({ id: `t${n}`, symbol: 'ETHUSDT', timeframe: '1h' as const, range: null }))
+  const s = slice({
+    tabs,
+    drawings: { 't4:ETHUSDT': [{ id: 'h', type: 'hline', price: 100 }] },
+    alarms: [{ id: 'la', symbol: 'ETHUSDT', op: 'above', price: 100, createdAt: 1, line: { key: 't4:ETHUSDT', drawing: 'h', part: 'main' } }]
+  })
+  const out = applyUnits(s, unitsOf(s), unitsOf(capTabs(s, 3, 'x')))
+  assert.equal(out.alarms.some((a) => a.id === 'la'), false)
+})

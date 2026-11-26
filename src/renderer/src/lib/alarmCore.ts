@@ -12,8 +12,8 @@ export interface AlarmDeps {
   update(fn: (alarms: Alarm[]) => Alarm[]): void
   /** Whether there is a price source for the alarm's symbol. */
   checkable(a: Alarm): boolean
-  /** 5-minute bars of the symbol; `stale` set = only a saved copy (offline). */
-  loadBars(symbol: string): Promise<{ candles: { time: number; high: number; low: number }[]; stale?: unknown }>
+  /** 5-minute bars of the symbol from `from` (seconds) on; `stale` set = only a saved copy (offline). */
+  loadBars(symbol: string, from: number): Promise<{ candles: { time: number; high: number; low: number }[]; stale?: unknown }>
   notify(a: Alarm, note?: AlarmNote): Promise<void>
   /** Phone: take over what the background check already reported, before reporting it again. */
   collect(): Promise<void>
@@ -24,13 +24,21 @@ export interface AlarmDeps {
 /** Seconds since a box's last check after which a live price no longer decides it alone (catch-up runs every 5 min). */
 const BOX_TICK_GAP = 15 * 60
 
+/** The catch-up's bars are 5 minutes long (loadBars). */
+const BAR = 300
+const earliest = (times: (number | undefined)[]): number | undefined => {
+  const known = times.filter((t): t is number => t !== undefined)
+  return known.length ? Math.min(...known) : undefined
+}
+
 const withEntry = (a: Alarm, entryAt: number | undefined): Alarm =>
   a.box && entryAt !== undefined && a.box.entryAt === undefined ? { ...a, box: { ...a.box, entryAt } } : a
 
 export function createAlarmWatch(deps: AlarmDeps) {
   const firing = new Set<string>()
-  // The last live price per symbol, to see a box's entry crossed between two of them.
-  const lastPrice = new Map<string, number>()
+  // The last live price per symbol, to see a box's entry crossed between two of them. Its time keeps a price from
+  // before a box was armed (an earlier alarm on the symbol, before a sleep) out of that box's crossing.
+  const lastPrice = new Map<string, { price: number; time: number }>()
   const armedNow = (id: string) => deps.alarms().find((x) => x.id === id && isArmed(x))
   /** Fixed alarms: no table. Line alarms: the table, or null when the drawing is not here (then nothing is checked). */
   const tableOf = (a: Alarm, now: number) => {
@@ -67,11 +75,13 @@ export function createAlarmWatch(deps: AlarmDeps) {
 
   /** A box's target and stop against the same bars: the earlier hit (the stop on a tie) decides. */
   async function catchUpBox(a: Alarm, done: Set<string>): Promise<void> {
-    const pid = partnerOf(a, deps.alarms())?.id
+    const partner = partnerOf(a, deps.alarms())
+    const pid = partner?.id
     done.add(a.id)
     if (pid) done.add(pid)
     if (!tableOf(a, Math.floor(Date.now() / 1000))) return
-    const { candles, stale } = await deps.loadBars(a.symbol)
+    const from = Math.min(...[a, partner].filter((x): x is Alarm => !!x && isArmed(x)).map((x) => x.checkedUntil ?? x.createdAt))
+    const { candles, stale } = await deps.loadBars(a.symbol, from)
     if (stale) return
     // Read again: either side may have fired, been re-armed or deleted while the bars loaded.
     const fresh = armedNow(a.id)
@@ -87,14 +97,15 @@ export function createAlarmWatch(deps: AlarmDeps) {
     const won = pairWinner(target, stop)
     if (won) {
       const [w, r] = won === fresh.line!.part ? [fresh, mine] : [other!, theirs as typeof mine]
-      // Either side may have seen the entry (they can be armed at different times).
-      const seen = [mine.entryAt, theirs.entryAt].filter((t): t is number => t !== undefined).sort((x, y) => x - y)[0]
+      // Either side may have seen the entry (they can be armed at different times); one touched after the hit bar is
+      // too late. A live price inside that bar (later than its open) still counts.
+      const seen = earliest([mine.entryAt, theirs.entryAt].filter((t) => t !== undefined && t < r.hit!.time + BAR))
       const note: AlarmNote | undefined = target && stop && target.time === stop.time ? 'same-bar' : seen === undefined ? 'no-entry' : undefined
       return fire(w, r.hit!, seen, note)
     }
     if (!candles.length) return
     const next = checked(table, candles)
-    const entryAt = mine.entryAt ?? theirs.entryAt
+    const entryAt = earliest([mine.entryAt, theirs.entryAt])
     deps.update((list) => list.map((x) => (x.id === fresh.id || x.id === other?.id ? next(withEntry(x, entryAt)) : x)))
   }
 
@@ -104,9 +115,15 @@ export function createAlarmWatch(deps: AlarmDeps) {
     async onPrice(symbol: string, price: number, time: number): Promise<void> {
       // Two live prices on either side of a box's entry: it was touched in between.
       const prev = lastPrice.get(symbol)
-      lastPrice.set(symbol, price)
+      lastPrice.set(symbol, { price, time })
       const crossed = (a: Alarm) =>
-        prev !== undefined && a.symbol === symbol && !!a.box && a.box.entryAt === undefined && isArmed(a) && (prev - a.box.entry) * (price - a.box.entry) <= 0
+        prev !== undefined &&
+        prev.time >= a.createdAt &&
+        a.symbol === symbol &&
+        !!a.box &&
+        a.box.entryAt === undefined &&
+        isArmed(a) &&
+        (prev.price - a.box.entry) * (price - a.box.entry) <= 0
       if (deps.alarms().some(crossed)) deps.update((list) => list.map((x) => (crossed(x) ? withEntry(x, time) : x)))
       // A waiting box before its entry is left to the bars (catchUp), and so is any box after a gap (sleep, start): the
       // missed bars may hold the other side's hit first.
@@ -141,7 +158,7 @@ export function createAlarmWatch(deps: AlarmDeps) {
             continue
           }
           if (!tableOf(a, Math.floor(Date.now() / 1000))) continue
-          const { candles, stale } = await deps.loadBars(a.symbol)
+          const { candles, stale } = await deps.loadBars(a.symbol, a.checkedUntil ?? a.createdAt)
           if (stale) continue
           // Read again: the alarm may have fired, been re-armed or deleted while the bars loaded.
           const fresh = armedNow(a.id)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { FIB_LEVELS, endAhead, lineAt, lineGeom, lineKnots, lineMoved, lineParts, linePrice, type LineGeom } from './lineAlarm.ts'
+import { FIB_LEVELS, endAhead, lineGeom, lineKnots, lineMoved, lineParts, linePrice, type LineGeom } from './lineAlarm.ts'
 import { aggregate, timeToLogical } from './candles.ts'
 import { timeZoneForSymbol } from './calendar.ts'
 import { openSessions, sessionOpen } from './market.ts'
@@ -161,9 +161,10 @@ test('4h: the lines of a channel run parallel in bars, as the chart draws them',
   const base = (t: number) => 100 + (4 * (L(t) - L(axis[0]))) / (L(axis[4]) - L(axis[0]))
   const off = 95 - base(axis[7])
   for (const t of [axis[7], axis[9], (axis[9] + axis[10]) / 2, axis[14]]) {
-    close(lineAt(lineGeom(ch, 'bottom', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t) + off)
-    close(lineAt(lineGeom(ch, 'top', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t))
-    close(lineAt(lineGeom(ch, 'mid', 'AAPL', '4h')!, 'AAPL', t, '4h'), base(t) + off / 2)
+    const at4h = (part: string) => linePrice(lineKnots(lineGeom(ch, part, 'AAPL', '4h')!, 'AAPL', axis[0], axis[14], '4h'), t)!
+    close(at4h('bottom'), base(t) + off)
+    close(at4h('top'), base(t))
+    close(at4h('mid'), base(t) + off / 2)
   }
 })
 

@@ -3,15 +3,13 @@
 import { App as CapApp } from '@capacitor/app'
 import { usePcStatus } from '../renderer/src/lib/pcStatus'
 import { saveAlpacaKeys } from '../data/alpaca'
-import { decodePairing, type PairingCode, type SourceKeys } from '../shared/link'
-import { t } from '../shared/i18n'
+import type { PairingCode, SourceKeys } from '../shared/link'
 import type { StockSource } from '../shared/types'
 import { resetSync, startStamping, syncWithPc } from '../renderer/src/services/sync'
 import { useStore } from '../renderer/src/store/useStore'
 import { notifyAlarm } from './alarmWatch'
 import { capHttp } from './capHttp'
 import { createLinkClient, type Pairing } from './linkClient'
-import { ask, tell } from './MessageBox'
 import { KandleNative } from './native'
 
 type Stored = Pairing & { keysVersion?: string }
@@ -95,33 +93,6 @@ export async function unpair(): Promise<void> {
   usePcStatus.setState({ state: 'none', pcName: '', lastSeen: null, syncFailed: false })
 }
 
-/**
- * A kandleos: link opened from outside (the phone's camera app or Google Lens scanned the PC's code). Anyone can
- * send such a link, and the name in it is the sender's choice: pairing waits for the user's yes, and a link to another
- * PC says that it replaces the current pairing.
- */
-async function openLink(url: string): Promise<void> {
-  const decoded = decodePairing(url)
-  if (!decoded) return
-  // Shown and used are the same list: no harmless-looking first addresses with the sender's own one hidden behind.
-  const code = { ...decoded, addrs: decoded.addrs.slice(0, 8) }
-  const p = await load()
-  const question = !p
-    ? t('Mit dem PC „{name}“ koppeln? Watchlist, Zeichnungen und Alarme werden dann mit ihm abgeglichen.', { name: code.name })
-    : p.pcId === code.pc
-      ? t('Neue Adressen für den PC „{name}“ übernehmen?', { name: p.pcName })
-      : t('Das Handy ist mit „{current}“ gekoppelt. Stattdessen mit „{name}“ koppeln? Watchlist, Zeichnungen und Alarme gehen dann an diesen PC. Koppel nur mit Codes, die dein eigener PC gerade anzeigt.', { current: p.pcName, name: code.name })
-  // The addresses are the one part of a forged link that is hard to disguise: a stranger's PC is not on your network.
-  const where = t('Adressen im Code: {addrs}', { addrs: code.addrs.join(', ') })
-  if (!(await ask(`${question} ${where}`, t('Koppeln'), p && p.pcId !== code.pc ? { danger: true } : undefined))) return
-  try {
-    await pairWith(code)
-    tell(t('Mit „{name}“ gekoppelt.', { name: code.name }))
-  } catch (e) {
-    tell((e as Error).message === 'offline' ? t('PC nicht erreichbar, oder der Code ist abgelaufen bzw. schon benutzt. Ist das Handy im selben WLAN oder im VPN? Blockt eine Firewall am PC (z. B. Portmaster) die Verbindung?') : (e as Error).message)
-  }
-}
-
 /** Hello (and sync) at start, every few minutes while in front, when the app comes back, and 5 s after a change. */
 export function startLink(): () => void {
   void hello()
@@ -132,15 +103,10 @@ export function startLink(): () => void {
   })
   const id = setInterval(() => document.visibilityState === 'visible' && void hello(), HELLO_MS)
   const resume = CapApp.addListener('resume', () => void hello())
-  const opened = CapApp.addListener('appUrlOpen', ({ url }) => void openLink(url))
-  void CapApp.getLaunchUrl().then((l) => {
-    if (l?.url) void openLink(l.url)
-  })
   return () => {
     stopStamping()
     clearTimeout(soon)
     clearInterval(id)
     void resume.then((h) => h.remove())
-    void opened.then((h) => h.remove())
   }
 }

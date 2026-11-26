@@ -144,3 +144,14 @@ test('4h stock bars across a DST switch give two future bars a day, at 9:30 and 
     '2026-11-12 9.5', '2026-11-12 13.5', '2026-11-13 9.5', '2026-11-13 13.5', '2026-11-16 9.5', '2026-11-16 13.5'
   ])
 })
+
+test('futureTimes keeps weekly stock bars on Monday midnight in New York across the autumn clock change', () => {
+  // Monday 2026-10-19 and 10-26 at 00:00 New York (EDT, UTC-4); from November 2 on it is EST (UTC-5).
+  const weeks = [Date.UTC(2026, 9, 19, 4) / 1000, Date.UTC(2026, 9, 26, 4) / 1000]
+  assert.deepEqual(futureTimes(weeks, 604800, 2, 'America/New_York'), [Date.UTC(2026, 10, 2, 5) / 1000, Date.UTC(2026, 10, 9, 5) / 1000])
+})
+
+test('futureTimes keeps weekly crypto bars evenly spaced in UTC', () => {
+  const weeks = [Date.UTC(2026, 9, 19) / 1000, Date.UTC(2026, 9, 26) / 1000]
+  assert.deepEqual(futureTimes(weeks, 604800, 1, 'UTC'), [Date.UTC(2026, 10, 2) / 1000])
+})
