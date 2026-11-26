@@ -23,20 +23,32 @@ export interface Alarm {
   line?: { key: string; drawing: string; part: string; tf?: Timeframe }
   /** The line's end passed without a touch. */
   expiredAt?: number
+  /**
+   * Target or stop of a position box (boxAlarm.ts): its entry, whether the pair waits for it (the price was outside
+   * stop–target when armed), when a bar first touched it, and whether this side lies between the arming price and the
+   * entry (then the bar reaching the entry does not count for it: boxAlarm.ts).
+   */
+  box?: { entry: number; wait: boolean; entryAt?: number; near?: true }
+  /** A box's target or stop switched off because the other side was reached first (that time). */
+  cancelledAt?: number
 }
 
-/** Still waiting: neither reached nor run out. */
-export const isArmed = (a: Alarm): boolean => a.triggeredAt === undefined && a.expiredAt === undefined
+/** Still waiting: neither reached, run out nor switched off by its box partner. */
+export const isArmed = (a: Alarm): boolean => a.triggeredAt === undefined && a.expiredAt === undefined && a.cancelledAt === undefined
 
 /** Whether a symbol has an alarm still waiting (the bell in the watchlist). */
 export const armedFor = (alarms: Alarm[], symbol: string): boolean => alarms.some((a) => a.symbol === symbol && isArmed(a))
 
 /**
  * "Now" for alarms (seconds), on the exchange's clock: the latest quote's time when there is one. Alarm times are
- * compared with bar times, and a device clock may be off (the user's PC by about an hour).
+ * compared with bar times, and a device clock may be off (the user's PC by about an hour). A closed market's last
+ * quote can be a day old (a holiday): "now" is then at most STALE_SLACK before the device clock, so arming does not
+ * take in the bars of the last session.
  */
 export const alarmClock = (quoteTime: number | undefined, wall = Math.floor(Date.now() / 1000)): number =>
-  quoteTime !== undefined && Number.isFinite(quoteTime) && quoteTime > 0 ? Math.floor(quoteTime) : wall
+  quoteTime !== undefined && Number.isFinite(quoteTime) && quoteTime > 0 ? Math.max(Math.floor(quoteTime), wall - STALE_SLACK) : wall
+/** How far a device clock may be ahead of the exchange (seconds); beyond it a quote counts as stale. */
+const STALE_SLACK = 2 * 3600
 
 /** The direction follows from where the price is now; at the current price there is nothing to wait for. */
 export function newAlarm(symbol: string, price: number, current: number, now = Math.floor(Date.now() / 1000)): Alarm | 'at-price' {
@@ -83,7 +95,9 @@ const optTime = (v: unknown) => v === undefined || (typeof v === 'number' && Num
 /** The alarm if it has every field it needs (from the other device or a backup), else null. */
 export function checkAlarm(v: unknown): Alarm | null {
   if (!isObj(v) || !str(v.id) || !str(v.symbol) || typeof v.price !== 'number' || (v.op !== 'above' && v.op !== 'below') || typeof v.createdAt !== 'number') return null
-  if (!optTime(v.triggeredAt) || !optTime(v.expiredAt) || !optTime(v.checkedUntil)) return null
+  if (!optTime(v.triggeredAt) || !optTime(v.expiredAt) || !optTime(v.checkedUntil) || !optTime(v.cancelledAt)) return null
+  if (v.box !== undefined && !(isObj(v.box) && typeof v.box.entry === 'number' && Number.isFinite(v.box.entry) && typeof v.box.wait === 'boolean' && optTime(v.box.entryAt) && (v.box.near === undefined || v.box.near === true)))
+    return null
   // A line that cannot be read must not turn into a fixed-price alarm at the arming price.
   if (v.line !== undefined && !(isObj(v.line) && str(v.line.key) && str(v.line.drawing) && str(v.line.part))) return null
   const tf = isObj(v.line) ? v.line.tf : undefined
@@ -112,6 +126,8 @@ export interface NativeTrigger {
   triggeredAt: number
   triggeredPrice: number
   checkedUntil: number
+  /** Box alarms: when the background check saw the entry touched. */
+  entryAt?: number
 }
 
 /** Takes in what the background check found; the earliest trigger wins, so applying it again changes nothing. */
@@ -125,9 +141,11 @@ export function mergeTriggered(local: Alarm[], native: NativeTrigger[]): Alarm[]
     // A trigger from before the alarm was armed again belongs to the old round.
     if (!n || (a.triggeredAt === undefined && n.triggeredAt < (a.checkedUntil ?? a.createdAt))) return a
     const earlier = a.triggeredAt === undefined || n.triggeredAt < a.triggeredAt
+    const entryAt = a.box && n.entryAt !== undefined ? Math.min(a.box.entryAt ?? Infinity, n.entryAt) : undefined
     return {
       ...a,
       ...(earlier ? { triggeredAt: n.triggeredAt, triggeredPrice: n.triggeredPrice } : {}),
+      ...(entryAt !== undefined && { box: { ...a.box!, entryAt } }),
       checkedUntil: Math.max(a.checkedUntil ?? 0, n.checkedUntil)
     }
   })

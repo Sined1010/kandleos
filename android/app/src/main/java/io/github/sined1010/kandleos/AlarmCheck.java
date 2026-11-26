@@ -59,6 +59,42 @@ public final class AlarmCheck {
         return -1;
     }
 
+    /**
+     * A position box's target or stop (src/shared/boxAlarm.ts scanBox): the first bar reaching the line from the bar
+     * that touches the entry on when the pair waits for it, except a {@code near} side in that very bar: it lies between
+     * the arming price and the entry and was crossed on the way), and when the entry was first touched.
+     * Returns {hit time, entry time}, -1 for none.
+     */
+    public static long[] boxScan(String op, long from, List<Bar> bars, long[] kt, double[] kp, double entry, boolean wait, boolean near, long entryAt) {
+        // A stored entry only opens the bars when it lies before them (boxAlarm.ts scanBox): one from the bar read again
+        // or from inside a bar is found again in the bars.
+        long seen = entryAt >= 0 && entryAt < from ? entryAt : -1;
+        for (Bar b : bars) {
+            if (b.time < from) continue;
+            boolean waiting = wait && seen < 0;
+            if (seen < 0 && b.low <= entry && entry <= b.high) seen = b.time;
+            if (wait && seen < 0) continue;
+            if (waiting && near) continue;
+            double price = linePrice(kt, kp, b.time);
+            if (Double.isNaN(price)) continue;
+            if ("above".equals(op) ? b.high >= price : b.low <= price) return new long[] {b.time, earlier(entryAt, seen)};
+        }
+        return new long[] {-1, earlier(entryAt, seen)};
+    }
+
+    private static long earlier(long a, long b) {
+        if (a < 0) return b;
+        if (b < 0) return a;
+        return Math.min(a, b);
+    }
+
+    /** Which side of a box decided (boxAlarm.ts pairWinner): 0 none, 1 target, 2 stop; the stop on a tie. */
+    public static int pairWinner(long target, long stop) {
+        if (target < 0) return stop < 0 ? 0 : 2;
+        if (stop < 0) return 1;
+        return target < stop ? 1 : 2;
+    }
+
     /** Price with the app's decimals (src/renderer/src/lib/format.ts formatPrice). */
     public static String formatPrice(double p, Locale locale) {
         NumberFormat f = NumberFormat.getNumberInstance(locale);

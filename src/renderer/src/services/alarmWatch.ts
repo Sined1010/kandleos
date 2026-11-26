@@ -3,7 +3,7 @@
 import { alarmClock, isArmed, type Alarm } from '../../../shared/alarms'
 import { t } from '../../../shared/i18n'
 import { planAlarm } from '../../../mobile/alarmPlan'
-import { createAlarmWatch } from '../lib/alarmCore'
+import { createAlarmWatch, type AlarmNote } from '../lib/alarmCore'
 import { formatPrice } from '../lib/format'
 import { knotsFor, lineLabel } from '../lib/lineAlarms'
 import { fetchCandles } from './marketData'
@@ -16,9 +16,17 @@ export function alarmTitle(a: Alarm): string {
   return a.line ? t('{name} · {line} berührt', { name, line: lineLabel(a, drawings) }) : t('{name} hat {price} erreicht', { name, price: formatPrice(a.price) })
 }
 
-/** Notification text: for a line, the price where it was touched (`price` given = a template for Android). */
-export const alarmBody = (a: Alarm, price?: string): string =>
-  a.line ? t('bei {price}', { price: price ?? formatPrice(a.triggeredPrice ?? a.price) }) : t('Kurs-Alarm von KandleOS')
+/**
+ * Notification text: for a line, the price where it was touched (`price` given = a template for Android); for a box,
+ * whether its entry was never touched or target and stop fell in one bar.
+ */
+export function alarmBody(a: Alarm, price?: string, note?: AlarmNote): string {
+  if (!a.line) return t('Kurs-Alarm von KandleOS')
+  const p = price ?? formatPrice(a.triggeredPrice ?? a.price)
+  if (note === 'no-entry' && a.box) return t('bei {price} · Einstieg {entry} wurde vorher nicht erreicht', { price: p, entry: formatPrice(a.box.entry) })
+  if (note === 'same-bar') return t('bei {price} · Ziel und Stop in derselben Kerze', { price: p })
+  return t('bei {price}', { price: p })
+}
 
 const CATCH_UP_MS = 5 * 60 * 1000
 
@@ -33,7 +41,7 @@ export function startPcAlarmWatch(): () => void {
       return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
     },
     loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
-    notify: async (a) => window.api.notify(alarmTitle(a), alarmBody(a)),
+    notify: async (a, note) => window.api.notify(alarmTitle(a), alarmBody(a, undefined, note)),
     collect: async () => {},
     knotsFor: (a, now) => knotsFor(a, useStore.getState().drawings, now)
   })

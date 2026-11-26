@@ -73,6 +73,12 @@ export function lineLabel(a: Alarm, drawings: Record<string, Drawing[]>): string
       return t('Fib {level}', { level: pct(part) })
     case 'fibext':
       return t('Fib-Erweiterung {level}', { level: pct(part) })
+    case 'long':
+    case 'short':
+      return t('{side}-{part}', {
+        side: d.type === 'long' ? 'Long' : 'Short',
+        part: part === 'target' ? t('Ziel') : part === 'stop' ? t('Stop') : t('Einstieg')
+      })
     default:
       return t('Linie')
   }

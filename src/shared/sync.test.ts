@@ -459,3 +459,56 @@ test('indicators from a device without patterns keep the local switch', () => {
   const local = { ...DEFAULT_INDICATORS, patterns: { on: true } }
   assert.equal(cleanIndicators(local, { sma: { on: false, period: 20 } }).patterns.on, true)
 })
+
+test('a box decided differently on both devices: after the trip the earlier side has won', () => {
+  const line = (part: string) => ({ key: 't1:BTCUSDT', drawing: 'bx', part })
+  const box = { entry: 100, wait: false }
+  const s = slice({
+    drawings: {
+      't1:BTCUSDT': [
+        { id: 'bx', type: 'long', points: [{ time: 1, price: 100 }, { time: 1, price: 110 }, { time: 1, price: 95 }, { time: 9, price: 100 }] }
+      ]
+    },
+    alarms: [
+      // Each unit came from another device: target off because the stop hit at 100, stop off because the target hit at 200.
+      { id: 'bt', symbol: 'BTCUSDT', op: 'above', price: 110, createdAt: 1, line: line('target'), box, cancelledAt: 100 },
+      { id: 'bs', symbol: 'BTCUSDT', op: 'below', price: 95, createdAt: 1, line: line('stop'), box, cancelledAt: 200 }
+    ]
+  })
+  const out = sliceOf(unitsOf(s), s)
+  assert.equal(out.drawings['t1:BTCUSDT'][0].type, 'long')
+  assert.equal(out.alarms.find((a) => a.id === 'bs')?.triggeredAt, 100)
+  assert.equal(out.alarms.find((a) => a.id === 'bt')?.cancelledAt, 100)
+})
+
+test('a box decided on both devices merges to the earlier hit, whichever device wrote last', () => {
+  const line = (part: string) => ({ key: 't1:BTCUSDT', drawing: 'bx', part })
+  const box = { entry: 100, wait: false }
+  const pts = [{ time: 1, price: 100 }, { time: 1, price: 110 }, { time: 1, price: 95 }, { time: 9, price: 100 }]
+  const drawings = { 't1:BTCUSDT': [{ id: 'bx', type: 'long' as const, points: pts }] }
+  const target = { id: 'bt', symbol: 'BTCUSDT', op: 'above' as const, price: 110, createdAt: 1, line: line('target'), box }
+  const stop = { id: 'bs', symbol: 'BTCUSDT', op: 'below' as const, price: 95, createdAt: 1, line: line('stop'), box }
+  const base = slice({ drawings, alarms: [target, stop] })
+  // Phone: the stop at 100. PC: the target at 200 (and the entry seen at 50).
+  const phone = slice({ drawings, alarms: [{ ...target, cancelledAt: 100 }, { ...stop, triggeredAt: 100, triggeredPrice: 95 }] })
+  const pc = slice({
+    drawings,
+    alarms: [
+      { ...target, triggeredAt: 200, triggeredPrice: 110, box: { ...box, entryAt: 50 } },
+      { ...stop, cancelledAt: 200, box: { ...box, entryAt: 50 } }
+    ]
+  })
+  for (const [early, late] of [[1, 2], [2, 1]]) {
+    const stampsPhone = { 'alarm:bt': early, 'alarm:bs': early }
+    const stampsPc = { 'alarm:bt': late, 'alarm:bs': late }
+    const merged = mergeUnits(unitsOf(base), unitsOf(pc), unitsOf(phone), stampsPc, stampsPhone, 0)
+    const out = sliceOf(merged, pc).alarms
+    const s = out.find((a) => a.id === 'bs')!
+    const t = out.find((a) => a.id === 'bt')!
+    assert.equal(s.triggeredAt, 100, `stamps ${early}/${late}`)
+    assert.equal(s.cancelledAt, undefined)
+    assert.equal(t.triggeredAt, undefined)
+    assert.equal(t.cancelledAt, 100)
+    assert.equal(s.box?.entryAt, 50)
+  }
+})

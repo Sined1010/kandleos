@@ -60,7 +60,8 @@ export async function hello(): Promise<void> {
     reached = true
     usePcStatus.setState({ state: 'online', pcName: p.pcName, lastSeen: Date.now() })
     // An alarm the PC reached first rings here too: the user may be away from the PC.
-    for (const a of await syncWithPc(p.pcId, call)) void notifyAlarm(a)
+    // A box reached elsewhere keeps its hint when the entry was never seen.
+    for (const a of await syncWithPc(p.pcId, call)) void notifyAlarm(a, a.box && a.box.entryAt === undefined ? 'no-entry' : undefined)
     usePcStatus.setState({ syncFailed: false })
   } catch (e) {
     const msg = (e as Error).message

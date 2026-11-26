@@ -61,4 +61,67 @@ public class AlarmCheckTest {
         assertEquals("0.123457", AlarmCheck.formatPrice(0.12345678, Locale.US));
         assertEquals("5.1234", AlarmCheck.formatPrice(5.12341, Locale.US));
     }
+
+    // Position boxes, mirroring src/shared/boxAlarm.test.ts (scanBox, pairWinner).
+    private static long[] flat(double p) { return new long[] {0, 100_000}; }
+    private static double[] flatP(double p) { return new double[] {p, p}; }
+
+    @Test
+    public void waitingBreakoutIgnoresTheStopUntilTheEntry() {
+        // Long breakout: stop 58, entry 60, armed at 100 with the price at 55.
+        List<AlarmCheck.Bar> early = Arrays.asList(new AlarmCheck.Bar(200, 57, 55), new AlarmCheck.Bar(300, 58.5, 57));
+        long[] r = AlarmCheck.boxScan("below", 100, early, flat(58), flatP(58), 60, true, false, -1);
+        assertEquals(-1, r[0]);
+        assertEquals(-1, r[1]);
+        List<AlarmCheck.Bar> later = Arrays.asList(new AlarmCheck.Bar(200, 57, 55), new AlarmCheck.Bar(300, 58.5, 57),
+                new AlarmCheck.Bar(400, 60.2, 59), new AlarmCheck.Bar(500, 59, 57.9));
+        r = AlarmCheck.boxScan("below", 100, later, flat(58), flatP(58), 60, true, false, -1);
+        assertEquals(500, r[0]);
+        assertEquals(400, r[1]);
+    }
+
+    @Test
+    public void pairThatCountsAtOnceHitsWithoutTheEntry() {
+        // Long: entry 53, target 56, armed with the price at 54.
+        List<AlarmCheck.Bar> b = Arrays.asList(new AlarmCheck.Bar(200, 55, 54), new AlarmCheck.Bar(300, 56.1, 55));
+        long[] r = AlarmCheck.boxScan("above", 100, b, flat(56), flatP(56), 53, false, false, -1);
+        assertEquals(300, r[0]);
+        assertEquals(-1, r[1]);
+        // An entry already seen stays.
+        assertEquals(150, AlarmCheck.boxScan("above", 100, b, flat(56), flatP(56), 53, false, false, 150)[1]);
+    }
+
+    @Test
+    public void entryBarDoesNotCountTheNearSide() {
+        // Breakout long: stop 58 lies between the arming price 55 and the entry 60.
+        List<AlarmCheck.Bar> one = Arrays.asList(new AlarmCheck.Bar(200, 60.1, 57.5));
+        long[] r = AlarmCheck.boxScan("below", 100, one, flat(58), flatP(58), 60, true, true, -1);
+        assertEquals(-1, r[0]);
+        assertEquals(200, r[1]);
+        List<AlarmCheck.Bar> two = Arrays.asList(new AlarmCheck.Bar(200, 60.1, 57.5), new AlarmCheck.Bar(300, 59, 57.9));
+        assertEquals(300, AlarmCheck.boxScan("below", 100, two, flat(58), flatP(58), 60, true, true, -1)[0]);
+    }
+
+    @Test
+    public void storedEntryFromTheBarReadAgainKeepsItTheEntryBar() {
+        // Checked up to 200 and the entry stored at 200 (the newest bar is read again).
+        List<AlarmCheck.Bar> one = Arrays.asList(new AlarmCheck.Bar(200, 60.1, 57.5));
+        long[] r = AlarmCheck.boxScan("below", 200, one, flat(58), flatP(58), 60, true, true, 200);
+        assertEquals(-1, r[0]);
+        assertEquals(200, r[1]);
+        // An entry from inside a later bar (a live price at 250) does not open the bars before it.
+        List<AlarmCheck.Bar> two = Arrays.asList(new AlarmCheck.Bar(150, 58.2, 55), new AlarmCheck.Bar(200, 60.1, 57.5));
+        r = AlarmCheck.boxScan("below", 100, two, flat(58), flatP(58), 60, true, true, 250);
+        assertEquals(-1, r[0]);
+        assertEquals(200, r[1]);
+    }
+
+    @Test
+    public void pairWinnerEarlierSideStopOnATie() {
+        assertEquals(0, AlarmCheck.pairWinner(-1, -1));
+        assertEquals(1, AlarmCheck.pairWinner(5, 7));
+        assertEquals(1, AlarmCheck.pairWinner(7, -1));
+        assertEquals(2, AlarmCheck.pairWinner(7, 7));
+        assertEquals(2, AlarmCheck.pairWinner(-1, 3));
+    }
 }

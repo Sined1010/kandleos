@@ -34,6 +34,9 @@ export function lineParts(d: Drawing): string[] {
       return FIB_LEVELS.map(String)
     case 'fibext':
       return FIB_EXT_LEVELS.map(String)
+    case 'long':
+    case 'short':
+      return ['target', 'stop', 'entry']
     default:
       return []
   }
@@ -123,6 +126,9 @@ export function lineGeom(d: Drawing, part: string, symbol: string, tf?: Timefram
       return { flat: d.p2.price + (d.p1.price - d.p2.price) * Number(part) }
     case 'fibext':
       return { flat: fibExtPrice(d.points[0].price, d.points[1].price, d.points[2].price, Number(part)) }
+    case 'long':
+    case 'short':
+      return { flat: d.points[part === 'target' ? 1 : part === 'stop' ? 2 : 0].price }
     case 'channel': {
       const base = through(d.points[0], d.points[1])
       // The third click sets the parallel line; measured like the line itself (bars of tf, or trading time).
@@ -139,6 +145,8 @@ export function lineGeom(d: Drawing, part: string, symbol: string, tf?: Timefram
 
 /** The drawing's lines as text: equal for the same shape, whatever its colour, text, text size or alarm end. */
 export function shapeKey(d: Drawing): string {
+  // A box's lines are flat: only its three prices count, so moving it in time or its right edge restarts nothing.
+  if (d.type === 'long' || d.type === 'short') return JSON.stringify([d.id, d.type, d.points.slice(0, 3).map((p) => p.price)])
   const { color: _c, alarmUntil: _u, text: _t, size: _s, ...geo } = d as Drawing & { text?: string; size?: number }
   return JSON.stringify(geo)
 }

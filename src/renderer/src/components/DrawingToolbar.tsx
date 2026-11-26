@@ -7,6 +7,7 @@ import {
   Columns2,
   Columns4,
   Fan,
+  Magnet,
   Merge,
   Minus,
   MousePointer2,
@@ -18,6 +19,8 @@ import {
   Slash,
   Spline,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Triangle,
   Type,
   X,
@@ -48,6 +51,8 @@ export const TOOLS: [Tool, LucideIcon, string][] = [
   ['wxyxz', Shuffle, msg('Elliott-Dreifachkombination 0-W-X-Y-X-Z (6 Klicks)')],
   ['sine', AudioWaveform, msg('Sinuswelle (2 Klicks: Tief → nächstes Hoch oder umgekehrt)')],
   ['measure', Ruler, msg('Messen – Preis, Prozent und Kerzen (2 Klicks)')],
+  ['long', TrendingUp, msg('Long-Position (1 Klick auf den Einstieg)')],
+  ['short', TrendingDown, msg('Short-Position (1 Klick auf den Einstieg)')],
   ['text', Type, msg('Text (1 Klick, dann tippen · Doppelklick bearbeitet)')]
 ]
 // A thin divider before each group: Fibonacci, Elliott, the rest.
@@ -61,6 +66,8 @@ export default function DrawingToolbar() {
   const symbol = useStore((s) => s.symbol)
   const removeDrawing = useStore((s) => s.removeDrawing)
   const clearDrawings = useStore((s) => s.clearDrawings)
+  const magnet = useStore((s) => s.magnet)
+  const setMagnet = useStore((s) => s.setMagnet)
 
   const btn = 'flex h-8 w-8 items-center justify-center rounded-lg transition'
   return (
@@ -81,6 +88,15 @@ export default function DrawingToolbar() {
         </div>
       ))}
       <div className="my-1 h-px w-6 bg-line" />
+      <button
+        onClick={() => setMagnet(!magnet)}
+        title={t('Magnet: rastet nah an Hoch, Tief, Eröffnung und Schluss ein · Strg gedrückt: frei setzen')}
+        aria-label={t('Magnet')}
+        aria-pressed={magnet}
+        className={`${btn} shrink-0 ${magnet ? 'bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-500' : 'text-muted hover:bg-line hover:text-white'}`}
+      >
+        <Magnet size={17} />
+      </button>
       {selectedId && (
         <button
           onClick={() => removeDrawing(selectedId)}

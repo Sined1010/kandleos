@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Magnet, Trash2 } from 'lucide-react'
 import { t } from '../shared/i18n'
 import { TOOLS } from '../renderer/src/components/DrawingToolbar'
 import { drawingsKey, useStore } from '../renderer/src/store/useStore'
@@ -11,6 +11,8 @@ export default function DrawTools() {
   const count = useStore((s) => s.drawings[drawingsKey(s)]?.length ?? 0)
   const symbol = useStore((s) => s.symbol)
   const clearDrawings = useStore((s) => s.clearDrawings)
+  const magnet = useStore((s) => s.magnet)
+  const setMagnet = useStore((s) => s.setMagnet)
   const active = TOOLS.find(([id]) => id === tool)
   return (
     // Same 96 px as the low watchlist sheet it replaces, so the chart above keeps its size.
@@ -22,6 +24,14 @@ export default function DrawTools() {
         <p className="min-w-0 flex-1 truncate text-xs text-muted">
           {active && tool !== 'cursor' ? t(active[2]).split(/ \(| – /)[0] : t('Werkzeug wählen')}
         </p>
+        <button
+          onClick={() => setMagnet(!magnet)}
+          aria-pressed={magnet}
+          className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ${magnet ? 'text-cyan-200 ring-1 ring-cyan-500' : 'text-muted'}`}
+        >
+          <Magnet size={14} />
+          {t('Magnet')}
+        </button>
         <button
           onClick={async () =>
             count && (await ask(t('Alle {count} Zeichnungen für {symbol} löschen?', { count, symbol }), t('Löschen'), { danger: true })) && clearDrawings()

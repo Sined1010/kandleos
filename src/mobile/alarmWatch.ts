@@ -1,6 +1,7 @@
 import { App as CapApp } from '@capacitor/app'
 import { alarmClock, isArmed, type Alarm } from '../shared/alarms'
-import { createAlarmWatch } from '../renderer/src/lib/alarmCore'
+import { partnerOf } from '../shared/boxAlarm'
+import { createAlarmWatch, type AlarmNote } from '../renderer/src/lib/alarmCore'
 import { knotsFor } from '../renderer/src/lib/lineAlarms'
 import { alarmBody, alarmTitle } from '../renderer/src/services/alarmWatch'
 import { fetchCandles } from '../renderer/src/services/marketData'
@@ -12,8 +13,8 @@ const armed = () => useStore.getState().alarms.filter(isArmed)
 /** Android wants an int id per notification; one per alarm, so a repeat replaces instead of stacking. */
 export const notificationId = (id: string) => parseInt(id.replace(/-/g, '').slice(0, 7), 16)
 /** The "reached" notification, whichever device saw the price. */
-export const notifyAlarm = (a: Alarm) =>
-  KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: alarmBody(a) }).catch(() => {})
+export const notifyAlarm = (a: Alarm, note?: AlarmNote) =>
+  KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: alarmBody(a, undefined, note) }).catch(() => {})
 
 /** What the background check found; merged first, so an alarm it already reported is not reported again. */
 async function collectNative(): Promise<void> {
@@ -48,7 +49,22 @@ async function syncNative(): Promise<void> {
     if (!a.line) return [base]
     // Line alarms: the table the background check reads, and the text it fills in ({price} = where it was touched).
     const table = knotsFor(a, s.drawings, now)
-    return table === 'missing' || !table.knots.length ? [] : [{ ...base, knots: table.knots, body: alarmBody(a, '{price}') }]
+    if (table === 'missing' || !table.knots.length) return []
+    const line = { ...base, knots: table.knots, body: alarmBody(a, '{price}') }
+    if (!a.box) return [line]
+    const pair = partnerOf(a, s.alarms)
+    return [
+      {
+        ...line,
+        part: a.line.part as 'target' | 'stop',
+        ...(pair && isArmed(pair) && { pair: pair.id }),
+        entry: a.box.entry,
+        wait: a.box.wait,
+        ...(a.box.near && { near: true }),
+        ...(a.box.entryAt !== undefined && { entryAt: a.box.entryAt }),
+        bodyNoEntry: alarmBody(a, '{price}', 'no-entry')
+      }
+    ]
   })
   await KandleNative.setAlarms({ alarms, instant: s.instantAlarms }).catch(() => {})
 }
@@ -87,6 +103,8 @@ export function startAlarmWatch(): () => void {
     }
   })
   void refresh()
+  // Like the PC: bars every 5 minutes while open, so a box (which live prices alone do not decide) still reports.
+  const every = setInterval(() => void watch.catchUp(), 5 * 60 * 1000)
   const resume = CapApp.addListener('resume', () => void refresh())
   const pause = CapApp.addListener('pause', flushSync)
   const offSync = useStore.subscribe((s, prev) => {
@@ -103,6 +121,7 @@ export function startAlarmWatch(): () => void {
   return () => {
     off()
     offSync()
+    clearInterval(every)
     clearTimeout(syncTimer)
     syncTimer = undefined
     void resume.then((l) => l.remove())

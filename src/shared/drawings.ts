@@ -22,7 +22,17 @@ export const CLICKS: Record<Exclude<Tool, 'cursor'>, number> = {
   wxyxz: 6,
   sine: 2,
   avwap: 1,
-  text: 1
+  text: 1,
+  // One click on the entry; target, stop and right edge come with it (lib/positionBox.ts newBox).
+  long: 1,
+  short: 1
+}
+
+/** A position box: entry, target, stop, right edge, with target and stop on their own side of the entry. */
+function boxOk(type: 'long' | 'short', pts: unknown): boolean {
+  if (!Array.isArray(pts) || pts.length !== 4 || !pts.every(point)) return false
+  const [e, t, s] = pts.map((p) => p.price as number)
+  return type === 'long' ? t > e && e > s : t < e && e < s
 }
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
@@ -43,7 +53,9 @@ export function checkDrawing(v: unknown): Drawing | null {
         ? finite(v.time)
         : type === 'trend' || type === 'fib'
           ? point(v.p1) && point(v.p2)
-          : Array.isArray(points) &&
+          : type === 'long' || type === 'short'
+            ? boxOk(type, points)
+            : Array.isArray(points) &&
             points.length >= CLICKS[type] &&
             points.length <= 64 &&
             points.every(point) &&

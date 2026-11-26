@@ -31,6 +31,17 @@ export type NativeAlarm = {
   /** Line alarms: where the line runs (shared/lineAlarm.ts) and the notification text with `{price}` to fill in. */
   knots?: Knot[]
   body?: string
+  /**
+   * Position box target/stop (shared/boxAlarm.ts): which side, the other side's id, the entry, whether the pair waits
+   * for it, when it was touched, and the text for a hit without the entry.
+   */
+  part?: 'target' | 'stop'
+  pair?: string
+  entry?: number
+  wait?: boolean
+  near?: boolean
+  entryAt?: number
+  bodyNoEntry?: string
 } & AlarmSource
 
 /** Browser preview only (npm run dev:mobile): keys live in memory and are gone on reload — never in web storage. */

@@ -72,6 +72,15 @@ test('alarm times follow the exchange (quote time), not a device clock that is o
   assert.ok(hit(a, [{ time: quoteTime + 300, high: 120, low: 90 }]))
 })
 
+test('a stale quote (market closed for a holiday) is no "now": alarm times never lie more than 2 h before the device clock', () => {
+  // The last quote carries the day's start (Nov 25, 00:00); it is Nov 26, 20:30 on the device.
+  const wall = 1_795_721_400
+  const dayStart = 1_795_582_800
+  assert.equal(alarmClock(dayStart, wall), wall - 7200)
+  // A fresh quote still wins over a device clock that is off by an hour.
+  assert.equal(alarmClock(wall + 3600, wall), wall + 3600)
+})
+
 const LINE = { key: 't1:AAPL', drawing: 'd1', part: 'main' }
 const lineAlarm = (over: Partial<Alarm> = {}): Alarm => ({ ...alarm({ price: 210, createdAt: 100 }), line: LINE, ...over })
 // Rises 1 per 100 s: 210 at 100, 220 at 1100.
@@ -164,4 +173,33 @@ test('reachedElsewhere: only alarms armed here that the other side reached', () 
   const before = [alarm({ id: 'a' }), alarm({ id: 'b', triggeredAt: 150 }), alarm({ id: 'c' })]
   const after = [alarm({ id: 'a', triggeredAt: 200 }), alarm({ id: 'b', triggeredAt: 150 }), alarm({ id: 'c' }), alarm({ id: 'd', triggeredAt: 300 })]
   assert.deepEqual(reachedElsewhere(before, after).map((a) => a.id), ['a'])
+})
+
+test('a box alarm switched off by its partner is no longer armed', () => {
+  assert.equal(isArmed(alarm({ cancelledAt: 5 })), false)
+})
+
+test('checkAlarm: a box needs a numeric entry and a boolean wait', () => {
+  const line = { key: 't:AAPL', drawing: 'b', part: 'target' }
+  assert.ok(checkAlarm(alarm({ line, box: { entry: 53, wait: false } })))
+  assert.ok(checkAlarm(alarm({ line, box: { entry: 53, wait: true, entryAt: 7 }, cancelledAt: 9 })))
+  assert.equal(checkAlarm({ ...alarm({ line }), box: { entry: '53', wait: false } }), null)
+  assert.equal(checkAlarm({ ...alarm({ line }), box: { entry: 53, wait: 'no' } }), null)
+  assert.equal(checkAlarm({ ...alarm({ line }), box: { entry: 53, wait: false, entryAt: 'x' } }), null)
+  assert.equal(checkAlarm({ ...alarm(), cancelledAt: 'x' }), null)
+})
+
+test('mergeTriggered keeps the earlier entryAt of a box alarm', () => {
+  const a = alarm({ box: { entry: 53, wait: false, entryAt: 300 } })
+  const [m] = mergeTriggered([a], [{ id: 'a', triggeredAt: 400, triggeredPrice: 230, checkedUntil: 400, entryAt: 200 }])
+  assert.equal(m.box?.entryAt, 200)
+  const b = alarm({ box: { entry: 53, wait: false } })
+  const [n] = mergeTriggered([b], [{ id: 'a', triggeredAt: 400, triggeredPrice: 230, checkedUntil: 400, entryAt: 250 }])
+  assert.equal(n.box?.entryAt, 250)
+})
+
+test('checkAlarm: a box near flag is a boolean when present', () => {
+  const line = { key: 't:AAPL', drawing: 'b', part: 'stop' }
+  assert.ok(checkAlarm(alarm({ line, box: { entry: 60, wait: true, near: true } })))
+  assert.equal(checkAlarm({ ...alarm({ line }), box: { entry: 60, wait: true, near: 'x' } }), null)
 })

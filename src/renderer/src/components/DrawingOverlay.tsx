@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { CLICKS } from '../../../shared/drawings'
-import { locale, t } from '../../../shared/i18n'
+import { locale, msg, t } from '../../../shared/i18n'
 import { FIB_LEVELS, LINE_HORIZON, lineParts, linePrice } from '../../../shared/lineAlarm'
 import { formatPrice } from '../lib/format'
 import { clockAt, lineTable } from '../lib/lineAlarms'
@@ -22,6 +22,8 @@ import {
   sinePrice
 } from '../lib/geometry'
 import { anchoredVwap, anchorIndex } from '../lib/indicators'
+import { BOX_BARS, boxNumbers, boxState, dragBox, newBox, type BoxDrawing } from '../lib/positionBox'
+import { magnetMode, snapPoint, type SnapKind } from '../lib/magnet'
 import { THEME } from '../lib/theme'
 import { IS_MOBILE } from '../lib/platform'
 import { mainPanePoint, onChartTap, TAP } from '../lib/chartTap'
@@ -39,6 +41,15 @@ const SELECTED = THEME.selected
 const AVWAP = '#a78bfa'
 // Same violet as the price alarms in ChartArea.
 const ALARM = '#a78bfa'
+// Position box: the entry line, and the whole box once its time ran out.
+const BOX_ENTRY = '#cbd5e1'
+const BOX_GREY = '#64748b'
+// Magnet: how near (px) a point must come to a bar's price to snap, and the mark that shows where it snapped.
+const SNAP_REACH = IS_MOBILE ? 20 : 8
+const SNAP_COLOR = '#06b6d4'
+// shortcut: label width estimated for the 11 px bold digits and letters; measure with getBBox if labels get clipped.
+const labelWidth = (label: string) => label.length * 6.6
+const SNAP_LABEL: Record<SnapKind, string> = { open: msg('Eröffnung'), high: msg('Hoch'), low: msg('Tief'), close: msg('Schluss') }
 const WAVE_COLORS = { elliott: '#ab47bc', abc: '#ff7043', triangle: '#42a5f5', wxy: '#ec407a', wxyxz: '#ffca28' }
 const WAVE_LABELS = {
   elliott: ['0', '1', '2', '3', '4', '5'],
@@ -67,6 +78,8 @@ const NO_DRAWINGS: Drawing[] = []
 const FUTURE_BARS = 500
 // Phone: how far (manhattan px) a finger may wobble and still be a tap, as lightweight-charts counts it.
 const TAP_SLOP = 5
+// PC: how far (manhattan px) the mouse may move between press and release and still be a click.
+const CLICK_SLOP = 3
 
 
 /** 'move' drags the whole drawing, a number drags that point. */
@@ -118,6 +131,13 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const listKey = useStore(drawingsKey)
   const allAlarms = useStore((s) => s.alarms)
   const toggleLineAlarm = useStore((s) => s.toggleLineAlarm)
+  const armBoxAlarms = useStore((s) => s.armBoxAlarms)
+  const magnet = useStore((s) => s.magnet)
+  // Where the magnet snapped the point under the mouse or crosshair (chart px), with its label.
+  const [snapMark, setSnapMark] = useState<{ x: number; y: number; label: string } | null>(null)
+  useEffect(() => setSnapMark(null), [tool])
+  // PC: the position box under the mouse shows its full labels (variant "quiet, full on hover").
+  const [hoverBox, setHoverBox] = useState<string | null>(null)
   const setAlarmUntil = useStore((s) => s.setAlarmUntil)
   const quote = useQuotes((s) => s.quotes[symbol])
   const alarmsOf = (id: string) => allAlarms.filter((a) => a.line?.key === listKey && a.line.drawing === id)
@@ -243,8 +263,19 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const price = series.coordinateToPrice(e.clientY - rect.top)
     return logical === null || price === null || !times.length ? null : { logical, price }
   }
-  const pointAt = (e: { clientX: number; clientY: number }): Point | null => {
+  /** The point under the pointer after the magnet for this drawing type (Ctrl held frees it); marks where it snapped. */
+  const snapped = (e: { clientX: number; clientY: number; ctrlKey?: boolean }, type: Drawing['type']) => {
     const at = logicalAt(e)
+    if (!at) return null
+    const top = svgRef.current!.getBoundingClientRect().top
+    const s = snapPoint({ ...at, y: e.clientY - top }, data, toY, SNAP_REACH, magnetMode(type, magnet, !!e.ctrlKey))
+    const x = s.kind ? xAt(s.logical) : null
+    const y = s.kind ? toY(s.price) : null
+    setSnapMark(s.kind && x !== null && y !== null ? { x, y, label: `${t(SNAP_LABEL[s.kind])} ${fmt(s.price)}` } : null)
+    return { logical: s.logical, price: s.price }
+  }
+  const pointAt = (e: { clientX: number; clientY: number; ctrlKey?: boolean }): Point | null => {
+    const at = tool === 'cursor' ? logicalAt(e) : snapped(e, tool)
     return at && { time: logicalToTime(axis, at.logical, step), price: at.price }
   }
 
@@ -326,10 +357,13 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (!dragging) return
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current
-      const at = logicalAt(e)
-      if (!d || !at || e.pointerId !== d.pointerId) return
+      if (!d || e.pointerId !== d.pointerId) return
+      // A grip snaps like a new point; the whole drawing moves freely.
+      const at = d.handle === 'move' ? logicalAt(e) : snapped(e, d.orig.type)
+      if (!at) return
       // Phone: a finger wobbles on a tap; only a move past that (as lightweight-charts counts a tap) drags.
-      if (IS_MOBILE && !d.moved && Math.abs(e.clientX - d.start.x) + Math.abs(e.clientY - d.start.y) < TAP_SLOP) return
+      // PC: a mouse jitter while clicking is no drag either (a moved box would restart its alarms).
+      if (!d.moved && Math.abs(e.clientX - d.start.x) + Math.abs(e.clientY - d.start.y) < (IS_MOBILE ? TAP_SLOP : CLICK_SLOP)) return
       const dPrice = at.price - d.from.price
       // Shift in bar space, not seconds, so a shape keeps its form across weekend/overnight gaps.
       const shiftTime = (t: number) => logicalToTime(axis, logicalOf(t) + at.logical - d.from.logical, step)
@@ -340,6 +374,16 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           ? { ...o, price: o.price + dPrice }
           : o.type === 'vline'
             ? { ...o, time: shiftTime(o.time) }
+            : o.type === 'long' || o.type === 'short'
+              ? // The entry grip puts the entry where the (snapped) pointer is; the body moves by the pointer's way.
+                dragBox(
+                  o,
+                  d.handle === 'move' ? 0 : (d.handle as 0 | 1 | 2 | 3),
+                  cursor,
+                  // The grip shifts by bars from the entry to the (snapped) pointer, so the box stays on whole bars.
+                  d.handle === 0 ? (t: number) => logicalToTime(axis, logicalOf(t) + logicalOf(cursor.time) - logicalOf(o.points[0].time), step) : shiftTime,
+                  d.handle === 0 ? cursor.price - o.points[0].price : dPrice
+                )
             : o.type === 'avwap'
               ? // The anchor only moves along the time axis; its price is never used.
                 { ...o, points: [{ time: Math.min(d.handle === 'move' ? shiftTime(o.points[0].time) : cursor.time, lastTime), price: o.points[0].price }] }
@@ -366,11 +410,13 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       }
       dragRef.current = null
       setDrag(null)
+      setSnapMark(null)
     }
     // The system took the touch (e.g. a back gesture): drop the drag, the drawing stays where it was.
     const onCancel = () => {
       dragRef.current = null
       setDrag(null)
+      setSnapMark(null)
     }
     // A second finger means zooming: drop the drag the same way.
     const onDown = (e: PointerEvent) => {
@@ -395,6 +441,20 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
   const addPoint = (p: Point | null) => {
     if (!p || tool === 'cursor') return
+    if (tool === 'long' || tool === 'short') {
+      // One click: a box with ATR distances, BOX_BARS wide, its target and stop armed (not on old bars).
+      const id = crypto.randomUUID()
+      const right = logicalToTime(axis, logicalOf(p.time) + BOX_BARS, step)
+      addDrawing(newBox(tool, id, p, data, right))
+      const now = alarmClock(quote?.time)
+      if (right > now) {
+        armBoxAlarms(id, now, quote?.price)
+        showPillRef.current(pillsOf(id))
+      }
+      setTool('cursor')
+      select(id)
+      return
+    }
     // An AVWAP right of the last bar would draw nothing and could not be picked again: it starts at the last bar.
     const pts = [...draft, tool === 'avwap' && times.length ? { ...p, time: Math.min(p.time, lastTime) } : p]
     if (pts.length < CLICKS[tool]) return setDraft(pts)
@@ -405,7 +465,9 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
 
   const onMove = (e: React.MouseEvent) => {
-    if (draft.length && !IS_MOBILE) setHover(pointAt(e))
+    if (IS_MOBILE || tool === 'cursor') return
+    const p = pointAt(e)
+    if (draft.length) setHover(p)
   }
 
   // Phone: the finger moves a crosshair that sits above it (touchAim); the round button places the point.
@@ -435,7 +497,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (p.start) return
     const a = aimAt({ x: e.clientX - r.left, y: e.clientY - r.top }, { width: r.width, height: r.height })
     setAim(a)
-    if (draft.length) setHover(pointAt({ clientX: r.left + a.x, clientY: r.top + a.y }))
+    const pt = pointAt({ clientX: r.left + a.x, clientY: r.top + a.y })
+    if (draft.length) setHover(pt)
   }
   const endFinger = (e: React.PointerEvent) => {
     const p = pinch.current
@@ -452,6 +515,125 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   const width = chart.timeScale().width()
   const height = chart.panes()[0]?.getHeight() ?? 0
   const drawingMode = tool !== 'cursor'
+
+  /**
+   * A position box: target zone (teal) and stop zone (rose) between its left and right edge. Quiet it shows the
+   * distances at its right edge; selected (or under the mouse on the PC) the full labels. Reached, the hit side stands
+   * out with a check where it was hit; run out, it turns grey.
+   */
+  const renderBox = (
+    d: BoxDrawing,
+    xs: number[],
+    ys: number[],
+    selected: boolean,
+    preview: boolean,
+    hit: (cursor?: string) => object | null,
+    handles: React.ReactNode
+  ) => {
+    const [xl, , , xr] = xs
+    const [ye, yt, yst] = ys
+    const mine = alarmsOf(d.id)
+    const state = boxState(mine, d, alarmClock(quote?.time))
+    const n = boxNumbers(d)
+    const grey = state === 'expired'
+    const upColor = grey ? BOX_GREY : THEME.up
+    const downColor = grey ? BOX_GREY : THEME.down
+    const opacity = (side: 'target' | 'stop') => (grey ? 0.08 : state === side ? 0.28 : state === 'running' || state === 'idle' ? 0.16 : 0.07)
+    const left = Math.min(xl, xr)
+    const w = Math.abs(xr - xl)
+    const zone = (y: number) => ({ x: left, y: Math.min(y, ye), width: w, height: Math.abs(y - ye) })
+    const sign = (v: number) => (v >= 0 ? '+' : '−')
+    const pct = (v: number) => `${sign(v)}${Math.abs(v).toFixed(2)} %`
+    const amt = (v: number) => `${sign(v)}${fmt(Math.abs(v))}`
+    const ratio = `${n.ratio.toFixed(1)} : 1`
+    const full = !preview && (selected || (!IS_MOBILE && hoverBox === d.id))
+    // Inside the zone, next to its line: below the line for the upper zone, above it for the lower one.
+    const inside = (y: number) => (y < ye ? y + 14 : y - 6)
+    // Labels go by the visible part: the right edge may lie past the chart's. A narrow box (often on the phone) puts
+    // its full labels left of it.
+    const right = Math.min(left + w, width)
+    const outside = right - left < 230
+    // Left of the box unless the label would run past the chart's left edge: then it starts at that edge.
+    const at = (label: string) =>
+      !outside ? { x: left + 6, textAnchor: 'start' as const } : left - 6 - labelWidth(label) < 4 ? { x: 4, textAnchor: 'start' as const } : { x: left - 6, textAnchor: 'end' as const }
+    const targetLabel = `${t('Ziel')} ${fmt(d.points[1].price)} · ${pct(n.targetPct)} · ${amt(n.targetAbs)}`
+    const stopLabel = `${t('Stop')} ${fmt(d.points[2].price)} · ${pct(n.stopPct)} · ${amt(n.stopAbs)}`
+    const sideLabel = `${d.type === 'long' ? 'Long' : 'Short'} ${ratio}`
+    const halo = { paintOrder: 'stroke' as const, stroke: THEME.bg, strokeWidth: 3, strokeLinejoin: 'round' as const }
+    const reached = mine.find((a) => a.triggeredAt !== undefined && (a.line?.part === 'target' || a.line?.part === 'stop'))
+    const checkX = reached ? toX(reached.triggeredAt!) : null
+    const checkY = reached ? (reached.line!.part === 'target' ? yt : yst) : null
+    return (
+      <g key={d.id}>
+        <rect {...zone(yt)} fill={upColor} fillOpacity={opacity('target')} />
+        <rect {...zone(yst)} fill={downColor} fillOpacity={opacity('stop')} />
+        <line x1={left} x2={left + w} y1={yt} y2={yt} stroke={upColor} strokeWidth={selected ? 2 : 1} />
+        <line x1={left} x2={left + w} y1={yst} y2={yst} stroke={downColor} strokeWidth={selected ? 2 : 1} />
+        <line x1={left} x2={left + w} y1={ye} y2={ye} stroke={grey ? BOX_GREY : BOX_ENTRY} strokeWidth={1} />
+        {/* PC: the whole box takes the mouse (drag, hover); phone: its three lines, picked by a tap (linePick). */}
+        {!preview && !IS_MOBILE && selected && (
+          <rect
+            x={left}
+            y={Math.min(yt, yst)}
+            width={w}
+            height={Math.abs(yst - yt)}
+            fill="transparent"
+            data-pick={d.id}
+            style={{ pointerEvents: 'all', cursor: 'move' }}
+            onPointerDown={(e) => startDrag(e, d, 'move')}
+            onPointerEnter={() => setHoverBox(d.id)}
+            onPointerLeave={() => setHoverBox((h) => (h === d.id ? null : h))}
+          />
+        )}
+        {/* Not selected (and always on the phone) only the three lines catch the pointer, so the chart pans and shows its crosshair inside. */}
+        {hit() &&
+          [yt, ye, yst].map((y) => (
+            <line
+              key={y}
+              x1={left}
+              x2={left + w}
+              y1={y}
+              y2={y}
+              {...hit()}
+              onPointerEnter={IS_MOBILE ? undefined : () => setHoverBox(d.id)}
+              onPointerLeave={IS_MOBILE ? undefined : () => setHoverBox((h) => (h === d.id ? null : h))}
+            />
+          ))}
+        {full ? (
+          <g fontSize={11} fontWeight={600} pointerEvents="none" {...halo}>
+            <text {...at(targetLabel)} y={inside(yt)} fill={upColor}>
+              {targetLabel}
+            </text>
+            <text {...at(stopLabel)} y={inside(yst)} fill={downColor}>
+              {stopLabel}
+            </text>
+            <text {...(outside ? at(sideLabel) : { x: right - 6, textAnchor: 'end' as const })} y={ye - 4} fill={BOX_ENTRY}>
+              {sideLabel}
+            </text>
+          </g>
+        ) : (
+          <g fontSize={11} fontWeight={600} pointerEvents="none" textAnchor="end" {...halo}>
+            <text x={right - 6} y={inside(yt)} fill={upColor}>
+              {pct(n.targetPct)}
+            </text>
+            <text x={right - 6} y={ye - 4} fill={BOX_ENTRY}>
+              {ratio}
+            </text>
+            <text x={right - 6} y={inside(yst)} fill={downColor}>
+              {pct(n.stopPct)}
+            </text>
+          </g>
+        )}
+        {checkX !== null && checkY !== null && (
+          <g pointerEvents="none">
+            <circle cx={checkX} cy={checkY} r={8} fill={reached!.line!.part === 'target' ? THEME.up : THEME.down} />
+            <path d={`M${checkX - 4} ${checkY}l3 3 5-6`} fill="none" stroke={THEME.bg} strokeWidth={2} />
+          </g>
+        )}
+        {handles}
+      </g>
+    )
+  }
 
   const render = (d: Drawing, preview = false) => {
     const selected = d.id === selectedId
@@ -620,6 +802,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     }
 
     const seg = (a: number, b: number) => ({ x1: xs[a], y1: ys[a], x2: xs[b], y2: ys[b] })
+
+    if (d.type === 'long' || d.type === 'short') return renderBox(d, xs, ys, selected, preview, hit, handles)
 
     if (d.type === 'trend' || (d.type === 'ray' && pts.length < 2)) {
       return (
@@ -889,7 +1073,11 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const pts = d.type === 'channel' ? pointsOf(d).slice(0, 2) : pointsOf(d)
     const lastPt = pts.length ? pts.reduce((a, b) => (a.time >= b.time ? a : b)) : null
     const armed = mine.filter(isArmed)
+    // A position box draws its own lines and shows reached or run out itself; it only runs on dashed past its right
+    // edge while it has no end, and its right edge is the end handle.
+    const boxD = d.type === 'long' || d.type === 'short'
     if (!armed.length) {
+      if (boxD) return null
       // Reached or run out: a grey clock at the drawing until it is armed again or switched off.
       const x = lastPt ? toX(lastPt.time) : width - 24
       const y = lastPt ? toY(lastPt.price) : d.type === 'hline' ? toY(d.price) : null
@@ -909,7 +1097,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const end = Math.min(until ?? Infinity, rightTime)
     if (end <= start) return null
     const color = selected ? ALARM : (d.color ?? COLOR)
-    const samples = [start, ...axis.filter((t) => t > Math.max(start, leftTime) && t < end), end]
+    const from = boxD ? (until === undefined ? Math.max(start, d.points[3].time) : Infinity) : start
+    const samples = from < end ? [from, ...axis.filter((t) => t > Math.max(from, leftTime) && t < end), end] : []
     const lines = armed.flatMap((a) => {
       const k = lineTable(d, a.line!.part, symbol, start, tableEnd, a.line!.tf)
       if (!k) return []
@@ -919,10 +1108,10 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         const y = p === null ? null : toY(p)
         return x === null || y === null ? [] : [[x, y] as const]
       })
-      return xy.length ? [{ id: a.id, part: a.line!.part, k, xy }] : []
+      return xy.length || boxD ? [{ id: a.id, part: a.line!.part, k, xy }] : []
     })
     if (!lines.length) return null
-    const [ex, ey] = lines[0].xy[lines[0].xy.length - 1]
+    const tip = boxD ? undefined : lines[0].xy[lines[0].xy.length - 1]
     // The clock sits on each alarmed line where it is now (a horizontal line keeps its tag on the price axis).
     const nowX = toX(now)
     const clocks =
@@ -969,10 +1158,10 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               }}
             />
           ))}
-        {selected && until !== undefined ? (
+        {!tip ? null : selected && until !== undefined ? (
           <rect
-            x={ex - 6}
-            y={ey - 6}
+            x={tip[0] - 6}
+            y={tip[1] - 6}
             width={12}
             height={12}
             rx={3}
@@ -982,9 +1171,9 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           />
         ) : selected ? (
           // No end yet: the handle sits at the right edge and pulling it left sets one.
-          <rect x={ex - 6} y={ey - 6} width={12} height={12} rx={3} fill="none" stroke={ALARM} strokeWidth={1.5} style={{ cursor: 'ew-resize', pointerEvents: 'all' }} onPointerDown={(e) => startUntilDrag(e, d)} />
+          <rect x={tip[0] - 6} y={tip[1] - 6} width={12} height={12} rx={3} fill="none" stroke={ALARM} strokeWidth={1.5} style={{ cursor: 'ew-resize', pointerEvents: 'all' }} onPointerDown={(e) => startUntilDrag(e, d)} />
         ) : d.type === 'hline' ? (
-          <text x={ex + 4} y={ey + 4} fontSize={11} opacity={0.8} pointerEvents="none">
+          <text x={tip[0] + 4} y={tip[1] + 4} fontSize={11} opacity={0.8} pointerEvents="none">
             ⏰
           </text>
         ) : null}
@@ -1078,13 +1267,32 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const q = useQuotes.getState().quotes[symbol]
     // Switching off needs no price; switching on does (the direction comes from it).
     const on = alarmsOf(d.id).some((a) => a.line?.part === part)
+    // A box whose trade is decided (reached, switched off, run out): target or stop arms the pair again together.
+    const pair = alarmsOf(d.id).filter((a) => a.line?.part === 'target' || a.line?.part === 'stop')
+    if ((part === 'target' || part === 'stop') && pair.length && !pair.some(isArmed)) {
+      if (!q) return setAlarmHint(t('Aktueller Kurs nötig.'))
+      armBoxAlarms(d.id, alarmClock(q.time), q.price)
+      return showPill(pillsOf(d.id))
+    }
     if (!q && !on) return setAlarmHint(t('Aktueller Kurs nötig.'))
     const r = toggleLineAlarm(d.id, part, alarmClock(q?.time), q?.price ?? 0)
     setAlarmHint(r === 'at-price' ? t('Der Kurs liegt schon dort.') : r === 'no-price' ? t('Diese Linie hat hier keinen Preis.') : '')
     if (!on && r === undefined) showPill([`${d.id}|${part}`])
   }
   const partLabel = (part: string) =>
-    part === 'top' ? t('oben') : part === 'mid' ? t('Mitte') : part === 'bottom' ? t('unten') : `${+(Number(part) * 100).toFixed(1)}`
+    part === 'top'
+      ? t('oben')
+      : part === 'mid'
+        ? t('Mitte')
+        : part === 'bottom'
+          ? t('unten')
+          : part === 'target'
+            ? t('Ziel')
+            : part === 'stop'
+              ? t('Stop')
+              : part === 'entry'
+                ? t('Einstieg')
+                : `${+(Number(part) * 100).toFixed(1)}`
 
   const textEdit = drawings.find((d): d is Extract<Drawing, { type: 'text' }> => d.id === editing && d.type === 'text')
   const editAt = textEdit && [toX(textEdit.points[0].time), toY(textEdit.points[0].price)]
@@ -1114,6 +1322,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         }}
         onClick={onClick}
         onMouseMove={onMove}
+        // The magnet mark belongs to the pointer: gone when it leaves the chart.
+        onMouseLeave={() => setSnapMark(null)}
         onPointerDown={onAim}
         onPointerMove={onAim}
         onPointerUp={endFinger}
@@ -1131,6 +1341,18 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         {/* Hidden only once a drag really moves: a tap on the selected drawing must still find its clock (onUp). */}
         {drawings.map((d) => (drag?.orig.id === d.id && drag.moved ? null : alarmLines(d)))}
         {preview && render(preview, true)}
+        {snapMark && (drawingMode || drag) && (
+          <g pointerEvents="none">
+            <circle cx={snapMark.x} cy={snapMark.y} r={6} fill={SNAP_COLOR} fillOpacity={0.35} />
+            <circle cx={snapMark.x} cy={snapMark.y} r={3.5} fill={SNAP_COLOR} />
+            <text
+              // Near the right edge the label goes left of the mark.
+              {...(snapMark.x + 10 + labelWidth(snapMark.label) > width ? { x: snapMark.x - 10, textAnchor: 'end' as const } : { x: snapMark.x + 10 })}
+              y={snapMark.y - 8} fill={SNAP_COLOR} fontSize={11} fontWeight={600} paintOrder="stroke" stroke={THEME.bg} strokeWidth={3}>
+              {snapMark.label}
+            </text>
+          </g>
+        )}
         {IS_MOBILE && drawingMode && aim && (
           <g pointerEvents="none">
             <line x1={0} x2={width} y1={aim.y} y2={aim.y} stroke={THEME.text} strokeDasharray="3 3" />
@@ -1179,6 +1401,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {/* A position box keeps its fixed teal/rose zones: no colour choice. */}
+          {styled.type !== 'long' && styled.type !== 'short' && (
           <div role="group" aria-label={t('Farbe')} className={`flex items-center ${IS_MOBILE ? 'gap-2.5' : 'gap-1.5'}`}>
             {palette().map(({ color, name }) => {
               const active = (styled.color ?? null) === color
@@ -1196,6 +1420,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               )
             })}
           </div>
+          )}
           {IS_MOBILE && (
             // No Delete key on the phone.
             <button onClick={() => removeDrawing(styled.id)} aria-label={t('Zeichnung löschen')} className="ml-1 flex h-9 w-9 items-center justify-center border-l border-line pl-2 text-down">
@@ -1215,19 +1440,33 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               ) : (
                 <>
                   <span aria-hidden>⏰</span>
-                  {lineParts(styled).map((part) => {
-                    const on = alarmsOf(styled.id).some((a) => a.line?.part === part)
+                  {(() => {
+                    const button = (part: string) => {
+                      const on = alarmsOf(styled.id).some((a) => a.line?.part === part)
+                      return (
+                        <button
+                          key={part}
+                          aria-pressed={on}
+                          onClick={() => switchAlarm(styled, part)}
+                          className={`${IS_MOBILE ? 'min-w-9 px-1.5 py-1.5 text-sm' : 'px-1 py-0.5'} rounded tabular-nums ${on ? 'bg-violet-500/25 text-violet-200 ring-1 ring-violet-400' : 'text-muted hover:bg-line hover:text-white'}`}
+                        >
+                          {partLabel(part)}
+                        </button>
+                      )
+                    }
+                    if (styled.type !== 'long' && styled.type !== 'short') return lineParts(styled).map(button)
+                    // A box: the entry on its own, target and stop framed as the pair whose first hit decides.
                     return (
-                      <button
-                        key={part}
-                        aria-pressed={on}
-                        onClick={() => switchAlarm(styled, part)}
-                        className={`${IS_MOBILE ? 'min-w-9 px-1.5 py-1.5 text-sm' : 'px-1 py-0.5'} rounded tabular-nums ${on ? 'bg-violet-500/25 text-violet-200 ring-1 ring-violet-400' : 'text-muted hover:bg-line hover:text-white'}`}
-                      >
-                        {partLabel(part)}
-                      </button>
+                      <>
+                        {button('entry')}
+                        <span className="flex items-center gap-0.5 rounded-md border border-violet-900 p-0.5" title={t('Der erste Treffer schaltet den anderen ab')}>
+                          {button('target')}
+                          <span className="px-0.5 text-violet-300">{t('oder')}</span>
+                          {button('stop')}
+                        </span>
+                      </>
                     )
-                  })}
+                  })()}
                 </>
               )}
               {alarmsOf(styled.id).length > 0 && (

@@ -82,6 +82,8 @@ export default function AlarmList({
             ? a.line
               ? t('berührt {time} bei {price}', { time: when(a.triggeredAt, 'short'), price: formatPrice(a.triggeredPrice ?? a.price) })
               : t('erreicht {time}', { time: when(a.triggeredAt, 'short') })
+            : a.cancelledAt !== undefined
+              ? t('abgeschaltet – {other} zuerst erreicht', { other: a.line?.part === 'target' ? t('Stop') : t('Ziel') })
             : a.expiredAt
               ? t('abgelaufen {date} · nicht berührt', { date: when(a.expiredAt) })
               : skip
@@ -118,7 +120,7 @@ export default function AlarmList({
                 {status}
               </p>
             </div>
-            {(a.triggeredAt || a.expiredAt) && !missing && (
+            {(a.triggeredAt || a.expiredAt || a.cancelledAt !== undefined) && !missing && (
               <button
                 // The time of the click, not of the last render: bars in between must not count.
                 onClick={() => useStore.getState().rearmAlarm(a.id, alarmClock(useQuotes.getState().quotes[a.symbol]?.time))}

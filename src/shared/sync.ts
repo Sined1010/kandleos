@@ -3,6 +3,7 @@
 // last changed each unit (stamps). Comparing base, mine and theirs per unit shows who changed what; nothing in the
 // store's actions has to know about sync.
 import { checkAlarm, type Alarm } from './alarms.ts'
+import { settlePairs } from './boxAlarm.ts'
 import { checkDrawing } from './drawings.ts'
 import { TIMEFRAMES, type Timeframe } from './types.ts'
 import type { ChartTab, Drawing, Folder, Indicators } from '../renderer/src/store/useStore.ts'
@@ -129,10 +130,36 @@ export function mergeUnits(base: Units, mine: Units, theirs: Units, stampsMine: 
     else if (m === b) v = t
     else if (m === undefined) v = t
     else if (t === undefined) v = m
-    else v = (stampsTheirs[k] ?? 0) + offset > (stampsMine[k] ?? 0) ? t : m
+    else {
+      v = (stampsTheirs[k] ?? 0) + offset > (stampsMine[k] ?? 0) ? t : m
+      if (k.startsWith('alarm:')) v = mergeAlarm(v, m, t)
+    }
     if (v !== undefined) out[k] = v
   }
   return normalize(out, [mine, theirs, base])
+}
+
+/**
+ * An alarm changed on both sides within the same round (same `createdAt`): the times each side saw are kept, the
+ * earliest of each (reached, switched off, entry touched), so a box pair can be decided by its earlier hit afterwards
+ * (settlePairs in sliceOf). A reached alarm is never switched off. Otherwise the picked side stays as it is.
+ */
+function mergeAlarm(picked: string, m: string, t: string): string {
+  const a = parse<Partial<Alarm> | null>(m, null)
+  const b = parse<Partial<Alarm> | null>(t, null)
+  if (!isObj(a) || !isObj(b) || a.createdAt !== b.createdAt) return picked
+  const min = (x?: number, y?: number) => (x === undefined ? y : y === undefined ? x : Math.min(x, y))
+  const first = [a, b].filter((x) => x.triggeredAt !== undefined).sort((x, y) => x.triggeredAt! - y.triggeredAt!)[0]
+  const out = { ...parse<Record<string, unknown>>(picked, {}) }
+  delete out.triggeredAt
+  delete out.triggeredPrice
+  delete out.cancelledAt
+  if (first) Object.assign(out, { triggeredAt: first.triggeredAt, triggeredPrice: first.triggeredPrice })
+  const cancelled = min(a.cancelledAt, b.cancelledAt)
+  if (!first && cancelled !== undefined) out.cancelledAt = cancelled
+  const entryAt = min(a.box?.entryAt, b.box?.entryAt)
+  if (isObj(out.box) && entryAt !== undefined) out.box = { ...out.box, entryAt }
+  return stable(out)
 }
 
 /** A surviving child brings back its deleted parent (taken from `sources`); order lists are made whole. */
@@ -300,7 +327,8 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
     keep.charts
   )
   const indicators = parse<unknown>(u.indicators, null)
-  const alarms = inOrder(
+  // Units merge one by one, so a box's target and stop may come from different devices: settlePairs makes them agree.
+  const alarms = settlePairs(inOrder(
     keys.filter((k) => k.startsWith('alarm:')).flatMap((k) => {
       const a = checkAlarm(parse<unknown>(u[k], null))
       if (!a) return []
@@ -311,7 +339,7 @@ export function sliceOf(u: Units, keep: SyncSlice): SyncSlice {
       return [{ ...(a as unknown as Alarm), ...(checkedUntil !== undefined && { checkedUntil }) }]
     }),
     keep.alarms
-  )
+  ))
   return { folders, pinned, names, tabs, drawings, charts, indicators: cleanIndicators(keep.indicators, indicators), alarms }
 }
 
@@ -366,6 +394,7 @@ const MAX_VALUE = 300_000
 // 2: pinned watchlist symbols (pin:<symbol>, order:pins); a format-1 device would drop them and unpin everywhere.
 // 3: anchored VWAP drawings (avwap) and the squeeze, ADX and volume-profile indicators.
 // 4: line alarms (alarm `line`, `expiredAt`, drawing `alarmUntil`); a format-3 device would check them at a fixed price.
+//    Also position boxes (drawing `long`/`short`, alarm `box`, `cancelledAt`), added before format 4 was released.
 export const SYNC_FORMAT = 4
 const formatOf = (v: Record<string, unknown>): number => (typeof v.format === 'number' && Number.isFinite(v.format) ? v.format : 1)
 

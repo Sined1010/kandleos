@@ -7,7 +7,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 
 /**
@@ -110,6 +112,11 @@ public final class AlarmStore {
      * nothing is recorded and nobody should be notified.
      */
     public boolean record(String id, long checkedUntil, boolean fired, double price) {
+        return record(id, checkedUntil, fired, price, -1);
+    }
+
+    /** Like above; a box alarm also keeps when its entry was first touched ({@code entryAt} >= 0), and reports it. */
+    public boolean record(String id, long checkedUntil, boolean fired, double price, long entryAt) {
         synchronized (LOCK) {
             try {
                 JSONArray armed = new JSONArray(prefs.getString("armed", "[]"));
@@ -120,6 +127,7 @@ public final class AlarmStore {
                     if (!a.getString("id").equals(id)) next.put(a);
                     else {
                         found = true;
+                        if (entryAt >= 0 && !a.has("entryAt")) a.put("entryAt", entryAt);
                         if (!fired) next.put(a.put("checkedUntil", Math.max(a.optLong("checkedUntil"), checkedUntil)));
                     }
                 }
@@ -127,7 +135,9 @@ public final class AlarmStore {
                 SharedPreferences.Editor e = prefs.edit().putString("armed", next.toString());
                 if (fired) {
                     JSONArray t = new JSONArray(prefs.getString("triggered", "[]"));
-                    t.put(new JSONObject().put("id", id).put("triggeredAt", checkedUntil).put("triggeredPrice", price).put("checkedUntil", checkedUntil));
+                    JSONObject trig = new JSONObject().put("id", id).put("triggeredAt", checkedUntil).put("triggeredPrice", price).put("checkedUntil", checkedUntil);
+                    if (entryAt >= 0) trig.put("entryAt", entryAt);
+                    t.put(trig);
                     e.putString("triggered", t.toString());
                 }
                 e.commit();
@@ -167,14 +177,19 @@ public final class AlarmStore {
     public static int checkAll(Context c) {
         AlarmStore store = new AlarmStore(c);
         JSONArray armed = store.armed();
+        Set<String> done = new HashSet<>();
         for (int i = 0; i < armed.length(); i++) {
             JSONObject a = armed.optJSONObject(i);
             if (a == null) continue;
             try {
                 // Without a start (bad data from the app) only bars from now on count, never years of old ones.
-                long from = a.optLong("checkedUntil", 0);
-                if (from <= 0) from = System.currentTimeMillis() / 1000;
+                long from = startOf(a);
                 String id = a.getString("id");
+                if (done.contains(id)) continue;
+                if (a.has("entry")) {
+                    checkBox(c, store, a, find(armed, a.optString("pair")), done);
+                    continue;
+                }
                 if (a.has("body")) {
                     checkLine(c, store, a, id, from);
                     continue;
@@ -195,6 +210,87 @@ public final class AlarmStore {
         }
         // Read again: an alarm the app armed during this pass counts too, so the checks do not stop without it.
         return store.armed().length();
+    }
+
+    private static long startOf(JSONObject a) {
+        long from = a.optLong("checkedUntil", 0);
+        return from > 0 ? from : System.currentTimeMillis() / 1000;
+    }
+
+    private static JSONObject find(JSONArray armed, String id) {
+        for (int i = 0; i < armed.length(); i++) {
+            JSONObject x = armed.optJSONObject(i);
+            if (x != null && id.equals(x.optString("id"))) return x;
+        }
+        return null;
+    }
+
+    /** One side of a position box: its table and the box fields from the app. */
+    private static final class Side {
+        final JSONObject a;
+        final String id;
+        final long[] kt;
+        final double[] kp;
+        long[] scan = {-1, -1};
+
+        Side(JSONObject a, double[][] k) throws Exception {
+            this.a = a;
+            id = a.getString("id");
+            kt = new long[k[0].length];
+            for (int i = 0; i < kt.length; i++) kt[i] = (long) k[0][i];
+            kp = k[1];
+        }
+    }
+
+    /**
+     * A position box's target and stop against the same bars (src/renderer/src/lib/alarmCore.ts catchUpBox): the
+     * earlier hit decides (the stop on a tie); the other side leaves the armed list quietly, and the app switches it off.
+     */
+    private static void checkBox(Context c, AlarmStore store, JSONObject a, JSONObject p, Set<String> done) throws Exception {
+        done.add(a.getString("id"));
+        if (p != null) done.add(p.getString("id"));
+        List<Side> sides = new ArrayList<>();
+        for (JSONObject x : p == null ? new JSONObject[] {a} : new JSONObject[] {a, p}) {
+            double[][] k = store.knotsOf(x.getString("id"));
+            // No readable table, or checked past its end: nothing left to check against (as in checkLine).
+            if (k == null || startOf(x) > (long) k[0][k[0].length - 1]) store.drop(x.getString("id"));
+            else sides.add(new Side(x, k));
+        }
+        if (sides.isEmpty()) return;
+        long from = Long.MAX_VALUE;
+        for (Side s : sides) from = Math.min(from, startOf(s.a));
+        List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
+        long target = -1, stop = -1;
+        for (Side s : sides) {
+            s.scan = AlarmCheck.boxScan(s.a.getString("op"), startOf(s.a), bars, s.kt, s.kp, s.a.getDouble("entry"), s.a.optBoolean("wait"), s.a.optBoolean("near"),
+                    s.a.optLong("entryAt", -1));
+            if ("target".equals(s.a.optString("part"))) target = s.scan[0];
+            else stop = s.scan[0];
+        }
+        int won = AlarmCheck.pairWinner(target, stop);
+        // Either side may have seen the entry (they can be armed at different times).
+        long seen = -1;
+        for (Side s : sides) if (s.scan[1] >= 0) seen = seen < 0 ? s.scan[1] : Math.min(seen, s.scan[1]);
+        if (won > 0) {
+            String part = won == 1 ? "target" : "stop";
+            for (Side s : sides) {
+                if (!part.equals(s.a.optString("part"))) continue;
+                double price = AlarmCheck.linePrice(s.kt, s.kp, s.scan[0]);
+                if (!store.record(s.id, s.scan[0], true, price, seen)) return;
+                // shortcut: no "same candle" note in the background check; add a third text if users ask for it.
+                String body = seen < 0 && s.a.has("bodyNoEntry") ? s.a.getString("bodyNoEntry") : s.a.getString("body");
+                Notifier.show(c, Notifier.idOf(s.id), s.a.optString("title", s.a.getString("symbol")),
+                        body.replace("{price}", AlarmCheck.formatPrice(price, Locale.getDefault())));
+            }
+            for (Side s : sides) if (!part.equals(s.a.optString("part"))) store.drop(s.id);
+            return;
+        }
+        if (bars.isEmpty()) return;
+        long last = bars.get(bars.size() - 1).time;
+        for (Side s : sides) {
+            if (last > s.kt[s.kt.length - 1]) store.drop(s.id);
+            else store.record(s.id, last, false, s.a.getDouble("price"), seen);
+        }
     }
 
     /** A line alarm: bars against where the line is at each bar; past the end of its table it is no longer checked. */

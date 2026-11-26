@@ -6,8 +6,10 @@ import { rangeById, type RangeId } from '../lib/ranges'
 import { moveSymbolTo, type WatchSort } from '../lib/watchlist'
 import type { AnalystId, ProviderId } from '../../../shared/agents'
 import type { Lang } from '../../../shared/i18n'
-import { alarmClock, checkAlarm, dropAlarmsOf, dropAlarmsOfTab, mergeTriggered, newLineAlarm, restartLine, type Alarm, type NativeTrigger } from '../../../shared/alarms'
+import { alarmClock, checkAlarm, dropAlarmsOf, dropAlarmsOfTab, isArmed, mergeTriggered, newLineAlarm, restartLine, type Alarm, type NativeTrigger } from '../../../shared/alarms'
 import { endAhead, lineMoved, lineParts } from '../../../shared/lineAlarm'
+import { armBox, settlePairs } from '../../../shared/boxAlarm'
+import type { BoxDrawing } from '../lib/positionBox'
 import { lineNow } from '../lib/lineAlarms'
 import { cleanIndicators, emptySync, type SyncState } from '../../../shared/sync'
 import type { FeedStatus } from '../services/marketData'
@@ -29,6 +31,8 @@ export type Drawing = { color?: string; alarmUntil?: number } & (
       points: Point[]
     }
   | { id: string; type: 'text'; points: Point[]; text: string; size?: number }
+  // Position box (lib/positionBox.ts): entry (time = left edge), target and stop (price only), right edge (time only).
+  | { id: string; type: 'long' | 'short'; points: Point[] }
 )
 export type Tool = 'cursor' | Drawing['type']
 export { drawingsKey, type SavedChart }
@@ -218,6 +222,9 @@ interface State {
   sync: SyncState
   /** Phone: check alarms every 15 s with a permanent notification instead of every 15 min. */
   instantAlarms: boolean
+  /** Drawing magnet (lib/magnet.ts): points near a bar's open/high/low/close snap onto it. Per device. */
+  magnet: boolean
+  setMagnet: (on: boolean) => void
   addAlarm: (a: Alarm) => void
   removeAlarm: (id: string) => void
   /** Arms a triggered alarm again, counting only bars from now on. */
@@ -230,6 +237,8 @@ interface State {
    * clock, `current` the last price. 'at-price': the price is on the line; 'no-price': the line has no price.
    */
   toggleLineAlarm: (drawingId: string, part: string, now: number, current: number) => 'at-price' | 'no-price' | void
+  /** A position box's target and stop armed (again) together, in the visible chart (shared/boxAlarm.ts armBox). */
+  armBoxAlarms: (drawingId: string, now: number, current: number | undefined) => void
   /** End of the alarms on a drawing's lines (seconds); undefined = no end. */
   setAlarmUntil: (drawingId: string, until: number | undefined) => void
 }
@@ -260,6 +269,18 @@ const endsAhead = (drawings: Record<string, Drawing[]>, key: string, id: string,
   const list = drawings[key]
   const d = list?.find((x) => x.id === id)
   return d && endAhead(d, now) !== d ? { ...drawings, [key]: list.map((x) => (x === d ? endAhead(x, now) : x)) } : drawings
+}
+const isBox = (d: Drawing | undefined): d is BoxDrawing => d?.type === 'long' || d?.type === 'short'
+const BOX_PAIR = ['target', 'stop']
+/** Target and stop of a box armed (again) at `now`; the entry line and other alarms stay as they are. */
+function armedBox(alarms: Alarm[], symbol: string, key: string, d: BoxDrawing, now: number, current: number | undefined): Alarm[] {
+  const mine = (part: string) => (a: Alarm) => a.line?.key === key && a.line.drawing === d.id && a.line.part === part
+  const rest = alarms.filter((a) => !BOX_PAIR.some((p) => mine(p)(a)))
+  const pair = BOX_PAIR.map((part) => {
+    const old = alarms.find(mine(part)) ?? { id: crypto.randomUUID(), symbol, op: 'above' as const, price: 0, createdAt: now, line: { key, drawing: d.id, part } }
+    return armBox(old, d, current, now)
+  })
+  return [...rest, ...pair]
 }
 const folder = (name: string, symbols: string[]): Folder => ({ id: crypto.randomUUID(), name, symbols, collapsed: false })
 const mapFolder = (s: State, id: string, fn: (f: Folder) => Folder) => ({
@@ -399,6 +420,8 @@ export const useStore = create<State>()(
           // A line the edit took away (a ray turned to the left) takes its alarm with it.
           const alarms = s.alarms.filter((a) => a.line?.key !== key || a.line.drawing !== d.id || lineParts(d).includes(a.line.part)).map((a) => {
             if (a.line?.key !== key || a.line.drawing !== d.id) return a
+            // A box's target and stop keep their fixed direction and look at the entry anew.
+            if (a.box && isBox(d)) return isArmed(a) ? armBox(a, d, q?.price, now) : a
             const at = lineNow(a, next.drawings, now)
             return at === null ? a : restartLine(a, now, q?.price ?? at, at)
           })
@@ -418,6 +441,11 @@ export const useStore = create<State>()(
         if (mine) return void set({ alarms: s.alarms.filter((a) => a !== mine) })
         // The line runs on in the bars of the timeframe it is armed on (lineAlarm.ts).
         const line = { key, drawing: drawingId, part, tf: s.timeframe }
+        const d = s.drawings[key]?.find((x) => x.id === drawingId)
+        if (isBox(d) && BOX_PAIR.includes(part)) {
+          const a = armBox({ id: crypto.randomUUID(), symbol: s.symbol, op: 'above', price: 0, createdAt: now, line }, d, current, now)
+          return void set({ alarms: [...s.alarms, a], drawings: endsAhead(s.drawings, key, drawingId, now) })
+        }
         const at = lineNow({ id: '', symbol: s.symbol, op: 'above', price: 0, createdAt: now, line }, s.drawings, now)
         if (at === null) return 'no-price'
         const a = newLineAlarm(s.symbol, line, at, current, now)
@@ -425,6 +453,13 @@ export const useStore = create<State>()(
         // An end that has passed would let the new alarm run out at once.
         set({ alarms: [...s.alarms, a], drawings: endsAhead(s.drawings, key, drawingId, now) })
       },
+      armBoxAlarms: (drawingId, now, current) =>
+        set((s) => {
+          const key = drawingsKey(s)
+          const d = s.drawings[key]?.find((x) => x.id === drawingId)
+          if (!isBox(d)) return {}
+          return { alarms: armedBox(s.alarms, s.symbol, key, d, now, current), drawings: endsAhead(s.drawings, key, drawingId, now) }
+        }),
       setAlarmUntil: (drawingId, until) =>
         set((s) =>
           withDrawings(
@@ -440,6 +475,8 @@ export const useStore = create<State>()(
       alarms: [],
       sync: emptySync(),
       instantAlarms: false,
+      magnet: true,
+      setMagnet: (magnet) => set({ magnet }),
       saveChart: (name, overwriteId) => {
         const id = overwriteId ?? crypto.randomUUID()
         set((s) => {
@@ -501,22 +538,31 @@ export const useStore = create<State>()(
       addAlarm: (a) => set((s) => ({ alarms: [...s.alarms, a] })),
       removeAlarm: (id) => set((s) => ({ alarms: s.alarms.filter((a) => a.id !== id) })),
       rearmAlarm: (id, now) =>
-        set((s) => ({
-          // A run-out line alarm armed again: its passed end goes, so it watches again (a new end can be dragged).
-          drawings: ((line) => (line ? endsAhead(s.drawings, line.key, line.drawing, now) : s.drawings))(s.alarms.find((a) => a.id === id)?.line),
-          alarms: s.alarms.map((a) => {
-            if (a.id !== id) return a
-            const { triggeredAt, triggeredPrice, expiredAt, ...armed } = a
-            // createdAt goes along with the sync (checkedUntil does not), so the other device starts there too.
-            const again = { ...armed, createdAt: now, checkedUntil: now }
-            if (!a.line) return again
-            // A line has moved on since: the direction follows from where the price is against the line now.
-            const at = lineNow(again, s.drawings, now)
+        set((s) => {
+          const a = s.alarms.find((x) => x.id === id)
+          // A box's target or stop comes back with its partner: the pair decides a trade together.
+          const d = a?.box && a.line ? s.drawings[a.line.key]?.find((x) => x.id === a.line!.drawing) : undefined
+          if (a?.line && isBox(d)) {
             const price = useQuotes.getState().quotes[a.symbol]?.price
-            return at === null || price === undefined ? again : restartLine(again, now, price, at)
-          })
-        })),
-      applyNative: (list) => set((s) => ({ alarms: mergeTriggered(s.alarms, list) }))
+            return { alarms: armedBox(s.alarms, a.symbol, a.line.key, d, now, price), drawings: endsAhead(s.drawings, a.line.key, d.id, now) }
+          }
+          return {
+            // A run-out line alarm armed again: its passed end goes, so it watches again (a new end can be dragged).
+            drawings: ((line) => (line ? endsAhead(s.drawings, line.key, line.drawing, now) : s.drawings))(a?.line),
+            alarms: s.alarms.map((x) => {
+              if (x.id !== id) return x
+              const { triggeredAt: _t, triggeredPrice: _p, expiredAt: _e, cancelledAt: _x, ...armed } = x
+              // createdAt goes along with the sync (checkedUntil does not), so the other device starts there too.
+              const again = { ...armed, createdAt: now, checkedUntil: now }
+              if (!x.line) return again
+              // A line has moved on since: the direction follows from where the price is against the line now.
+              const at = lineNow(again, s.drawings, now)
+              const price = useQuotes.getState().quotes[x.symbol]?.price
+              return at === null || price === undefined ? again : restartLine(again, now, price, at)
+            })
+          }
+        }),
+      applyNative: (list) => set((s) => ({ alarms: settlePairs(mergeTriggered(s.alarms, list)) }))
     }),
     {
       name: 'kandleos',
@@ -613,6 +659,7 @@ export const useStore = create<State>()(
         charts,
         alarms,
         instantAlarms,
+        magnet,
         sync,
         stockSource,
         yahooExtra,
@@ -659,6 +706,7 @@ export const useStore = create<State>()(
         charts,
         alarms,
         instantAlarms,
+        magnet,
         sync
       })
     }

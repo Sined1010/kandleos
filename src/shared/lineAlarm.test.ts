@@ -187,3 +187,26 @@ test('1h/2h/4h: both anchors in the same pre-market stretch keep clock time, not
   const range = [utc(11, 17, 10), utc(11, 21)] as const
   for (const tf of ['1h', '2h', '4h'] as const) assert.deepEqual(lineKnots(g, 'AAPL', ...range, tf), lineKnots(g, 'AAPL', ...range))
 })
+
+const longBox = (t0: number, t3: number, entry = 53, target = 56, stop = 51): Drawing => ({
+  id: 'b',
+  type: 'long',
+  points: [
+    { time: t0, price: entry },
+    { time: t0, price: target },
+    { time: t0, price: stop },
+    { time: t3, price: entry }
+  ]
+})
+
+test('a long/short box has target, stop and entry lines, all flat', () => {
+  assert.deepEqual(lineParts(longBox(1, 2)), ['target', 'stop', 'entry'])
+  assert.deepEqual(lineGeom(longBox(1, 2), 'stop', 'BTCUSDT'), { flat: 51 })
+  assert.deepEqual(lineGeom(longBox(1, 2), 'target', 'BTCUSDT'), { flat: 56 })
+  assert.deepEqual(lineGeom(longBox(1, 2), 'entry', 'BTCUSDT'), { flat: 53 })
+})
+
+test('a box moved in time keeps its lines; a changed price moves them', () => {
+  assert.equal(lineMoved(longBox(1, 2), longBox(5, 9)), false)
+  assert.equal(lineMoved(longBox(1, 2), longBox(1, 2, 53, 57)), true)
+})
