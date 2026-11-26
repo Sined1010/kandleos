@@ -1,5 +1,6 @@
 // Glue between the store and the sync rules in shared/sync.ts, for both sides: stamping local changes, the PC's
 // answer to a phone, and the phone applying the PC's answer.
+import { reachedElsewhere, type Alarm } from '../../../shared/alarms'
 import { t } from '../../../shared/i18n'
 import { tell } from '../../../mobile/MessageBox'
 import {
@@ -87,14 +88,14 @@ export function resetSync(): void {
   useStore.setState({ sync: emptySync() })
 }
 
-let running: Promise<void> | null = null
+let running: Promise<Alarm[]> | null = null
 let firstNotice = false
 
 // The PC's window gets 10 s to answer (main/index.ts); waiting less showed a slow sync as "PC off".
 const SYNC_TIMEOUT_MS = 12_000
 
-/** Phone: one sync with the PC; a second call while one runs waits for it. */
-export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeoutMs?: number) => Promise<unknown>): Promise<void> {
+/** Phone: one sync with the PC; a second call while one runs waits for it. Returns the alarms the PC reached. */
+export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeoutMs?: number) => Promise<unknown>): Promise<Alarm[]> {
   running ??= (async () => {
     try {
       stampNow()
@@ -110,7 +111,9 @@ export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeo
       const reply = checkSyncReply(await call('sync', { format: SYNC_FORMAT, units: sent, stamps: st.stamps, phoneNow: Date.now(), baseId }, SYNC_TIMEOUT_MS))
       if (!reply) throw new Error('bad-reply')
       const out = receiveSync(sliceOfStore(), useStore.getState().sync, pcId, sent, reply, Date.now())
+      const reached = reachedElsewhere(useStore.getState().alarms, out.slice.alarms)
       apply(out.slice, out.sync)
+      return reached
     } finally {
       running = null
     }

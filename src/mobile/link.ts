@@ -8,6 +8,7 @@ import { t } from '../shared/i18n'
 import type { StockSource } from '../shared/types'
 import { resetSync, startStamping, syncWithPc } from '../renderer/src/services/sync'
 import { useStore } from '../renderer/src/store/useStore'
+import { notifyAlarm } from './alarmWatch'
 import { capHttp } from './capHttp'
 import { createLinkClient, type Pairing } from './linkClient'
 import { ask, tell } from './MessageBox'
@@ -58,7 +59,8 @@ export async function hello(): Promise<void> {
     }
     reached = true
     usePcStatus.setState({ state: 'online', pcName: p.pcName, lastSeen: Date.now() })
-    await syncWithPc(p.pcId, call)
+    // An alarm the PC reached first rings here too: the user may be away from the PC.
+    for (const a of await syncWithPc(p.pcId, call)) void notifyAlarm(a)
     usePcStatus.setState({ syncFailed: false })
   } catch (e) {
     const msg = (e as Error).message

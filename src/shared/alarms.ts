@@ -115,6 +115,10 @@ export interface NativeTrigger {
 }
 
 /** Takes in what the background check found; the earliest trigger wins, so applying it again changes nothing. */
+/** Alarms still armed in `before` that come back reached in `after`: the other device saw the price first. */
+export const reachedElsewhere = (before: Alarm[], after: Alarm[]): Alarm[] =>
+  after.filter((a) => a.triggeredAt !== undefined && before.some((b) => b.id === a.id && isArmed(b)))
+
 export function mergeTriggered(local: Alarm[], native: NativeTrigger[]): Alarm[] {
   return local.map((a) => {
     const n = native.find((x) => x.id === a.id)

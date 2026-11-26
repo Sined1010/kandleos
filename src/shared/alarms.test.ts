@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { alarmClock, armedFor, checkAlarm, checkedAfter, dropAlarmsOf, dropAlarmsOfTab, hit, isArmed, mergeTriggered, newAlarm, newLineAlarm, restartLine, type Alarm } from './alarms.ts'
+import { alarmClock, armedFor, checkAlarm, checkedAfter, dropAlarmsOf, dropAlarmsOfTab, hit, isArmed, mergeTriggered, newAlarm, reachedElsewhere, newLineAlarm, restartLine, type Alarm } from './alarms.ts'
 import type { Knot } from './lineAlarm.ts'
 
 test('newAlarm picks above or below from where the price is now', () => {
@@ -158,4 +158,10 @@ test('checkAlarm: a line keeps the timeframe it was armed on; an unknown one is 
   const on4h = lineAlarm({ line: { ...lineAlarm().line!, tf: '4h' } })
   assert.deepEqual(checkAlarm(on4h), on4h)
   assert.equal(checkAlarm({ ...on4h, line: { ...on4h.line, tf: '3h' } }), null)
+})
+
+test('reachedElsewhere: only alarms armed here that the other side reached', () => {
+  const before = [alarm({ id: 'a' }), alarm({ id: 'b', triggeredAt: 150 }), alarm({ id: 'c' })]
+  const after = [alarm({ id: 'a', triggeredAt: 200 }), alarm({ id: 'b', triggeredAt: 150 }), alarm({ id: 'c' }), alarm({ id: 'd', triggeredAt: 300 })]
+  assert.deepEqual(reachedElsewhere(before, after).map((a) => a.id), ['a'])
 })

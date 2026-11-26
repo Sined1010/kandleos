@@ -1,5 +1,5 @@
 import { App as CapApp } from '@capacitor/app'
-import { alarmClock, isArmed } from '../shared/alarms'
+import { alarmClock, isArmed, type Alarm } from '../shared/alarms'
 import { createAlarmWatch } from '../renderer/src/lib/alarmCore'
 import { knotsFor } from '../renderer/src/lib/lineAlarms'
 import { alarmBody, alarmTitle } from '../renderer/src/services/alarmWatch'
@@ -11,6 +11,9 @@ import { KandleNative, type NativeAlarm } from './native'
 const armed = () => useStore.getState().alarms.filter(isArmed)
 /** Android wants an int id per notification; one per alarm, so a repeat replaces instead of stacking. */
 export const notificationId = (id: string) => parseInt(id.replace(/-/g, '').slice(0, 7), 16)
+/** The "reached" notification, whichever device saw the price. */
+export const notifyAlarm = (a: Alarm) =>
+  KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: alarmBody(a) }).catch(() => {})
 
 /** What the background check found; merged first, so an alarm it already reported is not reported again. */
 async function collectNative(): Promise<void> {
@@ -27,7 +30,7 @@ const watch = createAlarmWatch({
     return !('skip' in planAlarm(a, { stockSource: s.stockSource, yahooExtra: s.yahooExtra, alpacaKeys }))
   },
   loadBars: (symbol) => fetchCandles(symbol, '5m', useStore.getState().finnhubKey),
-  notify: (a) => KandleNative.showNotification({ id: notificationId(a.id), title: alarmTitle(a), body: alarmBody(a) }).catch(() => {}),
+  notify: notifyAlarm,
   collect: collectNative,
   knotsFor: (a, now) => knotsFor(a, useStore.getState().drawings, now)
 })
