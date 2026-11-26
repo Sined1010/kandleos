@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { phaseAt } from '../../../shared/market'
 import { barsKey, currentPatterns, findPatterns, framePieces, lookBack, PATTERN_NAME, patternGroup, regularBars, trendAt } from '../../../shared/patterns'
 import { TF_SECONDS, type Candle, type Timeframe } from '../../../shared/types'
+import { onChartTap, TAP, type TapHandler } from '../lib/chartTap'
 import { eventNear } from '../lib/patternHit'
 import { PatternMarks, type PatternMark } from '../lib/patternMarks'
 import { IS_MOBILE } from '../lib/platform'
@@ -158,7 +159,12 @@ export default function PatternLayer({ chart, series, data, symbol, timeframe, t
   // Phone: a tap near a pattern's bars opens its card, unless the bar has an event badge (its card offers the pattern).
   useEffect(() => {
     if (!IS_MOBILE) return
-    const onTap = (p: MouseEventParams<Time>) => {
+    const onTap: TapHandler = (p, taken) => {
+      // An event, a line alarm's clock or a line took the tap (chartTap): only close the card.
+      if (taken) {
+        if (usePatternsUi.getState().open) usePatternsUi.setState({ open: null })
+        return false
+      }
       const ts = chart.timeScale()
       const x = p.point?.x
       // The pill counts too: at the newest bars it is pushed left of them, out of the finger's reach.
@@ -177,11 +183,14 @@ export default function PatternLayer({ chart, series, data, symbol, timeframe, t
       // A tap near a bar with events is the event's (EventLayer uses the same finger rule); its card offers the pattern.
       const badgeTimes = Object.keys(useEventsUi.getState().badgeSides).map(Number)
       const toX = (t: number) => ts.timeToCoordinate(t as Time)
-      if (g && !eventNear(badgeTimes, toX, x!, FINGER)) usePatternsUi.setState({ open: { time: g.to, pinned: true } })
-      else usePatternsUi.setState({ open: null })
+      if (g && !eventNear(badgeTimes, toX, x!, FINGER)) {
+        usePatternsUi.setState({ open: { time: g.to, pinned: true } })
+        return true
+      }
+      usePatternsUi.setState({ open: null })
+      return false
     }
-    chart.subscribeClick(onTap)
-    return () => chart.unsubscribeClick(onTap)
+    return onChartTap(chart, TAP.PATTERN, onTap)
   }, [chart])
   // An event chosen (tap or list) closes the pattern card: one card at a time.
   const eventChosen = useEventsUi((s) => s.selected)

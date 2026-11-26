@@ -78,6 +78,10 @@ export function lineLabel(a: Alarm, drawings: Record<string, Drawing[]>): string
   }
 }
 
+/** Where the clock sits on the line: its price at `now`; null without a table, outside it, or past the alarm's end. */
+export const clockAt = (knots: Knot[] | null, now: number, until?: number): number | null =>
+  !knots || (until !== undefined && until < now) ? null : linePrice(knots, now)
+
 /** Where the alarm's line lies at `now`; null without its drawing. */
 export function lineNow(a: Alarm, drawings: Record<string, Drawing[]>, now: number): number | null {
   const d = drawingOf(a, drawings)

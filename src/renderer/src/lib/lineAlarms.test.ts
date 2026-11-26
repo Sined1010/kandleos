@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { Alarm } from '../../../shared/alarms.ts'
 import type { Drawing } from '../store/useStore.ts'
-import { knotsFor, lineLabel, lineNow } from './lineAlarms.ts'
+import { clockAt, knotsFor, lineLabel, lineNow } from './lineAlarms.ts'
 import { linePrice } from '../../../shared/lineAlarm.ts'
 
 const hline = (over: Partial<Drawing> = {}) => ({ id: 'd', type: 'hline', price: 50, ...over }) as Drawing
@@ -78,4 +78,14 @@ test('knotsFor and lineNow count in the bars of the timeframe the alarm was arme
   assert.ok(four !== 'missing' && Math.abs(linePrice(four.knots, thu)! - 102) < 1e-9)
   assert.ok(Math.abs(lineNow(on('4h'), lists, thu)! - 102) < 1e-9)
   assert.ok(Math.abs(lineNow(on(), lists, thu)! - 101.625) < 1e-9)
+})
+
+test('clockAt gives the line price now', () => {
+  assert.equal(clockAt([[100, 10], [200, 20]], 150), 15)
+})
+
+test('clockAt: no table, now outside or after the end → null', () => {
+  assert.equal(clockAt(null, 150), null)
+  assert.equal(clockAt([[100, 10], [200, 20]], 250), null)
+  assert.equal(clockAt([[100, 10], [200, 20]], 150, 120), null)
 })

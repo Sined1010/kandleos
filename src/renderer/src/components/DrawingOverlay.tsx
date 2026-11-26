@@ -1,11 +1,12 @@
-import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts'
+import type { IChartApi, ISeriesApi, Logical, MouseEventParams, Time } from 'lightweight-charts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
 import { CLICKS } from '../../../shared/drawings'
 import { locale, t } from '../../../shared/i18n'
 import { FIB_LEVELS, LINE_HORIZON, lineParts, linePrice } from '../../../shared/lineAlarm'
-import { lineTable } from '../lib/lineAlarms'
+import { formatPrice } from '../lib/format'
+import { clockAt, lineTable } from '../lib/lineAlarms'
 import { logicalToTime, timeToLogical } from '../../../shared/candles'
 import { TF_MONTHS, TF_SECONDS, type Candle } from '../../../shared/types'
 import {
@@ -23,6 +24,8 @@ import {
 import { anchoredVwap, anchorIndex } from '../lib/indicators'
 import { THEME } from '../lib/theme'
 import { IS_MOBILE } from '../lib/platform'
+import { mainPanePoint, onChartTap, TAP } from '../lib/chartTap'
+import { LINE_REACH, nearestPoint, pickAt, pillLeft } from '../lib/linePick'
 import { aimAt, pinchRange, type PinchStart } from '../lib/touchAim'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import { Crosshair, Trash2 } from 'lucide-react'
@@ -62,11 +65,18 @@ const isWave = (type: string): type is keyof typeof WAVE_LABELS => Object.hasOwn
 const NO_DRAWINGS: Drawing[] = []
 // How far right of the last candle drawings follow the trading calendar; beyond that, even steps.
 const FUTURE_BARS = 500
+// Phone: how far (manhattan px) a finger may wobble and still be a tap, as lightweight-charts counts it.
+const TAP_SLOP = 5
 
 
 /** 'move' drags the whole drawing, a number drags that point. */
 type Handle = 'move' | number
 interface DragState {
+  /** The finger (or mouse) that started it; others neither move it nor end it. */
+  pointerId: number
+  /** Where it went down (client px), and whether it has moved past a tap's wobble since. */
+  start: { x: number; y: number }
+  moved: boolean
   handle: Handle
   from: { logical: number; price: number }
   orig: Drawing
@@ -239,14 +249,76 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
   }
 
   const startDrag = (e: React.PointerEvent, d: Drawing, handle: Handle) => {
+    // A second finger is zooming: it ends a drag (window listener below) and never starts one.
+    if (!e.isPrimary) return
     e.stopPropagation()
     e.preventDefault()
     select(d.id)
     const from = logicalAt(e)
     if (!from) return
-    dragRef.current = { handle, from, orig: d, current: d }
+    dragRef.current = { pointerId: e.pointerId, start: { x: e.clientX, y: e.clientY }, moved: false, handle, from, orig: d, current: d }
     setDrag(dragRef.current)
   }
+
+  // The "now 156.05" pill beside a line alarm's clock, per `drawingId|part`: when it was started (it folds away on its
+  // own, index.css), and the one the mouse holds open on the PC.
+  const [pills, setPills] = useState<Record<string, number>>({})
+  const [heldPill, setHeldPill] = useState<string | null>(null)
+  const showPill = (keys: string[]) => {
+    if (!keys.length) return
+    const at = Date.now()
+    setPills((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, at])) }))
+    setTimeout(() => setPills((p) => Object.fromEntries(Object.entries(p).filter(([, t]) => t > at))), 3600)
+  }
+  const showPillRef = useRef(showPill)
+  showPillRef.current = showPill
+  /** The pills of every armed line of a drawing, e.g. after it was moved and its alarms set again. */
+  const pillsOf = (id: string) =>
+    useStore
+      .getState()
+      .alarms.filter((a) => a.line?.drawing === id && isArmed(a))
+      .map((a) => `${id}|${a.line!.part}`)
+
+  /** Points marked in the svg (clocks: data-clock, grips: data-grip) with their data-x/data-y. */
+  const marked = (attr: 'clock' | 'grip') =>
+    [...(svgRef.current?.querySelectorAll<SVGElement>(`[data-${attr}]`) ?? [])].map((el) => ({
+      key: el.dataset[attr]!,
+      x: Number(el.dataset.x),
+      y: Number(el.dataset.y)
+    }))
+  /** Phone: a clock in finger reach selects its drawing and shows the value. */
+  const tapClock = (x: number, y: number) => {
+    const key = nearestPoint(marked('clock'), x, y, LINE_REACH)
+    if (key === null) return false
+    select(key.split('|')[0])
+    showPillRef.current([key])
+    return true
+  }
+  /** Phone: the nearest drawing in finger reach gets selected. */
+  const tapLine = (x: number, y: number) => {
+    const id = svgRef.current && pickAt(svgRef.current, x, y, LINE_REACH)
+    if (id) select(id)
+    return !!id
+  }
+  const tapRef = useRef({ tapClock, tapLine })
+  tapRef.current = { tapClock, tapLine }
+
+  // Phone: clocks, then lines, in chartTap's order (after event badges, before event columns and patterns).
+  const toolRef = useRef(tool)
+  toolRef.current = tool
+  useEffect(() => {
+    if (!IS_MOBILE) return
+    const handler = (which: 'tapClock' | 'tapLine') => (p: MouseEventParams<Time>, taken: boolean) => {
+      const pt = mainPanePoint(p)
+      return !taken && !!pt && toolRef.current === 'cursor' && tapRef.current[which](pt.x, pt.y)
+    }
+    const offClock = onChartTap(chart, TAP.CLOCK, handler('tapClock'))
+    const offLine = onChartTap(chart, TAP.LINE, handler('tapLine'))
+    return () => {
+      offClock()
+      offLine()
+    }
+  }, [chart])
 
   // Window listeners: the pointer may leave the line (or the svg) while dragging.
   const dragging = drag !== null
@@ -255,7 +327,9 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current
       const at = logicalAt(e)
-      if (!d || !at) return
+      if (!d || !at || e.pointerId !== d.pointerId) return
+      // Phone: a finger wobbles on a tap; only a move past that (as lightweight-charts counts a tap) drags.
+      if (IS_MOBILE && !d.moved && Math.abs(e.clientX - d.start.x) + Math.abs(e.clientY - d.start.y) < TAP_SLOP) return
       const dPrice = at.price - d.from.price
       // Shift in bar space, not seconds, so a shape keeps its form across weekend/overnight gaps.
       const shiftTime = (t: number) => logicalToTime(axis, logicalOf(t) + at.logical - d.from.logical, step)
@@ -272,12 +346,24 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               : d.handle === 'move'
               ? withPoints(o, pointsOf(o).map((p) => ({ time: shiftTime(p.time), price: p.price + dPrice })))
               : withPoints(o, pointsOf(o).map((p, i) => (i === d.handle ? cursor : p)))
-      dragRef.current = { ...d, current }
+      dragRef.current = { ...d, moved: true, current }
       setDrag(dragRef.current)
     }
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       const d = dragRef.current
-      if (d && d.current !== d.orig) updateDrawing(d.current)
+      if (d && e.pointerId !== d.pointerId) return
+      if (d && d.current !== d.orig) {
+        updateDrawing(d.current)
+        // Moving a line sets its alarms again at a new value: show it.
+        showPillRef.current(pillsOf(d.orig.id))
+      } else if (d && IS_MOBILE && svgRef.current) {
+        // Phone: the selected drawing takes the touch, so the chart never sees this tap; handle it here (its clock,
+        // or a nearer drawing in the band).
+        const r = svgRef.current.getBoundingClientRect()
+        const x = e.clientX - r.left
+        const y = e.clientY - r.top
+        if (!tapRef.current.tapClock(x, y)) tapRef.current.tapLine(x, y)
+      }
       dragRef.current = null
       setDrag(null)
     }
@@ -286,13 +372,19 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       dragRef.current = null
       setDrag(null)
     }
+    // A second finger means zooming: drop the drag the same way.
+    const onDown = (e: PointerEvent) => {
+      if (dragRef.current && e.pointerId !== dragRef.current.pointerId) onCancel()
+    }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('pointerdown', onDown, true)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
+      window.removeEventListener('pointerdown', onDown, true)
     }
     // Handlers read the live drag via dragRef; the axis only changes on new bars, which is harmless mid-drag.
   }, [dragging])
@@ -366,15 +458,18 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     // An own colour stays when selected (handles and the style bar show the selection), else it turns cyan.
     const stroke = d.color ?? (selected ? SELECTED : COLOR)
     const lineWidth = selected ? 2 : 1.5
-    // A wide transparent twin of each line is the hit area; in cursor mode only these catch the mouse.
+    // A wide transparent twin of each line is the hit area; in cursor mode only these catch the mouse. On the phone only
+    // the selected drawing can be grabbed (in finger reach); the others are picked by a tap (linePick) and let the
+    // chart pan and zoom right over them.
     const hit = (cursor = 'move') =>
       preview
         ? null
         : {
+            'data-pick': d.id,
             stroke: 'transparent',
-            strokeWidth: 10,
+            strokeWidth: IS_MOBILE && selected ? 2 * LINE_REACH : 10,
             fill: 'none',
-            style: { pointerEvents: 'stroke' as const, cursor },
+            style: { pointerEvents: IS_MOBILE && !selected ? ('none' as const) : ('stroke' as const), cursor },
             onPointerDown: (e: React.PointerEvent) => startDrag(e, d, 'move')
           }
 
@@ -417,7 +512,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       // bar once pre/after market is switched off. A note keeps it visible and selectable.
       if (at === 'before' || at === 'after') {
         return (
-          <text key={d.id} x={8} y={noteY} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+          <text key={d.id} x={8} y={noteY} fill={color} fontSize={11} data-pick={d.id} style={{ pointerEvents: preview || (IS_MOBILE && !selected) ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
             {at === 'before' ? t('AVWAP: Anker vor den geladenen Kerzen') : t('AVWAP: Anker nach der letzten Kerze')}
           </text>
         )
@@ -427,7 +522,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       if (ax === null) return null
       if (values.every(Number.isNaN)) {
         return (
-          <text key={d.id} x={ax + 4} y={noteY} fill={color} fontSize={11} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
+          <text key={d.id} x={ax + 4} y={noteY} fill={color} fontSize={11} data-pick={d.id} style={{ pointerEvents: preview || (IS_MOBILE && !selected) ? 'none' : 'all', cursor: 'pointer' }} onPointerDown={pick}>
             {t('AVWAP: kein Volumen')}
           </text>
         )
@@ -457,7 +552,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
           {ay !== null && (
             <>
               {/* Near an edge the label grows inward, so it is not cut off at the last or first bar. */}
-              <text x={ax} y={ay - 8} fill={color} fontSize={11} textAnchor={ax > width - 60 ? 'end' : ax < 60 ? 'start' : 'middle'} style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move' }} onPointerDown={pick}>
+              <text x={ax} y={ay - 8} fill={color} fontSize={11} textAnchor={ax > width - 60 ? 'end' : ax < 60 ? 'start' : 'middle'} data-pick={d.id} style={{ pointerEvents: preview || (IS_MOBILE && !selected) ? 'none' : 'all', cursor: 'move' }} onPointerDown={pick}>
                 AVWAP {dateLabel(data[at].time)}
               </text>
               {(selected || preview) && (
@@ -485,17 +580,22 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const ys = xy.map(([, y]) => y as number)
     const handles = (selected || preview) &&
       xs.map((x, i) => (
-        <circle
-          key={`h${i}`}
-          cx={x}
-          cy={ys[i]}
-          r={5}
-          fill={THEME.bg}
-          stroke={stroke}
-          strokeWidth={1.5}
-          style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
-          onPointerDown={preview ? undefined : (e) => startDrag(e, d, i)}
-        />
+        <g key={`h${i}`}>
+          <circle
+            cx={x}
+            cy={ys[i]}
+            r={5}
+            fill={THEME.bg}
+            stroke={stroke}
+            strokeWidth={1.5}
+            style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'crosshair' }}
+            onPointerDown={preview ? undefined : (e) => startDrag(e, d, i)}
+          />
+          {/* Phone: a finger-sized grip around the point; it comes after the line's grip, so the point wins. */}
+          {IS_MOBILE && !preview && (
+            <circle data-grip={i} data-x={x} data-y={ys[i]} cx={x} cy={ys[i]} r={LINE_REACH} fill="transparent" style={{ pointerEvents: 'all' }} onPointerDown={(e) => startDrag(e, d, i)} />
+          )}
+        </g>
       ))
     if (d.type === 'text') {
       return (
@@ -507,7 +607,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               fill={stroke}
               fontSize={d.size ?? TEXT_SIZE}
               fontWeight={600}
-              style={{ pointerEvents: preview ? 'none' : 'all', cursor: 'move', userSelect: 'none' }}
+              data-pick={preview ? undefined : d.id}
+              style={{ pointerEvents: preview || (IS_MOBILE && !selected) ? 'none' : 'all', cursor: 'move', userSelect: 'none' }}
               onPointerDown={preview ? undefined : (e) => startDrag(e, d, 'move')}
               onDoubleClick={preview ? undefined : () => setEditing(d.id)}
             >
@@ -818,10 +919,20 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         const y = p === null ? null : toY(p)
         return x === null || y === null ? [] : [[x, y] as const]
       })
-      return xy.length ? [{ id: a.id, xy }] : []
+      return xy.length ? [{ id: a.id, part: a.line!.part, k, xy }] : []
     })
     if (!lines.length) return null
     const [ex, ey] = lines[0].xy[lines[0].xy.length - 1]
+    // The clock sits on each alarmed line where it is now (a horizontal line keeps its tag on the price axis).
+    const nowX = toX(now)
+    const clocks =
+      d.type === 'hline' || nowX === null || nowX < 0 || nowX > width
+        ? []
+        : lines.flatMap((l) => {
+            const price = clockAt(l.k, now, until)
+            const y = price === null ? null : toY(price)
+            return y === null ? [] : [{ key: `${d.id}|${l.part}`, x: nowX, y, price: price! }]
+          })
     return (
       <g key={`al-${d.id}`}>
         {/* A horizontal line already spans the chart; it only gets the clock and the end handle. */}
@@ -838,6 +949,26 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
               pointerEvents="none"
             />
           ))}
+        {/* Phone: the dashed part counts like the line for picking, and grabs the selected drawing. */}
+        {IS_MOBILE &&
+          d.type !== 'hline' &&
+          lines.map((l) => (
+            <polyline
+              key={`pick-${l.id}`}
+              data-pick={d.id}
+              points={l.xy.map(([x, y]) => `${x},${y}`).join(' ')}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={2 * LINE_REACH}
+              style={{ pointerEvents: selected ? 'stroke' : 'none' }}
+              onPointerDown={(e) => {
+                // This band lies over the drawing's grips (drawn later): a point in reach still wins.
+                const r = svgRef.current!.getBoundingClientRect()
+                const grip = nearestPoint(marked('grip'), e.clientX - r.left, e.clientY - r.top, LINE_REACH)
+                startDrag(e, d, grip === null ? 'move' : Number(grip))
+              }}
+            />
+          ))}
         {selected && until !== undefined ? (
           <rect
             x={ex - 6}
@@ -852,20 +983,63 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
         ) : selected ? (
           // No end yet: the handle sits at the right edge and pulling it left sets one.
           <rect x={ex - 6} y={ey - 6} width={12} height={12} rx={3} fill="none" stroke={ALARM} strokeWidth={1.5} style={{ cursor: 'ew-resize', pointerEvents: 'all' }} onPointerDown={(e) => startUntilDrag(e, d)} />
-        ) : (
+        ) : d.type === 'hline' ? (
           <text x={ex + 4} y={ey + 4} fontSize={11} opacity={0.8} pointerEvents="none">
             ⏰
           </text>
-        )}
+        ) : null}
+        {clocks.map((c) => {
+          const held = heldPill === c.key
+          const started = pills[c.key]
+          const label = t('jetzt {price}', { price: formatPrice(c.price) })
+          const w = label.length * 6.2 + 16
+          // Near the right edge (the clock sits a few bars from it) the pill opens to the left instead.
+          const left = pillLeft(c.x, w, width)
+          const px = left ? c.x - 12 - w : c.x + 12
+          return (
+            <g key={c.key}>
+              {(held || started !== undefined) && (
+                // Opens from the clock, holds, then folds back into it (index.css); a new start replays it.
+                <g key={held ? 'hold' : started} className={`alarm-pill${left ? ' alarm-pill-left' : ''}${held ? ' alarm-pill-hold' : ''}`} pointerEvents="none">
+                  <rect x={px} y={c.y - 10} width={w} height={20} rx={10} fill={ALARM} />
+                  <text x={px + w / 2} y={c.y + 4} textAnchor="middle" fontSize={11} fontWeight={600} fill={THEME.bg}>
+                    {label}
+                  </text>
+                </g>
+              )}
+              <g
+                data-clock={c.key}
+                data-x={c.x}
+                data-y={c.y}
+                // Phone: picked by distance (chartTap), so the clock never blocks panning.
+                style={{ pointerEvents: IS_MOBILE ? 'none' : 'all', cursor: 'pointer' }}
+                onClick={() => {
+                  select(d.id)
+                  showPill([c.key])
+                }}
+                onPointerEnter={() => setHeldPill(c.key)}
+                onPointerLeave={() => setHeldPill(null)}
+              >
+                <circle cx={c.x} cy={c.y} r={9} fill={ALARM} stroke={THEME.bg} strokeWidth={2} />
+                <text x={c.x} y={c.y + 3.5} textAnchor="middle" fontSize={10}>
+                  ⏰
+                </text>
+              </g>
+            </g>
+          )
+        })}
       </g>
     )
   }
 
   // Dragging the end handle: the time under the pointer, never before now (exchange clock).
   const startUntilDrag = (e: React.PointerEvent, d: Drawing) => {
+    // Like the drawing's own drag: only the first finger, a second one cancels.
+    if (!e.isPrimary) return
     e.stopPropagation()
     e.preventDefault()
     select(d.id)
+    const id = e.pointerId
     const at = (ev: { clientX: number; clientY: number }) => {
       const p = logicalAt(ev)
       return p ? Math.max(now, logicalToTime(axis, Math.round(p.logical), step)) : null
@@ -874,22 +1048,29 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     const [x0, y0] = [e.clientX, e.clientY]
     let last: number | null = null
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
       if (last === null && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return
       const t = at(ev)
       if (t === null) return
       last = t
       setUntilDrag({ id: d.id, time: t })
     }
-    const up = () => {
+    const end = (keep: boolean) => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
-      if (last !== null) setAlarmUntil(d.id, last)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('pointerdown', other, true)
+      if (keep && last !== null) setAlarmUntil(d.id, last)
       setUntilDrag(null)
     }
+    const up = (ev: PointerEvent) => ev.pointerId === id && end(true)
+    const cancel = () => end(false)
+    // A second finger means zooming: the end stays where it was.
+    const other = (ev: PointerEvent) => ev.pointerId !== id && end(false)
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('pointerdown', other, true)
   }
 
   // The bar under a selected drawing: alarm on/off per line, and its end.
@@ -900,6 +1081,7 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
     if (!q && !on) return setAlarmHint(t('Aktueller Kurs nötig.'))
     const r = toggleLineAlarm(d.id, part, alarmClock(q?.time), q?.price ?? 0)
     setAlarmHint(r === 'at-price' ? t('Der Kurs liegt schon dort.') : r === 'no-price' ? t('Diese Linie hat hier keinen Preis.') : '')
+    if (!on && r === undefined) showPill([`${d.id}|${part}`])
   }
   const partLabel = (part: string) =>
     part === 'top' ? t('oben') : part === 'mid' ? t('Mitte') : part === 'bottom' ? t('unten') : `${+(Number(part) * 100).toFixed(1)}`
@@ -946,7 +1128,8 @@ export default function DrawingOverlay({ chart, series, data, timeZone }: Props)
       >
         {drawings.map((d) => render(drag?.orig.id === d.id ? drag.current : d))}
         {/* While a drawing is dragged its alarms restart anyway; no new table on every pointer move. */}
-        {drawings.map((d) => (drag?.orig.id === d.id ? null : alarmLines(d)))}
+        {/* Hidden only once a drag really moves: a tap on the selected drawing must still find its clock (onUp). */}
+        {drawings.map((d) => (drag?.orig.id === d.id && drag.moved ? null : alarmLines(d)))}
         {preview && render(preview, true)}
         {IS_MOBILE && drawingMode && aim && (
           <g pointerEvents="none">

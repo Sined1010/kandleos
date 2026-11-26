@@ -972,6 +972,7 @@ export const EN: Record<string, string> = {
   'berührt {time} bei {price}': 'touched {time} at {price}',
   'abgelaufen {date} · nicht berührt': 'expired {date} · not touched',
   'Linie jetzt {price}': 'line now {price}',
+  'jetzt {price}': 'now {price}',
   'aktuell {price}': 'now {price}',
   'Kurs für den Alarm': 'Alarm price',
   'Alarm setzen': 'Set alarm',

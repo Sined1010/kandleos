@@ -261,3 +261,28 @@ input[type='number']::-webkit-inner-spin-button {
     opacity: 0.35;
   }
 }
+
+/* Line alarm: the "now 156.05" pill opens from its clock, holds 3 s, then folds back into it (right to left). */
+.alarm-pill {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: alarm-pill 3.5s ease forwards;
+}
+.alarm-pill-left {
+  transform-origin: right center;
+}
+.alarm-pill-hold {
+  animation: none;
+}
+@keyframes alarm-pill {
+  0% { transform: scaleX(0); opacity: 0; }
+  6% { transform: scaleX(1); opacity: 1; }
+  91% { transform: scaleX(1); opacity: 1; animation-timing-function: ease-in; }
+  100% { transform: scaleX(0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes alarm-pill {
+    0%, 100% { opacity: 0; }
+    3%, 94% { opacity: 1; }
+  }
+}

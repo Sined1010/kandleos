@@ -8,6 +8,7 @@ import { candleDates, candleIndex, candleMarks, shortMoney, sinceChange } from '
 import type { ChartEvent } from '../../../shared/events'
 import { locale, t } from '../../../shared/i18n'
 import { TF_SECONDS, type Candle, type Timeframe } from '../../../shared/types'
+import { mainPanePoint, onChartTap, TAP, type TapHandler } from '../lib/chartTap'
 import { EventBadges, type Badge } from '../lib/eventBadges'
 import { IS_MOBILE } from '../lib/platform'
 import { openEvents, useEventsData } from '../services/events'
@@ -186,22 +187,43 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
 
   // Phone: a tap anywhere in a bar's column (a badge is too small for a finger) chooses its first event and so
   // opens the card; a tap on a bar without events closes it.
+  // A badge under the finger goes before a line alarm's clock or a line; the column rule only after them (chartTap).
   useEffect(() => {
     if (!IS_MOBILE) return
-    const onTap = (p: MouseEventParams<Time>) => {
-      let time = barOfRef.current(p)
+    const choose = (time: number | undefined) => {
+      const id = time !== undefined && latest.current(time)[0]?.id
+      if (id) useEventsUi.setState({ selected: id })
+      return !!id
+    }
+    let badgeTook = false
+    const onBadge: TapHandler = (p, taken) => {
+      const pt = mainPanePoint(p)
+      const id = !taken && pt ? badges.current?.hitTest(pt.x, pt.y)?.externalId : undefined
+      badgeTook = id !== undefined && choose(id === 'tmp' ? tmpTime.current : Number(id))
+      return badgeTook
+    }
+    const onColumn: TapHandler = (p, taken) => {
+      // The badge handler of this same tap opened the card: leave it open.
+      if (badgeTook) return (badgeTook = false)
+      let time = taken ? undefined : barOfRef.current(p)
       // Zoomed out a bar is a few pixels wide: a finger near a marked bar means that bar.
-      if ((time === undefined || !latest.current(time).length) && p.point) {
+      if (!taken && (time === undefined || !latest.current(time).length) && p.point) {
         const near = marksRef.current
           .map((m) => ({ m, d: Math.abs((chart.timeScale().timeToCoordinate(m.time as Time) ?? -1e9) - p.point!.x) }))
           .filter((n) => n.d <= FINGER)
           .sort((a, b) => a.d - b.d)[0]
         if (near) time = near.m.time
       }
-      useEventsUi.setState({ selected: (time !== undefined && latest.current(time)[0]?.id) || null })
+      if (choose(time)) return true
+      useEventsUi.setState({ selected: null })
+      return false
     }
-    chart.subscribeClick(onTap)
-    return () => chart.unsubscribeClick(onTap)
+    const offBadge = onChartTap(chart, TAP.EVENT_BADGE, onBadge)
+    const offColumn = onChartTap(chart, TAP.EVENT_COLUMN, onColumn)
+    return () => {
+      offBadge()
+      offColumn()
+    }
   }, [chart])
 
   // Click on a marker (PC: the marker itself) opens the list at its first entry.

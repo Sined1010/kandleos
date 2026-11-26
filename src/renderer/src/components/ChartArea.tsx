@@ -56,7 +56,7 @@ import { useBack } from '../../../mobile/useBack'
 import { metaFor, useChartMeta } from '../store/chartMeta'
 import { drawingsKey, useQuotes, useStore } from '../store/useStore'
 import { alarmClock, isArmed } from '../../../shared/alarms'
-import { lineNow } from '../lib/lineAlarms'
+import { drawingOf, lineNow } from '../lib/lineAlarms'
 import AgentsPanel from './AgentsPanel'
 import ForecastQuality from './ForecastQuality'
 import { archiveForecast, settleDue, type ArchiveContext } from '../services/archive'
@@ -1011,8 +1011,10 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   const lineAlarmList = useStore((s) => s.alarms)
   const drawingLists = useStore((s) => s.drawings)
   const quoteTime = useQuotes((s) => s.quotes[symbol]?.time)
+  // Only a horizontal line's value is fixed, so only it keeps a tag on the price axis; a sloped line shows its clock
+  // on the line itself (DrawingOverlay).
   const lineTags = lineAlarmList.flatMap((a) => {
-    if (a.line?.key !== listKey || !isArmed(a)) return []
+    if (a.line?.key !== listKey || !isArmed(a) || drawingOf(a, drawingLists)?.type !== 'hline') return []
     const price = lineNow(a, drawingLists, alarmClock(quoteTime))
     return price === null ? [] : [{ price, color: ALARM, ink: THEME.bg, label: '⏰' }]
   })
@@ -1156,7 +1158,8 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
   )
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="relative min-h-0 flex-1" onPointerDown={() => select(null)}>
+      {/* A second finger is zooming, not choosing: only the first one clears the selection. */}
+      <div className="relative min-h-0 flex-1" onPointerDown={(e) => e.isPrimary && select(null)}>
         {/* isolate: keeps the chart canvases' z-indexes from stacking above the drawing overlay */}
         {/* The analysis panel takes the right edge; the chart narrows so its price axis (with the target line) stays visible. */}
         <div ref={containerRef} className="absolute inset-0 isolate" style={{ right: sideOpen ? AGENTS_WIDTH : 0 }} />
