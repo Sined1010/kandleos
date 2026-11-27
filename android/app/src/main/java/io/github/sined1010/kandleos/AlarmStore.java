@@ -178,6 +178,7 @@ public final class AlarmStore {
         AlarmStore store = new AlarmStore(c);
         JSONArray armed = store.armed();
         Set<String> done = new HashSet<>();
+        BarCache cache = new BarCache((source, symbol, from) -> AlarmFetch.bars(c, source, symbol, from));
         for (int i = 0; i < armed.length(); i++) {
             JSONObject a = armed.optJSONObject(i);
             if (a == null) continue;
@@ -187,14 +188,14 @@ public final class AlarmStore {
                 String id = a.getString("id");
                 if (done.contains(id)) continue;
                 if (a.has("entry")) {
-                    checkBox(c, store, a, find(armed, a.optString("pair")), done);
+                    checkBox(c, store, cache, a, find(armed, a.optString("pair")), done);
                     continue;
                 }
                 if (a.has("body")) {
-                    checkLine(c, store, a, id, from);
+                    checkLine(c, store, cache, a, id, from);
                     continue;
                 }
-                List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
+                List<AlarmCheck.Bar> bars = cache.bars(a.getString("source"), a.getString("providerSymbol"), from);
                 double price = a.getDouble("price");
                 long at = AlarmCheck.hit(a.getString("op"), price, from, false, bars);
                 if (at >= 0) {
@@ -246,7 +247,7 @@ public final class AlarmStore {
      * A position box's target and stop against the same bars (src/renderer/src/lib/alarmCore.ts catchUpBox): the
      * earlier hit decides (the stop on a tie); the other side leaves the armed list quietly, and the app switches it off.
      */
-    private static void checkBox(Context c, AlarmStore store, JSONObject a, JSONObject p, Set<String> done) throws Exception {
+    private static void checkBox(Context c, AlarmStore store, BarCache cache, JSONObject a, JSONObject p, Set<String> done) throws Exception {
         done.add(a.getString("id"));
         if (p != null) done.add(p.getString("id"));
         List<Side> sides = new ArrayList<>();
@@ -259,7 +260,7 @@ public final class AlarmStore {
         if (sides.isEmpty()) return;
         long from = Long.MAX_VALUE;
         for (Side s : sides) from = Math.min(from, startOf(s.a));
-        List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
+        List<AlarmCheck.Bar> bars = cache.bars(a.getString("source"), a.getString("providerSymbol"), from);
         long target = -1, stop = -1;
         for (Side s : sides) {
             s.scan = AlarmCheck.boxScan(s.a.getString("op"), startOf(s.a), bars, s.kt, s.kp, s.a.getDouble("entry"), s.a.optBoolean("wait"), s.a.optBoolean("near"),
@@ -298,7 +299,7 @@ public final class AlarmStore {
     }
 
     /** A line alarm: bars against where the line is at each bar; past the end of its table it is no longer checked. */
-    private static void checkLine(Context c, AlarmStore store, JSONObject a, String id, long from) throws Exception {
+    private static void checkLine(Context c, AlarmStore store, BarCache cache, JSONObject a, String id, long from) throws Exception {
         double[][] k = store.knotsOf(id);
         // No readable table: nothing to check against, so it must not keep the checks running.
         if (k == null) {
@@ -312,7 +313,7 @@ public final class AlarmStore {
             store.drop(id);
             return;
         }
-        List<AlarmCheck.Bar> bars = AlarmFetch.bars(c, a.getString("source"), a.getString("providerSymbol"), from);
+        List<AlarmCheck.Bar> bars = cache.bars(a.getString("source"), a.getString("providerSymbol"), from);
         long at = AlarmCheck.hitLine(a.getString("op"), from, bars, kt, kp);
         if (at >= 0) {
             double price = AlarmCheck.linePrice(kt, kp, at);
