@@ -10,6 +10,7 @@
     <string name="alarm_body">Kurs-Alarm von KandleOS</string>
     <string name="channel_analyses">Analysen</string>
     <string name="analysis_done">Analyse %1$s fertig: %2$s</string>
+    <string name="analysis_public">Neues zu einer Analyse von KandleOS</string>
     <string name="analysis_failed">Analyse %1$s abgebrochen</string>
     <string name="analysis_body">Umfassende Analyse auf deinem PC – zum Lesen tippen</string>
     <string name="rating_buy">Kaufen</string>

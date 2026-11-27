@@ -47,7 +47,15 @@ public final class Notifier {
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(openApp(c))
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                // Locked phone with Android set to hide sensitive content: this neutral notice instead of "content hidden".
+                // Set to show all content, Android shows the full notification there; an app cannot change that.
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(new NotificationCompat.Builder(c, channel)
+                        .setSmallIcon(R.drawable.ic_stat_alarm)
+                        .setContentTitle(c.getString(R.string.app_name))
+                        .setContentText(c.getString(ANALYSES.equals(channel) ? R.string.analysis_public : R.string.alarm_body))
+                        .build());
         try {
             NotificationManagerCompat.from(c).notify(id, b.build());
         } catch (SecurityException e) {

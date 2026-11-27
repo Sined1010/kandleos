@@ -285,6 +285,8 @@ function createWindow(): void {
       sandbox: true,
       nodeIntegration: false,
       webviewTag: false,
+      // Chromium's spell checker fetches its dictionaries from a Google server; a chart app needs none.
+      spellcheck: false,
       // DevTools would reach window.api (e.g. keyGet) with Ctrl+Shift+I; only for development.
       devTools: !app.isPackaged
     }
@@ -351,6 +353,8 @@ else {
   // Also brings back a window hidden in the notification area.
   app.on('second-instance', showWindow)
   app.whenReady().then(() => {
+    // The spell checker's dictionaries belong to the session, not the window: off here too (see webPreferences).
+    session.defaultSession.setSpellCheckerEnabled(false)
     // KandleOS needs no camera, microphone, location, notifications etc.; refuse every such request.
     // The one exception is fullscreen, for the chart's fullscreen mode.
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'fullscreen'))
