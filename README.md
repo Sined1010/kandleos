@@ -74,6 +74,7 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
 ## Download and installation
 
 Download the installer for your system from the [Releases](https://github.com/Sined1010/kandleos/releases) page.
+From 1.0.0 on, `SHA256SUMS.txt` is signed; [SECURITY.md](SECURITY.md#release-signatures) shows the key and how to check it.
 
 ### Windows (10/11, x64)
 
