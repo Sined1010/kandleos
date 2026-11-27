@@ -1270,5 +1270,8 @@ export const EN: Record<string, string> = {
   'Ein anderes Programm hält die Datei fest. Änderungen werden in dieser Sitzung nicht gespeichert; bitte KandleOS neu starten.':
     'Another program is holding the file. Changes are not saved in this session; please restart KandleOS.',
   'Gespeicherte Daten stammen von einer neueren Version': 'Saved data comes from a newer version',
-  'Bitte KandleOS aktualisieren. Änderungen werden in dieser Sitzung nicht gespeichert.': 'Please update KandleOS. Changes are not saved in this session.'
+  'Bitte KandleOS aktualisieren. Änderungen werden in dieser Sitzung nicht gespeichert.': 'Please update KandleOS. Changes are not saved in this session.',
+  'Nach einem Neustart des Handys laufen sie erst wieder, wenn KandleOS einmal geöffnet wurde; bis dahin prüft Android etwa alle 15 Minuten.':
+    'After the phone restarts they only run again once KandleOS has been opened; until then Android checks about every 15 minutes.',
+  'Teilen hat nicht geklappt: {error}': 'Sharing did not work: {error}'
 }

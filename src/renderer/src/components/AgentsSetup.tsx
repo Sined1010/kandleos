@@ -130,8 +130,16 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
     }
   }
   const remove = async () => {
-    if (await ask(t('Python-Umgebung der umfassenden Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.'), t('Entfernen'), { danger: true }))
+    if (!(await ask(t('Python-Umgebung der umfassenden Analyse entfernen? Gespeicherte Keys und Analysen bleiben erhalten.'), t('Entfernen'), { danger: true })))
+      return
+    setSetupError('')
+    try {
       setStatus(await window.api.agents.remove())
+    } catch (e) {
+      // Refused (an analysis runs) or stopped halfway (a file held): say so, and show what is left.
+      setSetupError(ipcError(e))
+      window.api.agents.status().then(setStatus)
+    }
   }
   const setModel = (tier: 'deep' | 'quick', value: string) =>
     setConfig({ models: { ...config.models, [config.provider]: { ...models, [tier]: value.trim() } } })
@@ -203,9 +211,10 @@ export default function AgentsSetup({ onClose }: { onClose: () => void }) {
             >
               <Download size={14} /> {t('Jetzt einrichten')}
             </button>
-            {setupError && <p className="mt-2 whitespace-pre-wrap text-xs text-down">{setupError}</p>}
           </div>
         )}
+        {/* Below every state: removing fails while installed too (an analysis runs). */}
+        {setupError && <p className="whitespace-pre-wrap text-xs text-down">{setupError}</p>}
 
         <p className={heading}>{t('2 · KI-Anbieter')}</p>
         <div className="grid grid-cols-3 gap-1.5">

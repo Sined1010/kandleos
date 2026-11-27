@@ -262,7 +262,9 @@ function checkRequest(req: unknown): AgentsRequest {
     typeof r.symbol === 'string' &&
     SYMBOL_RE.test(r.symbol) &&
     PROVIDERS.some((p) => p.id === r.provider) &&
+    typeof r.deepModel === 'string' &&
     model.test(r.deepModel) &&
+    typeof r.quickModel === 'string' &&
     model.test(r.quickModel) &&
     Array.isArray(r.analysts) &&
     r.analysts.length > 0 &&
@@ -270,7 +272,7 @@ function checkRequest(req: unknown): AgentsRequest {
     Number.isInteger(r.debateRounds) &&
     r.debateRounds >= 1 &&
     r.debateRounds <= 3 &&
-    (r.ollamaUrl === undefined || /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl))
+    (r.ollamaUrl === undefined || (typeof r.ollamaUrl === 'string' && /^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(r.ollamaUrl)))
   if (!ok) throw new Error(t('Ungültige Anfrage für die Analyse'))
   // An unusable forecast does not refuse the analysis; it runs without Chronos and says so.
   const chronos = r.chronos === undefined ? undefined : chronosOrSkip(r.chronos)

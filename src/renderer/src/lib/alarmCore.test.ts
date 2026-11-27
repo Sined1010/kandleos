@@ -319,3 +319,41 @@ test('box: without a hit both sides keep the earlier entry either of them saw, a
   await w.catchUp()
   assert.equal(byId(alarms(), 'target').box?.entryAt, 15)
 })
+
+function manySetup(createdAt: number[], load: (symbol: string, from: number) => Promise<{ candles: { time: number; high: number; low: number }[] }>) {
+  let alarms: Alarm[] = createdAt.map((c, i) => ({ id: 'm' + i, symbol: 'AAPL', op: 'above' as const, price: 200 + i, createdAt: c }))
+  const loads: number[] = []
+  const w = createAlarmWatch({
+    alarms: () => alarms,
+    update: (fn) => void (alarms = fn(alarms)),
+    checkable: () => true,
+    loadBars: (symbol, from) => (loads.push(from), load(symbol, from)),
+    notify: async () => {},
+    collect: async () => {}
+  })
+  return { w, loads, alarms: () => alarms }
+}
+const quiet = async () => ({ candles: [{ time: 20, high: 150, low: 140 }, { time: 30, high: 151, low: 141 }] })
+
+test('catch-up loads the bars of a symbol once for all its alarms with the same start', async () => {
+  const { w, loads } = manySetup([10, 10, 10], quiet)
+  await w.catchUp()
+  assert.deepEqual(loads, [10])
+})
+
+test('alarms on one symbol armed at different times share the load from the next run on', async () => {
+  const { w, loads } = manySetup([10, 15], quiet)
+  await w.catchUp()
+  assert.deepEqual(loads, [10, 15])
+  await w.catchUp()
+  assert.deepEqual(loads, [10, 15, 30])
+})
+
+test('a failed load is not asked again for the other alarms of that symbol in the same run', async () => {
+  const { w, loads, alarms } = manySetup([10, 10], async () => {
+    throw new Error('HTTP 429')
+  })
+  await w.catchUp()
+  assert.deepEqual(loads, [10])
+  assert.ok(alarms().every((a) => a.checkedUntil === undefined))
+})

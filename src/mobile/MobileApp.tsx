@@ -23,7 +23,7 @@ import PcLink from './PcLink'
 import DrawTools from './DrawTools'
 import Layer from './Layer'
 import Licenses from './Licenses'
-import MessageBox from './MessageBox'
+import MessageBox, { tell } from './MessageBox'
 import MobileHeader, { FullscreenBar } from './MobileHeader'
 import Notice from './Notice'
 import { setFullscreen } from './statusBar'
@@ -183,7 +183,12 @@ export default function MobileApp() {
               }
             },
             { label: t('Infos zum Wert'), disabled: isCrypto(symbol), onPick: () => setPage('info') },
-            { label: t('Chart teilen'), onPick: () => void shareChart(document.querySelector('main')!, symbol).catch(() => {}) },
+            { label: t('Chart teilen'), onPick: () =>
+                void shareChart(document.querySelector('main')!, symbol).catch(
+                  // Closing the share menu is no error (@capacitor/share rejects it with this text).
+                  (e: Error) => e.message !== 'Share canceled' && tell(t('Teilen hat nicht geklappt: {error}', { error: e.message }))
+                )
+            },
             { label: t('Mit PC koppeln'), section: t('App'), onPick: () => setPage('pc') },
             { label: t('Einstellungen'), onPick: () => setSettings(true) },
             { label: t('Über KandleOS'), onPick: () => setAbout(true) }

@@ -20,14 +20,14 @@ export default function DrawTools() {
       className="mobile-chrome draw-tools fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel px-2 pt-1"
       style={{ height: 'calc(6rem + var(--sab, 0px))', paddingBottom: 'var(--sab, 0px)' }}
     >
-      <div className="flex items-center gap-2 px-1 pb-1">
+      <div className="flex items-center gap-2 px-1 pb-0.5">
         <p className="min-w-0 flex-1 truncate text-xs text-muted">
           {active && tool !== 'cursor' ? t(active[2]).split(/ \(| – /)[0] : t('Werkzeug wählen')}
         </p>
         <button
           onClick={() => setMagnet(!magnet)}
           aria-pressed={magnet}
-          className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ${magnet ? 'text-cyan-200 ring-1 ring-cyan-500' : 'text-muted'}`}
+          className={`flex min-h-11 items-center gap-1 rounded-lg px-3 text-xs ${magnet ? 'text-cyan-200 ring-1 ring-cyan-500' : 'text-muted'}`}
         >
           <Magnet size={14} />
           {t('Magnet')}
@@ -38,7 +38,7 @@ export default function DrawTools() {
           }
           disabled={!count}
           aria-label={t('Alle Zeichnungen löschen')}
-          className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-down disabled:opacity-30"
+          className="flex min-h-11 items-center gap-1 rounded-lg px-3 text-xs text-down disabled:opacity-30"
         >
           <Trash2 size={14} />
           {t('Alle löschen')}

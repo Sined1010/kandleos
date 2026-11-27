@@ -74,14 +74,14 @@ export function createAlarmWatch(deps: AlarmDeps) {
   }
 
   /** A box's target and stop against the same bars: the earlier hit (the stop on a tie) decides. */
-  async function catchUpBox(a: Alarm, done: Set<string>): Promise<void> {
+  async function catchUpBox(a: Alarm, done: Set<string>, loadBars: AlarmDeps['loadBars']): Promise<void> {
     const partner = partnerOf(a, deps.alarms())
     const pid = partner?.id
     done.add(a.id)
     if (pid) done.add(pid)
     if (!tableOf(a, Math.floor(Date.now() / 1000))) return
     const from = Math.min(...[a, partner].filter((x): x is Alarm => !!x && isArmed(x)).map((x) => x.checkedUntil ?? x.createdAt))
-    const { candles, stale } = await deps.loadBars(a.symbol, from)
+    const { candles, stale } = await loadBars(a.symbol, from)
     if (stale) return
     // Read again: either side may have fired, been re-armed or deleted while the bars loaded.
     const fresh = armedNow(a.id)
@@ -150,15 +150,24 @@ export function createAlarmWatch(deps: AlarmDeps) {
     /** Bars since the last check, so a spike while KandleOS was closed still counts. */
     async catchUp(): Promise<void> {
       const done = new Set<string>()
+      // Once per symbol and start in a run: alarms on one symbol line up their starts once a run has seen a bar after
+      // all of them (checked up to the same bar), so they share one load instead of asking the source once each; armed
+      // while the market is closed they line up at its next session. A failed load stays failed for this run.
+      const loads = new Map<string, ReturnType<AlarmDeps['loadBars']>>()
+      const loadBars: AlarmDeps['loadBars'] = (symbol, from) => {
+        const key = `${symbol}|${from}`
+        if (!loads.has(key)) loads.set(key, deps.loadBars(symbol, from))
+        return loads.get(key)!
+      }
       for (const a of deps.alarms().filter((x) => isArmed(x) && deps.checkable(x))) {
         if (done.has(a.id)) continue
         try {
           if (a.box) {
-            await catchUpBox(a, done)
+            await catchUpBox(a, done, loadBars)
             continue
           }
           if (!tableOf(a, Math.floor(Date.now() / 1000))) continue
-          const { candles, stale } = await deps.loadBars(a.symbol, a.checkedUntil ?? a.createdAt)
+          const { candles, stale } = await loadBars(a.symbol, a.checkedUntil ?? a.createdAt)
           if (stale) continue
           // Read again: the alarm may have fired, been re-armed or deleted while the bars loaded.
           const fresh = armedNow(a.id)
