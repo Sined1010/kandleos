@@ -4,10 +4,11 @@ KandleOS is a free, open-source app for technical chart analysis. The Android ap
 <ul>
 <li>Candlestick charts from 1 minute to 12 months, with volume and live prices</li>
 <li>Indicators such as SMA, EMA, Bollinger Bands, Squeeze, VWAP, Volume Profile, Supertrend, RSI, MACD, Stochastic, ATR and ADX</li>
-<li>Drawing tools: trend lines, channels, Fibonacci, Elliott waves, anchored VWAP, text and more</li>
+<li>Candlestick patterns with an honest look back at how often they worked for this symbol (off until you switch them on)</li>
+<li>Drawing tools: trend lines, channels, Fibonacci, Elliott waves, anchored VWAP, long/short positions, text and more, with a magnet</li>
 <li>Watchlist with folders, as a list or as folder tiles, with pinned symbols and sorting by daily change</li>
 <li>Saved charts with their drawings</li>
-<li>Price alarms, also in the background</li>
+<li>Price alarms and alarms at drawn lines and long/short positions, also in the background</li>
 <li>Insider deals (BaFin, Finnhub) and, for BTC and ETH, daily exchange flows (Coin Metrics), off until you switch them on</li>
 </ul>
 

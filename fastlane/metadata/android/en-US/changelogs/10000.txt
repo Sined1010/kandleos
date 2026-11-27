@@ -1,0 +1,7 @@
+- Alarms at drawn lines and at long/short positions (target, stop, entry)
+- Long/short position tool and a magnet for drawing
+- Candlestick patterns with an honest look back
+- Gaps after sleep or a lost connection are filled
+- Keyboard learns nothing, lock screen hides prices, no preview in recent apps
+- Pairing only via the scanner in the app
+- Update PC and phone together: 1.0.0 does not sync with 0.9.x

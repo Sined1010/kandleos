@@ -27,7 +27,7 @@ body:
     attributes:
       label: KandleOS version
       description: Shown in the About dialog (desktop) or ⋮ → About (Android).
-      placeholder: "0.9.1"
+      placeholder: "1.0.0"
     validations:
       required: true
   - type: dropdown

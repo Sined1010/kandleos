@@ -41,7 +41,12 @@ https://github.com/user-attachments/assets/08937b61-0954-4af9-a7fc-89ec120ba1f5
   Switching back to a chart you opened before shows it at once while fresh prices load
 - **Indicators:** SMA, EMA, triple EMA, Bollinger Bands, Squeeze, VWAP, Volume Profile (with POC and value area), Supertrend, RSI, MACD, Stochastic, ATR, ADX, with a legend in the chart showing their values.
   The "Volatility breakout" setup switches on Bollinger Bands, Squeeze, Supertrend, ADX and ATR with one click and explains how to read them
-- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, anchored VWAP, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure. Each drawing can get its own color, text comes in five sizes
+- **Candlestick patterns** (off by default): eleven textbook patterns such as hammer, engulfing and morning star on the last
+  finished candles, each with an honest look back at how often the price then moved the suggested way for this symbol,
+  compared with the same situations without the pattern
+- **Drawing tools:** trend line, ray, horizontal/vertical line, channel, rectangle, anchored VWAP, text, Fibonacci retracement, extension, fan and time zones, Elliott waves (impulse, correction, triangle, W-X-Y, W-X-Y-X-Z), sine wave, measure, long and short position (entry, target and stop with risk/reward). Each drawing can get its own color, text comes in five sizes, and a magnet snaps points to the candles' high, low, open or close
+- **Alarms at your drawings:** a trend line, ray, horizontal line, channel, rectangle or Fibonacci level can carry an alarm
+  that fires once when the price touches it. Long/short positions watch target and stop as a pair, waiting for the entry first if needed
 - **Saved charts:** save a symbol with its candle size and drawings under a name and load it again later, grouped by symbol and searchable
 - **Watchlist** with folders, a list or folder view with tiles, drag & drop, "Move to …", renaming, market status and a right-click menu.
   The daily change shows as a colored pill, ⏰ marks symbols with an active alarm, each folder shows its average change,
