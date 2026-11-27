@@ -13,3 +13,6 @@ export const eventNear = (badgeTimes: number[], toX: (time: number) => number | 
     const bx = toX(t)
     return bx !== null && Math.abs(bx - x) <= finger
   })
+
+/** Whether a hovered object id is an event badge (EventBadges: the bar time as digits, or 'tmp' for the temporary one). */
+export const isEventBadge = (id: unknown): id is string => id === 'tmp' || (typeof id === 'string' && /^\d+$/.test(id))

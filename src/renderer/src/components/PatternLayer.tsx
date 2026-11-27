@@ -128,19 +128,18 @@ export default function PatternLayer({ chart, series, data, symbol, timeframe, t
   const groupsRef = useRef(groups)
   groupsRef.current = groups
 
-  // PC: hover shows the card, a click keeps it until Esc or a click beside it. An event badge under the mouse wins.
+  // PC: hover shows the card, a click keeps it until Esc or a click beside it. Event boxes open only over their own
+  // badge (EventLayer), so the object under the mouse decides and hovering never opens both.
   const [hover, setHover] = useState<number | null>(null)
   useEffect(() => {
     if (IS_MOBILE) return
-    // A bar with event badges shows the event box (EventLayer reads the whole column), never both.
-    const onEvent = (p: MouseEventParams<Time>) => p.time !== undefined && !!useEventsUi.getState().badgeSides[p.time as number]
     const onMove = (p: MouseEventParams<Time>) => {
       const id = p.hoveredObjectId
-      setHover(isPattern(id) && !onEvent(p) ? Number(id.slice(4)) : null)
+      setHover(isPattern(id) ? Number(id.slice(4)) : null)
     }
     const onClick = (p: MouseEventParams<Time>) => {
       const id = p.hoveredObjectId
-      if (isPattern(id) && !onEvent(p)) usePatternsUi.setState({ open: { time: Number(id.slice(4)), pinned: true } })
+      if (isPattern(id)) usePatternsUi.setState({ open: { time: Number(id.slice(4)), pinned: true } })
       else if (usePatternsUi.getState().open) usePatternsUi.setState({ open: null })
     }
     const onKey = (e: KeyboardEvent) => {

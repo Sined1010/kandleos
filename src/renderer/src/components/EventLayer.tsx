@@ -10,6 +10,7 @@ import { locale, t } from '../../../shared/i18n'
 import { TF_SECONDS, type Candle, type Timeframe } from '../../../shared/types'
 import { mainPanePoint, onChartTap, TAP, type TapHandler } from '../lib/chartTap'
 import { EventBadges, type Badge } from '../lib/eventBadges'
+import { isEventBadge } from '../lib/patternHit'
 import { IS_MOBILE } from '../lib/platform'
 import { openEvents, useEventsData } from '../services/events'
 import { useEventsUi } from '../store/eventsUi'
@@ -165,19 +166,19 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
   const barOf = (p: MouseEventParams<Time>): number | undefined => {
     const id = p.hoveredObjectId
     if (id === 'tmp') return tmpTime.current
-    return typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : (p.time as number | undefined)
+    return isEventBadge(id) ? Number(id) : (p.time as number | undefined)
   }
   const barOfRef = useRef(barOf)
   barOfRef.current = barOf
   const marksRef = useRef(marks)
   marksRef.current = marks
 
-  // Hover box (PC): over a bar with a marker.
+  // Hover box (PC): only over a badge itself, not anywhere in its bar's column.
   const [tip, setTip] = useState<{ x: number; y: number; time: number } | null>(null)
   useEffect(() => {
     if (IS_MOBILE) return
     const onMove = (p: MouseEventParams<Time>) => {
-      const time = barOfRef.current(p)
+      const time = isEventBadge(p.hoveredObjectId) ? barOfRef.current(p) : undefined
       setTip(p.point && time !== undefined && latest.current(time).length ? { x: p.point.x, y: p.point.y, time } : null)
     }
     chart.subscribeCrosshairMove(onMove)
@@ -230,8 +231,7 @@ export default function EventLayer({ chart, series, data, symbol, timeframe, tim
   useEffect(() => {
     if (IS_MOBILE) return
     const onClick = (p: MouseEventParams<Time>) => {
-      const id = p.hoveredObjectId
-      if (typeof id !== 'string' || (id !== 'tmp' && !/^\d+$/.test(id))) return
+      if (!isEventBadge(p.hoveredObjectId)) return
       const first = latest.current(barOfRef.current(p)!)[0]
       if (!first) return
       openEvents()

@@ -254,8 +254,8 @@ function AddToWatchlist({ symbol }: { symbol: string }) {
   )
 }
 
-// [field, label, step]
-const ROWS: Record<Exclude<keyof Indicators, 'patterns'>, { label: string; params: [string, string, number?][] }> = {
+// [field, label, step]; below: drawn in its own pane under the chart (ChartArea), which groups it in the menu.
+const ROWS: Record<Exclude<keyof Indicators, 'patterns'>, { label: string; params: [string, string, number?][]; below?: true }> = {
   sma: { label: 'SMA', params: [['period', msg('Periode')]] },
   ema: { label: 'EMA', params: [['period', msg('Periode')]] },
   ema3: { label: msg('3-fach EMA'), params: [['fast', msg('Kurz')], ['mid', msg('Mittel')], ['slow', msg('Lang')]] },
@@ -264,12 +264,14 @@ const ROWS: Record<Exclude<keyof Indicators, 'patterns'>, { label: string; param
   vwap: { label: 'VWAP', params: [] },
   vp: { label: 'Volume Profile', params: [['rows', msg('Stufen')]] },
   supertrend: { label: 'Supertrend', params: [['period', msg('ATR-Periode')], ['mult', msg('Faktor'), 0.1]] },
-  rsi: { label: 'RSI', params: [['period', msg('Periode')]] },
-  macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']] },
-  stoch: { label: msg('Stochastik'), params: [['period', msg('Periode')], ['smoothK', '%K'], ['smoothD', '%D']] },
-  atr: { label: 'ATR', params: [['period', msg('Periode')]] },
-  adx: { label: 'ADX', params: [['period', msg('Periode')]] }
+  rsi: { label: 'RSI', params: [['period', msg('Periode')]], below: true },
+  macd: { label: 'MACD', params: [['fast', 'Fast'], ['slow', 'Slow'], ['signal', 'Signal']], below: true },
+  stoch: { label: msg('Stochastik'), params: [['period', msg('Periode')], ['smoothK', '%K'], ['smoothD', '%D']], below: true },
+  atr: { label: 'ATR', params: [['period', msg('Periode')]], below: true },
+  adx: { label: 'ADX', params: [['period', msg('Periode')]], below: true }
 }
+const HEAD = 'px-1 pb-1 text-[11px] uppercase tracking-wide text-muted'
+const SUBHEAD = 'px-1 pb-0.5 pt-1.5 text-xs font-medium text-slate-300'
 
 /**
  * A number field that may be empty or out of range while typing (so a value can be deleted and retyped); only valid
@@ -311,12 +313,52 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
   // Setup whose explanation is open.
   const [info, setInfo] = useState<string | null>(null)
 
+  const row = (name: keyof typeof ROWS) => {
+    const cfg = indicators[name] as unknown as Record<string, number | boolean>
+    const of = setupsOf(name).filter((s) => setupOn(indicators, s))
+    return (
+      <div key={name} className="flex items-center gap-2 rounded px-1 py-1.5 hover:bg-bg">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={cfg.on as boolean}
+            onChange={(e) => setIndicator(name, { on: e.target.checked })}
+            className="accent-accent"
+          />
+          {/* Name and setup tag wrap under each other when a row with three fields is short of room (phone). */}
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+            <span className="text-white">{t(ROWS[name].label)}</span>
+            {of.map((s) => (
+              <span key={s.id} className="whitespace-nowrap text-xs text-muted">
+                · {t(s.short)}
+              </span>
+            ))}
+          </span>
+        </label>
+        {ROWS[name].params.map(([field, label, step = 1]) => (
+          <NumberField
+            key={field}
+            label={`${t(ROWS[name].label)} ${t(label)}`}
+            title={t(label)}
+            min={step}
+            max={500}
+            step={step}
+            value={cfg[field] as number}
+            onValue={(v) => setIndicator(name, { [field]: v })}
+          />
+        ))}
+      </div>
+    )
+  }
+  const names = Object.keys(ROWS) as (keyof typeof ROWS)[]
+
   return (
     <>
       <div className="fixed inset-0 z-10" onClick={onClose} />
       {/* Scrolls instead of running off a small window or phone screen; above the forecast button (z-30). */}
       <div className="absolute left-0 top-full z-40 mt-1 max-h-[calc(100dvh-7rem)] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-line bg-panel/95 backdrop-blur p-2 shadow-2xl shadow-black/50">
-        <div className="px-1 pb-1 text-[11px] uppercase tracking-wide text-muted">{t('Setups')}</div>
+        <div className={HEAD}>{t('Indikatoren')}</div>
+        <div className={SUBHEAD}>{t('Setups')}</div>
         {SETUPS.map((s) => (
           <div key={s.id} className="rounded px-1 py-1.5 hover:bg-bg">
             <div className="flex items-center gap-2">
@@ -346,7 +388,12 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
             )}
           </div>
         ))}
-        <div className="px-1 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted">{t('Kerzenmuster')}</div>
+        <div className={SUBHEAD}>{t('Im Chart')}</div>
+        {names.filter((n) => !ROWS[n].below).map(row)}
+        <div className={SUBHEAD}>{t('Unter dem Chart')}</div>
+        {names.filter((n) => ROWS[n].below).map(row)}
+        <div className="my-2 border-t border-line" />
+        <div className={HEAD}>{t('Kerzenmuster')}</div>
         <div className="rounded px-1 py-1.5 hover:bg-bg">
           <div className="flex items-center gap-2">
             <label className="flex flex-1 cursor-pointer items-center gap-2">
@@ -379,44 +426,6 @@ export function IndicatorMenu({ onClose }: { onClose: () => void }) {
             </p>
           )}
         </div>
-        <div className="my-1 border-t border-line" />
-        {(Object.keys(ROWS) as (keyof typeof ROWS)[]).map((name) => {
-          const cfg = indicators[name] as unknown as Record<string, number | boolean>
-          const of = setupsOf(name).filter((s) => setupOn(indicators, s))
-          return (
-            <div key={name} className="flex items-center gap-2 rounded px-1 py-1.5 hover:bg-bg">
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={cfg.on as boolean}
-                  onChange={(e) => setIndicator(name, { on: e.target.checked })}
-                  className="accent-accent"
-                />
-                {/* Name and setup tag wrap under each other when a row with three fields is short of room (phone). */}
-                <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-white">{t(ROWS[name].label)}</span>
-                  {of.map((s) => (
-                    <span key={s.id} className="whitespace-nowrap text-xs text-muted">
-                      · {t(s.short)}
-                    </span>
-                  ))}
-                </span>
-              </label>
-              {ROWS[name].params.map(([field, label, step = 1]) => (
-                <NumberField
-                  key={field}
-                  label={`${t(ROWS[name].label)} ${t(label)}`}
-                  title={t(label)}
-                  min={step}
-                  max={500}
-                  step={step}
-                  value={cfg[field] as number}
-                  onValue={(v) => setIndicator(name, { [field]: v })}
-                />
-              ))}
-            </div>
-          )
-        })}
       </div>
     </>
   )

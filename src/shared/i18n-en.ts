@@ -447,6 +447,8 @@ export const EN: Record<string, string> = {
   'Drei kräftige rote Kerzen, jede schließt tiefer. Nach einem Anstieg kann das bedeuten, dass Verkäufer übernehmen.':
     'Three strong red candles, each closing lower. After a rise this can mean sellers are taking over.',
   Setups: 'Setups',
+  'Im Chart': 'On the chart',
+  'Unter dem Chart': 'Below the chart',
   'Volatilitäts-Ausbruch': 'Volatility breakout',
   Ausbruch: 'Breakout',
   'Volume Profile: kein Volumen': 'Volume Profile: no volume',
