@@ -19,7 +19,7 @@ import { Moon, SlidersHorizontal, Sparkles, Sunrise, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { barZone, futureTimes } from '../../../shared/calendar'
-import { mergeTick } from '../../../shared/candles'
+import { fillGap, mergeTick } from '../../../shared/candles'
 import { flowAsset, flowsPerBar } from '../../../shared/chain'
 import { candleDates } from '../../../shared/eventChart'
 import { HISTORY_LIMIT, mayLoadOlder, OLDER_RETRY_MS, prependOlder } from '../../../shared/history'
@@ -393,7 +393,9 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
           // Shown again on every try, the stored copy would reset the view each time.
           if (first) show(d)
           setStatus(t('Gespeicherter Stand, keine neuen Kurse: {error}', { error: d.stale }))
-          retry = setTimeout(() => load(false), 15_000)
+          // At most a minute here: the stored copy is shown, fresh candles should follow soon after the network is back.
+          retry = setTimeout(() => load(false), Math.min(wait, 60_000))
+          wait = Math.min(wait * 2, 300_000)
         })
         .catch((e: Error) => {
           if (!active) return
@@ -405,18 +407,49 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
     load(true)
     // After a dropped stream or a sleep the bars in between are missing: the newest page fills them in. Not for stock
     // bars of a day or longer: Yahoo stamps today's bar with the quote time, which would add a second bar for today.
-    const refill = () =>
-      (isCrypto(symbol) || (seconds < 86400 && !months)) &&
+    // The gap starts at the last bar seen before it (`seen`, taken while all was running), not at the last bar now: a
+    // quote or stream bar after waking would already start a bar behind the gap. It holds for every try until a page
+    // went in.
+    let refillRetry: ReturnType<typeof setTimeout> | undefined
+    let refillWait = 5_000
+    let seen: number | undefined
+    let gapFrom: number | undefined
+    const lastTime = () => dataRef.current[dataRef.current.length - 1]?.time
+    const refill = (): void => {
+      if (!active || !(isCrypto(symbol) || (seconds < 86400 && !months))) return
+      gapFrom ??= seen ?? lastTime()
+      const since = gapFrom
+      if (since === undefined) return
+      clearTimeout(refillRetry)
+      // A tick replaces the newest bar object (push): the same object at the answer means none came meanwhile.
+      const newest = dataRef.current[dataRef.current.length - 1]
       fetchCandles(symbol, timeframe, finnhubKey, extended)
         .then(({ candles }) => {
-          const last = dataRef.current[dataRef.current.length - 1]?.time
-          if (last !== undefined) for (const b of candles) if (b.time >= last) push(b)
+          if (!active) return
+          refillWait = 5_000
+          gapFrom = undefined
+          const bars = fillGap(dataRef.current, candles, since, dataRef.current[dataRef.current.length - 1] !== newest)
+          if (!bars) return
+          // The chart keeps the view itself: at the newest bar it moves with it, scrolled back it stays.
+          api.candles.setData(bars.map(toBar))
+          api.volume.setData(bars.map(toVol))
+          dataRef.current = bars
+          setData([...bars])
         })
-        .catch(() => {})
+        .catch(() => {
+          // Right after waking the network is often not back yet; stocks have no reconnect to try again.
+          if (!active) return
+          // wake and a reconnect may both have asked: one retry, not two.
+          clearTimeout(refillRetry)
+          refillRetry = setTimeout(refill, refillWait)
+          refillWait = Math.min(refillWait * 2, 300_000)
+        })
+    }
     // A sleeping PC runs no timers: a tick far later than planned means it woke up.
     let tickAt = Date.now()
     const wake = setInterval(() => {
-      if (Date.now() - tickAt > 90_000) void refill()
+      if (Date.now() - tickAt > 90_000) refill()
+      else seen = lastTime()
       tickAt = Date.now()
     }, 30_000)
 
@@ -438,6 +471,7 @@ export default function ChartArea({ full = false }: { full?: boolean }) {
       // Also on unmount (a tab switch remounts the chart): a forecast still running for these candles is dropped.
       fcRun.current++
       clearTimeout(retry)
+      clearTimeout(refillRetry)
       clearTimeout(soon)
       clearInterval(wake)
       stop()

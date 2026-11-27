@@ -45,6 +45,12 @@ test('a backup is parsed only when it looks like one', () => {
     assert.throws(() => parseBackup(bad), bad.slice(0, 60))
 })
 
+test('a backup store the app would trip over, or from a newer version, is refused', () => {
+  for (const store of [{ state: { folders: 5 }, version: 8 }, { state: {}, version: 9 }, { state: {}, version: -3 }])
+    assert.throws(() => parseBackup(backup({ store })), JSON.stringify(store))
+  assert.throws(() => parseBackup(backup({ store: { state: {}, version: 9 } })), /newer|neueren/)
+})
+
 test('a backup store cannot bring a Finnhub key past the password', () => {
   const parsed = parseBackup(backup({ store: { state: { folders: [], finnhubKey: 'evil123' }, version: 2 } }))
   assert.deepEqual(parsed.store, { state: { folders: [] }, version: 2 })

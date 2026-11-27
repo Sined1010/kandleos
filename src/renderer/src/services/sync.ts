@@ -17,7 +17,7 @@ import {
   type SyncState,
   type Units
 } from '../../../shared/sync'
-import { useStore } from '../store/useStore'
+import { storeStopped, useStore } from '../store/useStore'
 
 const sliceOfStore = (): SyncSlice => {
   const s = useStore.getState()
@@ -67,6 +67,8 @@ export function startStamping(onLocalChange?: () => void): () => void {
 export function answerPhone(device: string, raw: unknown): SyncReply {
   const req = checkSyncRequest(raw)
   if (!req) throw new Error('bad-request')
+  // A session that saves nothing runs on defaults: merged in, they would land on the phone as if they were the PC's.
+  if (storeStopped()) throw new Error('store-stopped')
   stampNow()
   const out = answerSync(sliceOfStore(), useStore.getState().sync, device, req, Date.now(), {
     fromPhone: t('Tab vom Handy'),
@@ -98,6 +100,8 @@ const SYNC_TIMEOUT_MS = 12_000
 export function syncWithPc(pcId: string, call: (op: string, args: unknown, timeoutMs?: number) => Promise<unknown>): Promise<Alarm[]> {
   running ??= (async () => {
     try {
+      // Same on the phone: a session that saves nothing does not take part.
+      if (storeStopped()) throw new Error('store-stopped')
       stampNow()
       const st = useStore.getState().sync
       const sent = unitsOf(sliceOfStore())

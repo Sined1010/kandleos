@@ -5,7 +5,7 @@ import { createAlarmWatch, type AlarmNote } from '../renderer/src/lib/alarmCore'
 import { knotsFor } from '../renderer/src/lib/lineAlarms'
 import { alarmBody, alarmTitle } from '../renderer/src/services/alarmWatch'
 import { fetchCandles } from '../renderer/src/services/marketData'
-import { useQuotes, useStore } from '../renderer/src/store/useStore'
+import { storeStopped, useQuotes, useStore } from '../renderer/src/store/useStore'
 import { planAlarm } from './alarmPlan'
 import { KandleNative, type NativeAlarm } from './native'
 
@@ -18,6 +18,8 @@ export const notifyAlarm = (a: Alarm, note?: AlarmNote) =>
 
 /** What the background check found; merged first, so an alarm it already reported is not reported again. */
 async function collectNative(): Promise<void> {
+  // A session that saves nothing would take the hits and lose them; they stay with the background check.
+  if (storeStopped()) return
   const { list } = await KandleNative.takeTriggered().catch(() => ({ list: [] }))
   if (list.length) useStore.getState().applyNative(list)
 }
@@ -38,6 +40,8 @@ const watch = createAlarmWatch({
 
 /** The armed alarms go to the Android background check (AlarmWorker / AlarmService). */
 async function syncNative(): Promise<void> {
+  // The store could not be read: its alarms are unknown here, so the background check keeps the ones it has.
+  if (storeStopped()) return
   await collectNative()
   const s = useStore.getState()
   alpacaKeys = await window.api.alpacaHasKeys()

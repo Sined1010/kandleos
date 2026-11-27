@@ -116,3 +116,21 @@ export function snapLast(candles: Candle[], seconds: number): Candle[] {
   if (time > prev.time) return [...head, prev, { ...live, time }]
   return [...head, { ...prev, high: Math.max(prev.high, live.high), low: Math.min(prev.low, live.low), close: live.close }]
 }
+
+/**
+ * The newest page, fetched after a sleep or a dropped stream, put into the bars shown. From `since` (the last bar
+ * before the gap) the page's bars count; live bars newer than the page stay. A bar both have keeps the page's range;
+ * its price comes from the live bar only if a tick came while the page was on its way (`ticked`), otherwise the live
+ * bar is still the one from before the gap. Null when the page has nothing from `since` on.
+ */
+export function fillGap(current: Candle[], fetched: Candle[], since: number, ticked = true): Candle[] | null {
+  const page = fetched.filter((c) => c.time >= since)
+  if (!page.length) return null
+  const end = page[page.length - 1]
+  const live = current.find((c) => c.time === end.time)
+  const last = live && ticked
+    ? { ...end, high: Math.max(end.high, live.high), low: Math.min(end.low, live.low), close: live.close, volume: Math.max(end.volume, live.volume) }
+    : end
+  // Cut at the page's first bar, not at `since`: a gap longer than one page starts later, the bar before it stays.
+  return [...current.filter((c) => c.time < page[0].time), ...page.slice(0, -1), last, ...current.filter((c) => c.time > end.time)]
+}

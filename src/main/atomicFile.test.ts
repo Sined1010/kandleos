@@ -59,3 +59,13 @@ test('readOrSetAside does not take a file it cannot read for a missing one (lock
   await mkdir(file)
   assert.throws(() => readOrSetAside(file, 5))
 })
+
+test('readOrSetAside tries again when another program holds the file for a moment (virus scanner at start)', () => {
+  let tries = 0
+  const read = (): string => {
+    if (++tries < 3) throw Object.assign(new Error('busy'), { code: 'EBUSY' })
+    return '{"v":1}'
+  }
+  assert.equal(readOrSetAside('x.json', 5, read), '{"v":1}')
+  assert.equal(tries, 3)
+})

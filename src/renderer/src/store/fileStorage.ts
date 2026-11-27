@@ -8,7 +8,7 @@ import type { PersistStorage, StorageValue } from 'zustand/middleware'
 export function fileStorage<S>(
   read: () => string | null,
   write: (text: string) => Promise<boolean> | void
-): PersistStorage<S> & { stop(): void } {
+): PersistStorage<S> & { stop(): void; isStopped(): boolean } {
   let last: StorageValue<S> | undefined
   let stopped = false
   const same = (a: StorageValue<S>, b: StorageValue<S>): boolean => {
@@ -30,6 +30,7 @@ export function fileStorage<S>(
       })
     },
     removeItem: () => {},
-    stop: () => void (stopped = true)
+    stop: () => void (stopped = true),
+    isStopped: () => stopped
   }
 }

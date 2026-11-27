@@ -61,7 +61,6 @@ export async function exportBackup(wc: WebContents, store: string | null, opts: 
 export interface BackupSummary {
   appVersion: string
   exportedAt: string
-  storeVersion: number | null
   symbols: number
   analyses: number
   hasKeys: boolean
@@ -89,7 +88,6 @@ export async function pickBackup(wc: WebContents): Promise<BackupSummary | null>
   return {
     appVersion: backup.appVersion,
     exportedAt: backup.exportedAt,
-    storeVersion: backup.store?.version ?? null,
     symbols,
     analyses: backup.analyses.length,
     hasKeys: backup.keys !== null
@@ -97,19 +95,20 @@ export async function pickBackup(wc: WebContents): Promise<BackupSummary | null>
 }
 
 /**
- * Applies the picked backup: keys (only with the right password; empty skips them), analyses, and returns the
- * store text for index.ts to write. Nothing is written if the password is wrong.
+ * Applies the picked backup: the store first (index.ts writes it), then keys (only with the right password; empty
+ * skips them), analyses and the archive. Nothing is written if the password is wrong; a store that cannot be written
+ * stops it before anything else changed.
  */
-export async function applyBackup(password: unknown): Promise<string | null> {
+export async function applyBackup(password: unknown, writeStore: (text: string) => Promise<void>): Promise<void> {
   const backup = pending
   if (!backup) throw new Error(t('Keine Sicherung ausgewählt'))
   const keys = backup.keys && typeof password === 'string' && password ? openKeys(backup.keys, password) : null
   pending = null
+  if (backup.store) await writeStore(JSON.stringify(backup.store))
   if (keys?.finnhub) await saveFinnhubKey(keys.finnhub)
   if (keys?.alpaca) await saveAlpacaKeys(keys.alpaca)
   if (keys?.agents) await writeKeys({ ...readKeys(), ...keys.agents })
   for (const a of backup.analyses) await saveAnalysis(a)
   // A backup with an archive replaces it; one from before the archive leaves the current one alone.
   if (backup.archive) await archive().importData(backup.archive)
-  return backup.store ? JSON.stringify(backup.store) : null
 }

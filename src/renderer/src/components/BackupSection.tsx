@@ -3,7 +3,6 @@ import type { BackupSummary } from '../../../main/backup'
 import { t } from '../../../shared/i18n'
 import { MIN_PASSWORD } from '../../../shared/types'
 import { ipcError } from '../lib/format'
-import { useStore } from '../store/useStore'
 
 // The section sits inside the settings form: Enter in a password field must not save and close the settings.
 const noEnter = (e: React.KeyboardEvent) => e.key === 'Enter' && e.preventDefault()
@@ -54,8 +53,6 @@ export default function BackupSection() {
       setPicked(null)
       const summary = await window.api.backup.pick()
       if (!summary) return
-      if ((summary.storeVersion ?? 0) > (useStore.persist.getOptions().version ?? 0))
-        throw new Error(t('Die Sicherung stammt von einer neueren KandleOS-Version.'))
       setKeyPassword('')
       setPicked(summary)
     })

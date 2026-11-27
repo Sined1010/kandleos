@@ -1,14 +1,18 @@
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
-import type { Files } from './storeFile'
+import { readOrMissing, type Files } from './storeFile'
 
 const at = { directory: Directory.Data }
 
 /** The app's private data folder (Android: /data/data/<app>/files). */
 export const appFiles: Files = {
   read: (path) =>
-    Filesystem.readFile({ path, ...at, encoding: Encoding.UTF8 }).then(
-      (r) => r.data as string,
-      () => null
+    readOrMissing(
+      () => Filesystem.readFile({ path, ...at, encoding: Encoding.UTF8 }).then((r) => r.data as string),
+      // Metadata only: it answers even when reading the content failed.
+      () => Filesystem.stat({ path, ...at }).then(
+        () => true,
+        () => false
+      )
     ),
   write: async (path, data) => {
     await Filesystem.writeFile({ path, data, ...at, encoding: Encoding.UTF8, recursive: true })

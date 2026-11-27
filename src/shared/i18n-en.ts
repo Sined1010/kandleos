@@ -1265,5 +1265,10 @@ export const EN: Record<string, string> = {
   'Die alte Datei liegt als Kopie im Datenordner; KandleOS startet leer.':
     'The old file is kept as a copy in the data folder; KandleOS starts empty.',
   'Speichern fehlgeschlagen': 'Saving failed',
-  'Änderungen werden in dieser Sitzung nicht gespeichert.': 'Changes are not saved in this session.'
+  'Änderungen werden in dieser Sitzung nicht gespeichert.': 'Changes are not saved in this session.',
+  'Gespeicherte Daten gesperrt': 'Saved data locked',
+  'Ein anderes Programm hält die Datei fest. Änderungen werden in dieser Sitzung nicht gespeichert; bitte KandleOS neu starten.':
+    'Another program is holding the file. Changes are not saved in this session; please restart KandleOS.',
+  'Gespeicherte Daten stammen von einer neueren Version': 'Saved data comes from a newer version',
+  'Bitte KandleOS aktualisieren. Änderungen werden in dieser Sitzung nicht gespeichert.': 'Please update KandleOS. Changes are not saved in this session.'
 }

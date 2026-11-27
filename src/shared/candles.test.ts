@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aggregate, aggregateMonths, logicalToTime, mergeTick, snapLast, timeToLogical } from './candles.ts'
+import { aggregate, aggregateMonths, fillGap, logicalToTime, mergeTick, snapLast, timeToLogical } from './candles.ts'
 
 test('timeToLogical / logicalToTime round-trip inside, between and beyond bars', () => {
   const times = [100, 160, 400, 460] // gap between 160 and 400
@@ -130,4 +130,35 @@ test('mergeTick opens day bars by the trading date and keeps the time of day of 
   // Finnhub labels days at 00:00 UTC (read in UTC), Alpaca at 00:00 ET: both keep their midnight.
   assert.equal(mergeTick(bar(Date.UTC(2026, 10, 17) / 1000), 3, et(18, 9, 31), 86400, 0, 'UTC').time, Date.UTC(2026, 10, 18) / 1000)
   assert.equal(mergeTick(bar(et(17, 0)), 3, et(18, 9, 31), 86400, 0, ny).time, et(18, 0))
+})
+
+const bar = (time: number, close = 1, high = close, low = close) => ({ time, open: 1, high, low, close, volume: 1 })
+
+test('fillGap puts the missed bars in even when a live tick already started a bar after the gap', () => {
+  // Chart at 300, PC asleep, the first quote after waking makes a bar at 7500 before the newest page arrives.
+  const current = [bar(0), bar(300), { time: 7500, open: 5, high: 5, low: 5, close: 5, volume: 1 }]
+  const fetched = Array.from({ length: 25 }, (_, i) => bar(300 + i * 300, 2, 9, 0.5))
+  const out = fillGap(current, fetched, 300)!
+  assert.deepEqual(out.map((c) => c.time), Array.from({ length: 26 }, (_, i) => i * 300))
+  // The bar both have: the page knows its whole range, the live tick the latest price.
+  assert.deepEqual(out.at(-1), { time: 7500, open: 1, high: 9, low: 0.5, close: 5, volume: 1 })
+})
+
+test('fillGap keeps live bars newer than the page and the history before the gap', () => {
+  const out = fillGap([bar(0, 7), bar(300), bar(900, 3)], [bar(0, 8), bar(300), bar(600)], 300)!
+  assert.deepEqual(out.map((c) => [c.time, c.close]), [[0, 7], [300, 1], [600, 1], [900, 3]])
+})
+
+test('fillGap without a bar from the gap on changes nothing', () => {
+  assert.equal(fillGap([bar(0), bar(300)], [bar(0)], 300), null)
+})
+
+test('fillGap keeps the bar before the gap when the page starts later (a gap longer than one page)', () => {
+  const out = fillGap([bar(0), bar(300), bar(9000, 4)], [bar(3000), bar(6000), bar(9000)], 300)!
+  assert.deepEqual(out.map((c) => c.time), [0, 300, 3000, 6000, 9000])
+})
+
+test('fillGap takes the page close when no tick came since asking (the shared bar is the one from before the sleep)', () => {
+  const out = fillGap([bar(0), bar(3600, 10)], [bar(3600, 20, 25, 5)], 0, false)!
+  assert.deepEqual(out.at(-1), { time: 3600, open: 1, high: 25, low: 5, close: 20, volume: 1 })
 })

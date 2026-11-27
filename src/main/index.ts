@@ -19,7 +19,7 @@ import { setLang, t } from '../shared/i18n'
 import { FINNHUB_KEY_RE } from '../shared/types'
 import { VERSION_RE } from '../shared/version'
 import { archive } from './archive'
-import { readOrSetAside, writeFileAtomic } from './atomicFile'
+import { isBusy, readOrSetAside, writeFileAtomic } from './atomicFile'
 import { applyBackup, exportBackup, pickBackup } from './backup'
 import { forecast, loadModel, modelReady } from './forecast'
 import { createRemoteOps } from './remoteOps'
@@ -144,37 +144,41 @@ ipcMain.on('app:notify', (_e, title, body) => notify(title, body))
 // Alpaca keys only go in; the window learns whether they are set.
 ipcMain.handle('alpaca:has-keys', () => alpacaHasKeys())
 ipcMain.handle('alpaca:set-keys', (_e, id, secret) => setAlpacaKeys(id, secret))
-// After an import the old page would save its state back over the imported store; ignore it until the reload. Also
-// set when the store could not be read: the window's defaults must not replace it.
+// Set when the store could not be read: the window's defaults must not replace it (for the whole session).
 let storeLocked = false
+// After an import the old page would save its state back over the imported store; ignored until the reload.
+let importing = false
 ipcMain.on('store:get', (e) => {
   const had = existsSync(storeFile())
   try {
     const text = readOrSetAside(storeFile())
+    // Each page load decides anew: a store imported over an unreadable one may be saved again.
+    storeLocked = false
     // Set aside unreadable: the window starts empty, the old file stays next to it for the user.
     if (text === null && had) notify(t('Gespeicherte Daten waren beschädigt'), t('Die alte Datei liegt als Kopie im Datenordner; KandleOS startet leer.'))
     e.returnValue = text
   } catch (err) {
     console.error('Store nicht lesbar:', err)
     storeLocked = true
-    notify(t('Gespeicherte Daten waren beschädigt'), t('Änderungen werden in dieser Sitzung nicht gespeichert.'))
-    e.returnValue = null
+    // Not null: that reads as a first start. The window's load fails on this, saves nothing, keeps out of the sync
+    // with the phone and gives the notice (useStore.ts).
+    e.returnValue = { locked: isBusy(err) ? 'store-busy' : 'store-locked' }
   }
 })
 let saveWarned = false
 ipcMain.handle('store:set', (_e, data: unknown) => {
-  if (typeof data !== 'string' || storeLocked) return false
+  if (typeof data !== 'string' || storeLocked || importing) return false
   // Serialize writes and swap atomically so a crash mid-write never truncates the store.
   const run = writeQueue.then(() => writeFileAtomic(storeFile(), data))
   writeQueue = run.catch((err) => {
     console.error('Speichern fehlgeschlagen:', err)
-    // Once per run: a full disk would otherwise raise a notice on every click.
+    // Once until the next save that works: a full disk would otherwise raise a notice on every click.
     if (!saveWarned) notify(t('Speichern fehlgeschlagen'), (err as Error).message)
     saveWarned = true
   })
   // false: the window saves the same state again next time (fileStorage.ts).
   return run.then(
-    () => true,
+    () => ((saveWarned = false), true),
     () => false
   )
 })
@@ -197,20 +201,25 @@ ipcMain.handle('backup:export', async (e, opts) => {
 })
 ipcMain.handle('backup:pick', (e) => pickBackup(e.sender))
 ipcMain.handle('backup:apply', async (e, password) => {
-  const store = await applyBackup(password)
-  storeLocked = true
-  await writeQueue
-  if (store) {
-    try {
+  let wrote = false
+  try {
+    await applyBackup(password, async (store) => {
+      importing = true
+      await writeQueue
       await writeFileAtomic(storeFile(), store)
-    } catch (err) {
-      // No reload comes, so the page must be able to save again.
-      storeLocked = false
+      wrote = true
+    })
+  } catch (err) {
+    // Before the store: nothing changed, the page may save again. After it: the old page must not save over the
+    // imported store, so it reloads anyway and the error goes out as a notice.
+    if (!wrote) {
+      importing = false
       throw err
     }
+    notify(t('Speichern fehlgeschlagen'), (err as Error).message)
   }
-  // The new page reads the imported store (and keys) on start.
-  e.sender.once('did-finish-load', () => (storeLocked = false))
+  // The new page reads the imported store (and keys) on start; a lock its read sets stays.
+  e.sender.once('did-finish-load', () => (importing = false))
   e.sender.reload()
 })
 ipcMain.handle('stocks:candles', (_e, symbol, tf, key, extended, older) => stockCandles(symbol, tf, key, extended, older))

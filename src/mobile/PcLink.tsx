@@ -56,6 +56,7 @@ function PairPage({ onDone }: { onDone(): void }) {
 
   useEffect(() => {
     let stream: MediaStream | null = null
+    let closed = false
     let timer = 0
     let found = false
     let reading = false
@@ -67,7 +68,8 @@ function PairPage({ onDone }: { onDone(): void }) {
       .then((s) => {
         stream = s
         const v = video.current
-        if (!v) return
+        // The page closed while the camera was starting (permission prompt, slow start): switch it off again.
+        if (closed || !v) return s.getTracks().forEach((tr) => tr.stop())
         v.srcObject = s
         void v.play()
         timer = window.setInterval(async () => {
@@ -92,6 +94,7 @@ function PairPage({ onDone }: { onDone(): void }) {
       })
       .catch(() => setCamera(false))
     return () => {
+      closed = true
       clearInterval(timer)
       stream?.getTracks().forEach((tr) => tr.stop())
     }

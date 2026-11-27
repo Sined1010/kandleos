@@ -5,6 +5,7 @@ import type { SavedAnalysis } from './agents'
 import { keyEnvFor } from '../shared/agents.ts'
 import { t } from '../shared/i18n.ts'
 import { checkAnalyses } from '../shared/savedAnalysis.ts'
+import { STORE_VERSION, storeShapeOk } from '../shared/storeShape.ts'
 import { ALPACA_KEY_RE, FINNHUB_KEY_RE, isObj, MIN_PASSWORD } from '../shared/types.ts'
 
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024
@@ -119,7 +120,10 @@ export function parseBackup(text: string): Backup {
   }
   if (!isObj(v) || v.app !== 'KandleOS' || v.format !== 1) return fail()
   const store = v.store
-  if (store !== null && !(isObj(store) && isObj(store.state) && Number.isInteger(store.version))) return fail()
+  if (isObj(store) && typeof store.version === 'number' && store.version > STORE_VERSION)
+    throw new Error(t('Die Sicherung stammt von einer neueren KandleOS-Version.'))
+  // A store the app would trip over at every start never gets in.
+  if (store !== null && !(isObj(store) && storeShapeOk(store.state, store.version))) return fail()
   if (!Array.isArray(v.analyses) || v.analyses.length > 10_000) return fail()
   const keys = v.keys
   if (keys !== null) {

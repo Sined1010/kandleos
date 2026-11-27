@@ -6,6 +6,7 @@ const queues = new Map<string, Promise<unknown>>()
 
 // A virus scanner or the search indexer holds a just-written file for a moment on Windows; the rename then fails.
 const BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
+export const isBusy = (e: unknown): boolean => BUSY.has((e as NodeJS.ErrnoException).code ?? '')
 
 async function renameRetry(from: string, to: string): Promise<void> {
   for (let i = 0; ; i++) {
@@ -35,13 +36,19 @@ export function writeFileAtomic(path: string, data: string | Uint8Array, mode = 
  * first: the app then starts with its defaults, and its first save must not overwrite the only copy of the user's data.
  * A file that is there but cannot be read (held by another program) or set aside throws: the caller must not save.
  */
-export function readOrSetAside(path: string, now = Date.now()): string | null {
+export function readOrSetAside(path: string, now = Date.now(), read = (p: string) => readFileSync(p, 'utf8')): string | null {
   let text: string
-  try {
-    text = readFileSync(path, 'utf8')
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw e
+  for (let i = 0; ; i++) {
+    try {
+      text = read(path)
+      break
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code ?? ''
+      if (code === 'ENOENT') return null
+      // Held for a moment (virus scanner at start): a short wait, or the whole session would save nothing.
+      if (i >= 4 || !BUSY.has(code)) throw e
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 + i * 25)
+    }
   }
   try {
     JSON.parse(text)

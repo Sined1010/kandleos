@@ -13,7 +13,7 @@ const file = (name: string): string => join(app.getPath('userData'), name)
 export async function save(encrypted: string, plain: string, value: string): Promise<void> {
   // A file that cannot be decrypted now is kept aside, not overwritten or removed: it may hold keys a later start can
   // read again (an empty field in the settings may only mean the keyring is still locked).
-  if (decryptFails(encrypted)) await rename(file(encrypted), file(encrypted + '.unreadable')).catch(() => {})
+  if (decryptFails(encrypted)) await rename(file(encrypted), file(`${encrypted}.unreadable-${Date.now()}`)).catch(() => {})
   if (!value) {
     await rm(file(encrypted), { force: true })
     await rm(file(plain), { force: true })

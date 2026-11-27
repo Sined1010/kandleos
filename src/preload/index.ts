@@ -14,7 +14,12 @@ function listen<T>(channel: string, cb: (value: T) => void): () => void {
 }
 
 const api = {
-  storeGet: (): string | null => ipcRenderer.sendSync('store:get'),
+  storeGet: (): string | null => {
+    const v = ipcRenderer.sendSync('store:get')
+    // A store main could not read: the store's load fails (useStore.ts onRehydrateStorage).
+    if (v && typeof v === 'object') throw new Error(String(v.locked))
+    return v
+  },
   /** Language for texts the main process produces (error messages, names). */
   setLanguage: (lang: string): void => ipcRenderer.send('app:language', lang),
   /**

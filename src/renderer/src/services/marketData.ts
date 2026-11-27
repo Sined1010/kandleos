@@ -15,6 +15,7 @@ import {
   type Timeframe
 } from '../../../shared/types'
 import { ipcError } from '../lib/format'
+import { pollErrors } from '../lib/pollErrors'
 import { socket } from './socket'
 
 const BINANCE = 'https://api.binance.com/api/v3'
@@ -207,21 +208,28 @@ export function watchQuotes(
   const polled: Record<string, Quote> = {}
   // Time of the latest Finnhub trade per stock: a slower poll must not put an older price over it.
   const traded: Record<string, number> = {}
-  const poll = (list = stocks) =>
+  const stockError = pollErrors()
+  let groups = 0
+  const poll = (list = stocks, group = 0) =>
     window.api
       .stockQuotes(list)
       .then(({ quotes, error: sourceError }) => {
         if (!active) return
-        onStockError(sourceError)
+        onStockError(stockError.report(group, sourceError))
         for (const [s, q] of Object.entries(quotes)) {
           polled[s] = q
           if (!(traded[s] > q.time)) onQuote(s, q)
         }
       })
-      .catch((e) => active && onStockError(ipcError(e)))
+      .catch((e) => active && onStockError(stockError.report(group, ipcError(e))))
   const startPolling = (list = stocks, ms = source === 'alpaca' ? 5_000 : 15_000) => {
     if (!list.length) return
-    const id = setInterval(() => poll(list), ms)
+    const group = ++groups
+    stockError.start(group)
+    // The slow group once right away: until each group has answered, the first poll's error stays (pollErrors), and
+    // a minute is long for it. The fast ones answer within seconds; asking them now would ask every stock twice.
+    if (ms > 15_000) poll(list, group)
+    const id = setInterval(() => poll(list, group), ms)
     cleanups.push(() => clearInterval(id))
   }
   let fellBack = false

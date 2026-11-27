@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readStore, writeAtomic, type Files } from './storeFile.ts'
+import { readOrMissing, readStore, writeAtomic, type Files } from './storeFile.ts'
 import { createCandleCache } from './candleCache.ts'
 
 /** Files in memory; `crashAfterWrite` makes the next rename fail as if the app was killed right then. */
@@ -29,22 +29,22 @@ function memFiles() {
 
 test('writeAtomic called twice in a row ends with the second value', async () => {
   const f = memFiles()
-  await Promise.all([writeAtomic(f, '{"v":1}'), writeAtomic(f, '{"v":2}')])
-  assert.equal(await readStore(f), '{"v":2}')
+  await Promise.all([writeAtomic(f, '{"state":{"v":1},"version":8}'), writeAtomic(f, '{"state":{"v":2},"version":8}')])
+  assert.equal(await readStore(f), '{"state":{"v":2},"version":8}')
 })
 
 test('a write killed before its rename leaves the previous store readable', async () => {
   const f = memFiles()
-  await writeAtomic(f, '{"v":1}')
+  await writeAtomic(f, '{"state":{"v":1},"version":8}')
   f.crashNextRename()
-  await writeAtomic(f, '{"v":2}').catch(() => {})
-  assert.equal(await readStore(f), '{"v":1}')
+  await writeAtomic(f, '{"state":{"v":2},"version":8}').catch(() => {})
+  assert.equal(await readStore(f), '{"state":{"v":1},"version":8}')
 })
 
 test('readStore falls back to a valid temp file when the store file is gone', async () => {
   const f = memFiles()
-  f.disk.set('store.json.tmp', '{"v":3}')
-  assert.equal(await readStore(f), '{"v":3}')
+  f.disk.set('store.json.tmp', '{"state":{"v":3},"version":8}')
+  assert.equal(await readStore(f), '{"state":{"v":3},"version":8}')
 })
 
 test('readStore ignores a broken temp file', async () => {
@@ -86,8 +86,8 @@ test('candle cache gives back what it stored after a restart', async () => {
 test('an empty or broken store file falls back to a valid temp file', async () => {
   const f = memFiles()
   f.disk.set('store.json', '')
-  f.disk.set('store.json.tmp', '{"v":4}')
-  assert.equal(await readStore(f), '{"v":4}')
+  f.disk.set('store.json.tmp', '{"state":{"v":4},"version":8}')
+  assert.equal(await readStore(f), '{"state":{"v":4},"version":8}')
 })
 
 test('an unreadable store is set aside before the app starts with defaults, so nothing overwrites it', async () => {
@@ -102,4 +102,44 @@ test('no store file yet: nothing to set aside', async () => {
   const f = memFiles()
   assert.equal(await readStore(f, 1), null)
   assert.equal(f.disk.size, 0)
+})
+
+test('readOrMissing gives null only for a file that is not there, not for one that cannot be read', async () => {
+  const fail = async (): Promise<string> => {
+    throw new Error('out of memory')
+  }
+  assert.equal(await readOrMissing(async () => 'x', async () => true), 'x')
+  assert.equal(await readOrMissing(fail, async () => false), null)
+  await assert.rejects(readOrMissing(fail, async () => true), /out of memory/)
+})
+
+test('readStore lets a read error through, so the app locks the store instead of saving defaults over it', async () => {
+  const f = memFiles()
+  f.read = async () => {
+    throw new Error('I/O error')
+  }
+  await assert.rejects(readStore(f), /I\/O error/)
+})
+
+test('readStore reports a store it set aside, so the app can say why it starts empty', async () => {
+  const f = memFiles()
+  f.disk.set('store.json', '{"st')
+  let told = 0
+  await readStore(f, 1, () => told++)
+  assert.equal(told, 1)
+})
+
+test('a store of the wrong shape is set aside too, so the phone can save again (it has no import to get out)', async () => {
+  const f = memFiles()
+  const bad = JSON.stringify({ state: { folders: 5 }, version: 8 })
+  f.disk.set('store.json', bad)
+  assert.equal(await readStore(f, 7), null)
+  assert.equal(f.disk.get('store.broken-7.json'), bad)
+})
+
+test('a store from a newer version stays where it is (the app says to update and saves nothing)', async () => {
+  const f = memFiles()
+  const newer = JSON.stringify({ state: { folders: 5 }, version: 99 })
+  f.disk.set('store.json', newer)
+  assert.equal(await readStore(f, 7), newer)
 })

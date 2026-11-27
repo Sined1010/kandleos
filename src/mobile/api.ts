@@ -93,7 +93,9 @@ export async function createMobileApi(): Promise<Api> {
   // storeGet and keyGet are synchronous on the desktop (sendSync); here their values are read up front.
   // An unreadable store that could not be set aside: start empty, and save nothing over it this session.
   let locked = false
-  let store = await readStore(appFiles).catch(() => ((locked = true), null))
+  let store = await readStore(appFiles, Date.now(), () =>
+    tell(t('Die alte Datei liegt als Kopie im Datenordner; KandleOS startet leer.'), { title: t('Gespeicherte Daten waren beschädigt') })
+  ).catch(() => ((locked = true), null))
   let storeWarned = false
   let finnhub = (await secret('finnhub')) ?? ''
   let alpaca: AlpacaKeys | null = null
@@ -112,7 +114,11 @@ export async function createMobileApi(): Promise<Api> {
   )
 
   return {
-    storeGet: () => store,
+    storeGet: () => {
+      // Thrown, the store's load fails: it then saves nothing this session and says so (useStore.ts, notify below).
+      if (locked) throw new Error('store locked')
+      return store
+    },
     storeSet: async (data) => {
       if (locked) return false
       store = data
@@ -171,8 +177,8 @@ export async function createMobileApi(): Promise<Api> {
       progress.add(cb)
       return () => void progress.delete(cb)
     },
-    // The phone notifies through KandleNative (alarmWatch.ts).
-    notify: () => {},
+    // Alarms notify through KandleNative (alarmWatch.ts); this is the store's notice that nothing is saved.
+    notify: (title, body) => tell(body, { title }),
     agents: {
       status: async () => {
         try {

@@ -13,6 +13,7 @@ import { armBox, settlePairs } from '../../../shared/boxAlarm'
 import type { BoxDrawing } from '../lib/positionBox'
 import { lineNow } from '../lib/lineAlarms'
 import { cleanIndicators, emptySync, MAX_TABS, type SyncState } from '../../../shared/sync'
+import { STORE_VERSION, storeShapeOk } from '../../../shared/storeShape'
 import type { FeedStatus } from '../services/marketData'
 import { DEFAULT_INDICATORS } from '../lib/indicatorDefaults'
 
@@ -297,6 +298,8 @@ const storage = fileStorage<unknown>(
   () => window.api.storeGet(),
   (text) => window.api.storeSet(text)
 )
+/** True in a session that saves nothing (the stored data could not be taken in). */
+export const storeStopped = (): boolean => storage.isStopped()
 
 export const useStore = create<State>()(
   persist(
@@ -575,9 +578,11 @@ export const useStore = create<State>()(
     {
       name: 'kandleos',
       // v6: alarms; v7: sync bookkeeping (both filled in by merge, nothing to convert); v8: candles as the forecast view.
-      version: 8,
+      version: STORE_VERSION,
       // v1 had a flat watchlist; keep the user's symbols by splitting them into two folders.
       migrate: (persisted, version) => {
+        // Written by a newer KandleOS (one installed again over it): saving it back as this version would drop its new fields.
+        if (version > STORE_VERSION) throw new Error('newer-store')
         const p = persisted as Record<string, unknown>
         if (version < 2 && Array.isArray(p.watchlist)) {
           const list = p.watchlist as string[]
@@ -618,7 +623,8 @@ export const useStore = create<State>()(
       // Synchronous read lets the store hydrate before the first render (no flash of defaults).
       // Indicators added in later versions are missing from older files; fill them with their defaults.
       merge: (persisted, current) => {
-        // A first start has no file.
+        // A first start has no file. A field of the wrong kind would break the app at every start: refuse the file instead.
+        if (!storeShapeOk(persisted ?? {}, STORE_VERSION)) throw new Error('store-shape')
         const p = (persisted ?? {}) as Partial<State>
         const { backtest, ...view } = (p.forecastView ?? {}) as Partial<ForecastView> & { backtest?: boolean }
         const s = {
@@ -648,7 +654,12 @@ export const useStore = create<State>()(
         if (!err) return
         storage.stop()
         console.error('Store nicht lesbar:', err)
-        window.api.notify(t('Gespeicherte Daten waren beschädigt'), t('Änderungen werden in dieser Sitzung nicht gespeichert.'))
+        const why = (err as Error).message
+        if (why === 'newer-store')
+          window.api.notify(t('Gespeicherte Daten stammen von einer neueren Version'), t('Bitte KandleOS aktualisieren. Änderungen werden in dieser Sitzung nicht gespeichert.'))
+        else if (why === 'store-busy')
+          window.api.notify(t('Gespeicherte Daten gesperrt'), t('Ein anderes Programm hält die Datei fest. Änderungen werden in dieser Sitzung nicht gespeichert; bitte KandleOS neu starten.'))
+        else window.api.notify(t('Gespeicherte Daten waren beschädigt'), t('Änderungen werden in dieser Sitzung nicht gespeichert.'))
       },
       partialize: ({
         symbol,

@@ -41,3 +41,10 @@ test('a save that failed (disk full) is written again by the next save, even of 
   s.setItem('k', { state: { drawings }, version: 8 })
   assert.equal(writes.length, 2)
 })
+
+test('stop() is reported, so the phone leaves its background alarms alone in a session that saves nothing', () => {
+  const s = fileStorage(() => null, () => {})
+  assert.equal(s.isStopped(), false)
+  s.stop()
+  assert.equal(s.isStopped(), true)
+})
