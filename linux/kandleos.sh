@@ -37,7 +37,8 @@ cat >"$HERE/KandleOS.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=KandleOS
-Comment=Technische Chartanalyse
+Comment=Technical chart analysis
+Comment[de]=Technische Chartanalyse
 Exec=bash "$HERE/kandleos.sh"
 Path=$DIR
 Icon=$DIR/resources/icon.svg

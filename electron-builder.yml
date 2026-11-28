@@ -21,7 +21,7 @@ extraResources:
   - from: resources/agents/build-constraints.txt
     to: agents/build-constraints.txt
 # Hardening of the packaged Electron binary: no "run as plain Node", no Node debugging/option injection,
-# app code only from the (integrity-checked) app.asar, encrypted cookies.
+# app code only from app.asar (integrity-checked on Windows; Electron does not check it on Linux), encrypted cookies.
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false
@@ -80,7 +80,7 @@ linux:
   icon: resources/icon.png
   category: Office
   syncDesktopName: true # window <-> launcher icon association (WM_CLASS / Wayland app_id)
-  synopsis: Technische Chartanalyse
+  synopsis: Technical chart analysis
   artifactName: KandleOS-${version}-${arch}.${ext}
 appImage:
   # No --no-sandbox in the menu entry: AppRun itself adds it only where user namespaces are blocked.

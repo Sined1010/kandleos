@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "versionCode": 10000,
   "private": true,
-  "description": "Desktop-App für technische Chartanalyse",
+  "description": "Local chart analysis with an on-device AI forecast",
   "author": "Sined1010 <343844815+Sined1010@users.noreply.github.com>",
   "license": "GPL-3.0-or-later",
   "desktopName": "kandleos.desktop",

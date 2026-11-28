@@ -91,7 +91,8 @@ cat >"$APPS/$ENTRY" <<EOF
 [Desktop Entry]
 Type=Application
 Name=KandleOS
-Comment=Technische Chartanalyse
+Comment=Technical chart analysis
+Comment[de]=Technische Chartanalyse
 Exec="$DEST/kandleos"$FLAG
 Icon=$DEST/icon.svg
 Terminal=false
